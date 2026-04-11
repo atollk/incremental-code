@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 ratatui = "0.30.0"
+ratatui-code-editor = { git = "https://github.com/atollk/ratatui-code-editor/", rev = "d92aedbf962303bf33fd56033e04d0e4f10424a2" }
 ratzilla = "0.3.0"

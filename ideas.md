@@ -1,0 +1,7 @@
+- stages:
+  - 1 instruction = 1 resource1
+  - 1 print with n characters = n resource2
+  - 1 sleep with n seconds = n resource3
+  - break = 1 resource4 + speed reset
+- program goes faster the longer it runs; but slows down by memory usage
+- reboot = prestige
