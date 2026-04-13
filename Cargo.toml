@@ -4,6 +4,29 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+beamterm-core = { version = "1.0.0", optional = true }
+beamterm-renderer = "1.0.0"
 ratatui = "0.30.0"
 ratatui-code-editor = { git = "https://github.com/atollk/ratatui-code-editor/", rev = "d92aedbf962303bf33fd56033e04d0e4f10424a2" }
 ratzilla = "0.3.0"
+tachyonfx = "0.25.0"
+ratbeam = { git = "https://github.com/atollk/ratbeam", branch="main", optional = true }
+crossterm = "0.29.0"
+glutin = { version="0.32" , optional = true}
+winit = { version="0.30" , optional = true}
+glutin-winit = { version="0.5" , optional = true}
+raw-window-handle = { version="0.6" , optional = true}
+glow = { version = "0.17.0", optional = true }
+thiserror = "2.0.18"
+
+[features]
+default = ["beamterm-native"]
+beamterm-native = [
+    "dep:beamterm-core",
+    "dep:ratbeam",
+    'dep:glutin',
+    'dep:winit',
+    'dep:glow',
+    'dep:glutin-winit',
+    'dep:raw-window-handle',
+]
