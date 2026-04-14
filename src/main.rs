@@ -2,17 +2,17 @@
 mod beamterm_native;
 #[cfg(feature = "tui")]
 mod crossterm;
-#[cfg(feature = "web")]
+#[cfg(any(feature = "egui-web", feature = "egui-desktop"))]
 mod egui;
 
 const FEATURE_COUNT: usize =
     cfg!(feature = "opengl") as usize +
         cfg!(feature = "tui")    as usize +
-        cfg!(feature = "web")    as usize;
+        cfg!(feature = "egui-web")    as usize +
+        cfg!(feature = "egui-desktop")    as usize;
 
 const _: () = {
-    assert!(FEATURE_COUNT <= 1, "Only one backend feature may be enabled at a time");
-    assert!(FEATURE_COUNT >= 1, "At least one backend feature must be enabled");
+    assert!(FEATURE_COUNT == 1, "Exactly one feature must be enabled");
 };
 
 fn main() {
@@ -22,6 +22,9 @@ fn main() {
     #[cfg(feature = "tui")]
     crossterm::main().unwrap();
 
-    #[cfg(feature = "web")]
-    egui::main().unwrap();
+    #[cfg(feature = "egui-web")]
+    egui::main_web();
+
+    #[cfg(feature = "egui-desktop")]
+    egui::main_desktop().unwrap();
 }
