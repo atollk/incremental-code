@@ -3,7 +3,7 @@ mod beamterm_native;
 #[cfg(feature = "tui")]
 mod crossterm;
 #[cfg(feature = "web")]
-mod wgpu;
+mod egui;
 
 const FEATURE_COUNT: usize =
     cfg!(feature = "opengl") as usize +
@@ -23,5 +23,5 @@ fn main() {
     crossterm::main().unwrap();
 
     #[cfg(feature = "web")]
-    wgpu::main().unwrap();
+    egui::main().unwrap();
 }
