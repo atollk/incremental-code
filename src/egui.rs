@@ -1,7 +1,8 @@
 #![warn(clippy::all, rust_2018_idioms)]
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use eframe::egui;
+use eframe::{egui, Frame};
+use egui::Context;
 use egui_ratatui::RataguiBackend;
 use ratatui::Terminal;
 use ratatui::prelude::Stylize;
@@ -25,7 +26,7 @@ impl Default for TemplateApp {
 
 impl TemplateApp {
     /// Called once before the first frame.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         Default::default()
@@ -34,17 +35,14 @@ impl TemplateApp {
 
 impl eframe::App for TemplateApp {
     /// Called by the framework to save state before shutdown.
-    fn save(&mut self, storage: &mut dyn eframe::Storage) {}
+    fn save(&mut self, _storage: &mut dyn eframe::Storage) {}
 
     /// Called each time the UI needs repainting, which may be many times per second.
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        // Put your widgets into a `SidePanel`, `TopBottomPanel`, `CentralPanel`, `Window` or `Area`.
-        // For inspiration and more examples, go to https://emilk.github.io/egui
         ui.label("this is a label");
 
         self.terminal
             .draw(|frame| {
-
                 let area = frame.area();
                 let textik = format!("Hello eframe! The window area is {}", area);
                 frame.render_widget(
@@ -57,14 +55,19 @@ impl eframe::App for TemplateApp {
                 );
             })
             .expect("epic fail");
+
         egui::CentralPanel::default().show_inside(ui, |ui| {
-            // ui.add(self.terminal.backend_mut());
+            ui.add(self.terminal.backend_mut()); // <-- uncomment this
         });
+    }
+
+    fn update(&mut self, ctx: &Context, frame: &mut Frame) {
+        
     }
 }
 
 fn make_terminal() -> Terminal<RataguiBackend<EmbeddedGraphics>> {
-    let options = eframe::NativeOptions {
+    let _options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
         ..Default::default()
     };
@@ -80,8 +83,7 @@ fn make_terminal() -> Terminal<RataguiBackend<EmbeddedGraphics>> {
         Some(font_italic),
     );
     let backend = RataguiBackend::new("soft_rat", soft_backend);
-    //backend.set_font_size(12);
-    let mut terminal = Terminal::new(backend).unwrap();
+    let terminal = Terminal::new(backend).unwrap();
     terminal
 }
 
