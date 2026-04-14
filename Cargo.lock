@@ -204,26 +204,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "beamterm-renderer"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8db76d04d575a0534ad5dba63acc05ccbe69597f977f11c59a612cbea199112"
-dependencies = [
- "beamterm-core",
- "beamterm-data 1.0.0",
- "bitflags 2.11.0",
- "compact_str",
- "console_error_panic_hook",
- "glow",
- "js-sys",
- "thiserror 2.0.18",
- "unicode-width",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "beamterm-unicode"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1233,7 +1213,7 @@ name = "incremental-code"
 version = "0.1.0"
 dependencies = [
  "beamterm-core",
- "beamterm-renderer 1.0.0",
+ "beamterm-renderer",
  "crossterm",
  "glow",
  "glutin",
@@ -1244,8 +1224,9 @@ dependencies = [
  "ratzilla",
  "raw-window-handle",
  "tachyonfx",
- "thiserror 2.0.18",
  "tree-sitter",
+ "wasm-bindgen",
+ "web-sys",
  "winit",
 ]
 
@@ -2421,7 +2402,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cfc729362a3a8714b512f330c8dfaa03979813e9491e21b8e49b81e1e5d78014"
 dependencies = [
- "beamterm-renderer 0.10.0",
+ "beamterm-renderer",
  "bitvec",
  "compact_str",
  "console_error_panic_hook",
