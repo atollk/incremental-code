@@ -8,17 +8,24 @@ ratatui = { version = "0.30.0", default-features = false }
 ratzilla = { version = "0.3.0", optional = true }
 #ratatui-code-editor = { git = "https://github.com/atollk/ratatui-code-editor/", rev="96800ce1496547f35c1721d24e8c44067b9da0bb", default-features = false }
 tachyonfx = "0.25.0"
-beamterm-renderer = { version = "~0.10.0", optional = true }
 beamterm-core = { version = "^1.0", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
-web-sys = { version = "0.3", features = ["EventTarget"], optional = true }
+web-sys = { version = "0.3", features = ["EventTarget", "Worker", "WorkerOptions", "WorkerType", "MessageEvent", "HtmlCanvasElement"], optional = true }
 ratbeam = { git = "https://github.com/atollk/ratbeam", branch="main", optional = true }
 crossterm = { version = "0.29.0", optional = true }
 glutin = { version="0.32" , optional = true}
 winit = { version="0.30" , optional = true}
+winit-web = { version="0.31.0-beta.2" , optional = true}
 glutin-winit = { version="0.5" , optional = true}
 raw-window-handle = { version="0.6" , optional = true}
 glow = { version = "0.17.0", optional = true }
+ratatui-wgpu = { version = "0.5.0", features = ["web"] , optional = true}
+anyhow = "1.0.102"
+console_error_panic_hook = "0.1.7"
+log = "0.4.29"
+wasm-bindgen-futures = { version = "0.4.65", optional = true }
+wgpu = { version = "28.0.0" , optional = true}
+console_log = { version = "1.0.0", optional = true }
 #tree-sitter = { version = "0.26.8", default-features = false, features = ["std"] }
 
 [package.metadata.bin]
@@ -40,10 +47,14 @@ opengl = [
     'dep:raw-window-handle',
 ]
 web = [
-    "dep:beamterm-renderer",
     "dep:wasm-bindgen",
     "dep:web-sys",
-    "dep:ratzilla",
+    "dep:ratatui-wgpu",
+    "dep:wgpu",
+    "dep:wasm-bindgen-futures",
+    'dep:winit',
+    'dep:winit-web',
+    "dep:console_log",
 #    "tree-sitter/wasm"
 ]
 
