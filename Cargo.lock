@@ -1256,8 +1256,8 @@ dependencies = [
 
 [[package]]
 name = "egui_ratatui"
-version = "2.1.1"
-source = "git+https://github.com/atollk/egui_ratatui?branch=update#f7a5dfef06b9552d72cf0edba51ffbd60d20f1fb"
+version = "2.2.0"
+source = "git+https://github.com/atollk/egui_ratatui?rev=aaa4821#aaa48212ca060e18af4ad1d21921b3eb3c36a939"
 dependencies = [
  "egui",
  "ratatui-core",

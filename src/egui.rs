@@ -61,16 +61,16 @@ impl eframe::App for TemplateApp {
         });
     }
 
-    fn update(&mut self, ctx: &Context, frame: &mut Frame) {
+    fn update(&mut self, _ctx: &Context, _frame: &mut Frame) {
         
     }
 }
 
 fn make_terminal() -> Terminal<RataguiBackend<EmbeddedGraphics>> {
-    let _options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
-        ..Default::default()
-    };
+    // let _options = eframe::NativeOptions {
+    //     viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
+    //     ..Default::default()
+    // };
 
     let font_regular = mono_8x13_atlas();
     let font_italic = mono_8x13_italic_atlas();
@@ -86,8 +86,6 @@ fn make_terminal() -> Terminal<RataguiBackend<EmbeddedGraphics>> {
     let terminal = Terminal::new(backend).unwrap();
     terminal
 }
-
-fn draw_terminal() {}
 
 // When compiling natively:
 #[cfg(feature = "egui-desktop")]

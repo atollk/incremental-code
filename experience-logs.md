@@ -1,0 +1,8 @@
+- started building a TUI app
+- a game, so it would be nice to also publish in web and desktop native w/o terminal
+- ratatui obvious choice
+- ratatui recommends ratzilla; ratzilla recommends beamterm
+- dependency hell -> every change is breaking and every create depends on another one
+  - idea: specify dependencies as "internal" and "external" ?
+- i create PRs in several repos to update the version but many have not seen updates in months and none of the PRs receive answers
+- i end up using my own forks for my dependencies for like a third of the crates
