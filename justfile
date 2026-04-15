@@ -1,3 +1,6 @@
+[parallel]
+build-all: build-tui build-opengl build-egui-desktop build-egui-web
+
 build-tui:
     cargo build --features tui
 

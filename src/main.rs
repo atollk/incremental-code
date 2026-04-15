@@ -4,6 +4,8 @@ mod beamterm_native;
 mod crossterm;
 #[cfg(any(feature = "egui-web", feature = "egui-desktop"))]
 mod egui;
+mod backend;
+pub mod app;
 
 const FEATURE_COUNT: usize =
     cfg!(feature = "opengl") as usize +

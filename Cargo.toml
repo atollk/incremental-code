@@ -6,11 +6,12 @@ edition = "2024"
 [dependencies]
 # general dependencies
 ratatui = { version = "0.30.0", default-features = false }
-#ratatui-code-editor = { git = "https://github.com/atollk/ratatui-code-editor/", rev="96800ce1496547f35c1721d24e8c44067b9da0bb", default-features = false }
+ratatui-core = { version = "0.1.0" }
+ratatui-code-editor = { git = "https://github.com/atollk/ratatui-code-editor/", rev = "96800ce1496547f35c1721d24e8c44067b9da0bb", default-features = false }
 tachyonfx = "0.25.0"
 log = "0.4.29"
 serde = { version = "1.0.228", features = ["derive"] }
-#tree-sitter = { version = "0.26.8", default-features = false, features = ["std"] }
+tree-sitter = { version = "0.26.8", default-features = false, features = ["std"] }
 
 # tui dependencies
 crossterm = { version = "0.29.0", optional = true }
@@ -37,15 +38,18 @@ wasm-bindgen-futures = { version = "0.4.50", optional = true }
 
 # egui-desktop dependencies
 env_logger = { version = "0.11.8", optional = true }
+anyhow = "1.0.102"
+once_cell = "1.21.4"
 
 [package.metadata.bin]
 trunk = { version = "0.21.14" }
 
 [features]
+default=["opengl"]
 tui = [
     "dep:crossterm",
     "ratatui/crossterm",
-    #    "ratatui-code-editor/crossterm",
+    "ratatui-code-editor/crossterm",
 ]
 opengl = [
     "dep:beamterm-core",
