@@ -2,8 +2,6 @@ use crate::backend::backend::{BackendSuite, TerminalApp};
 use ratatui::backend::CrosstermBackend;
 use std::io::Stdout;
 use std::sync::{LazyLock, Mutex};
-use glow::BACK;
-use crate::backend::beamterm_native::BeamtermCoreBackendSuite;
 
 pub type BackendType = CrosstermBackend<Stdout>;
 

@@ -18,8 +18,6 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::sync::{LazyLock, Mutex};
 use tachyonfx::Interpolation::*;
-use winit::event::ElementState;
-use winit::keyboard::{Key, NamedKey};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,

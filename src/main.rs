@@ -42,9 +42,9 @@ impl TerminalApp<backend::BackendType> for TApp {
     }
 
     fn frame(&mut self) -> anyhow::Result<()> {
-        let mut terminal = self.terminal.as_mut().unwrap();
+        let terminal = self.terminal.as_mut().unwrap();
         let app_state = &self.app_state;
-        terminal.draw(|frame| frame.render_widget(app_state, frame.area()))?;
+        terminal.draw(|frame: &mut ratatui::Frame| frame.render_widget(app_state, frame.area()))?;
         if self.app_state.exit {
             return Err(anyhow::anyhow!("exit"));
         }

@@ -1,21 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::io::Stdout;
 use crate::backend::backend::{BackendSuite, TerminalApp};
-use eframe::{AppCreator, CreationContext, Frame, egui};
-use egui::Context;
+use eframe::{egui, AppCreator, CreationContext, Frame};
 use egui_ratatui::RataguiBackend;
-use ratatui::Terminal;
-use ratatui::prelude::Stylize;
-use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use soft_ratatui::embedded_graphics_unicodefonts::{
     mono_8x13_atlas, mono_8x13_bold_atlas, mono_8x13_italic_atlas,
 };
 use soft_ratatui::{EmbeddedGraphics, SoftBackend};
-use std::rc::Rc;
 use std::sync::{LazyLock, Mutex};
-use ratatui::backend::CrosstermBackend;
-use crate::backend::crossterm::CrosstermBackendSuite;
 
 pub type BackendType = RataguiBackend<EmbeddedGraphics>;
 
@@ -51,10 +43,10 @@ impl BackendSuite<BackendType> for EguiDesktopBackendSuite {
                 .with_min_inner_size([300.0, 220.0]),
             ..Default::default()
         };
-        let app_creator = Box::new(|cc| {
-            let handler = EguiDesktopApplicationHandler::new(cc, self, terminal_app);
-            let backend =self.make_backend();
+        let backend = self.make_backend();
+        let app_creator: AppCreator = Box::new(|cc| {
             terminal_app.init(backend).unwrap();
+            let handler = EguiDesktopApplicationHandler::new(cc, self, terminal_app);
             Ok(Box::new(handler))
         });
         eframe::run_native("eframe template", native_options, app_creator)?;
