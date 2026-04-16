@@ -52,11 +52,11 @@ impl TerminalApp<backend::BackendType> for TApp {
     }
 
     fn backend(&self) -> &backend::BackendType {
-        todo!()
+        self.terminal.as_ref().unwrap().backend()
     }
 
-    fn backend_mut(&self) -> &mut backend::BackendType {
-        todo!()
+    fn backend_mut(&mut self) -> &mut backend::BackendType {
+        self.terminal.as_mut().unwrap().backend_mut()
     }
 }
 

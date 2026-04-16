@@ -83,6 +83,5 @@ impl<A: TerminalApp<BackendType>> eframe::App
     }
 
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
-        todo!()
     }
 }
