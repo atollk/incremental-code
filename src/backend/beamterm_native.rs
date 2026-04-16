@@ -1,5 +1,7 @@
-use crate::backend::backend::BackendSuite;
-use beamterm_core::{FontAtlasData, GlState, GlslVersion, StaticFontAtlas, TerminalGrid};
+use crate::backend::backend::{BackendSuite, TerminalApp};
+use beamterm_core::{
+    Drawable, FontAtlasData, GlState, GlslVersion, RenderContext, StaticFontAtlas, TerminalGrid,
+};
 use glutin::surface::GlSurface;
 use glutin::{
     config::{ConfigTemplateBuilder, GlConfig},
@@ -16,6 +18,8 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::sync::{LazyLock, Mutex};
 use tachyonfx::Interpolation::*;
+use winit::event::ElementState;
+use winit::keyboard::{Key, NamedKey};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -27,66 +31,134 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
+pub static BACKEND_INSTANCE: LazyLock<Mutex<BeamtermCoreBackendSuite>> =
+    LazyLock::new(|| Mutex::new(BeamtermCoreBackendSuite {}));
+
+pub type BackendType = BeamtermBackend;
+
 pub struct BeamtermCoreBackendSuite {}
 
 impl BeamtermCoreBackendSuite {
-    fn get_backend(event_loop: &ActiveEventLoop) -> BeamtermBackend {
+    fn get_window_state(event_loop: &ActiveEventLoop) -> WindowState {
         let builder = GlWindowBuilder::new(event_loop, "ratbeam demo", (1280, 800));
-        let physical_size = builder.physical_size();
-        let pixel_ratio = builder.pixel_ratio();
         let (win, gl_raw) = builder.build();
         let gl = Rc::new(gl_raw);
         let gl_state = GlState::new(&gl);
-
-        let atlas_data = FontAtlasData::default();
-        let atlas = StaticFontAtlas::load(&gl, atlas_data).expect("failed to load font atlas");
-
-        let grid = TerminalGrid::new(
-            &gl,
-            atlas.into(),
-            physical_size,
-            pixel_ratio,
-            &GlslVersion::Gl330,
-        )
-        .expect("failed to create terminal grid");
-
-        let backend = BeamtermBackend::new(grid, gl.clone());
-        backend
+        WindowState { win, gl, gl_state }
     }
 }
 
-impl BackendSuite<BeamtermBackend> for BeamtermCoreBackendSuite {
-    fn run(&mut self, runner: impl FnMut(BeamtermBackend)) -> anyhow::Result<()> {
+impl BackendSuite<BackendType> for BeamtermCoreBackendSuite {
+    fn run(&mut self, terminal_app: impl TerminalApp<BackendType>) -> anyhow::Result<()> {
         let event_loop = EventLoop::new().expect("failed to create event loop");
         let mut app = BeamtermCoreApplicationHandler {
-            backend: self,
-            runner,
+            backend_suite: self,
+            terminal_app,
+            window_state: None,
         };
         event_loop.run_app(&mut app)?;
         Ok(())
     }
 }
 
-pub static BACKEND_INSTANCE: LazyLock<Mutex<BeamtermCoreBackendSuite>> =
-    LazyLock::new(|| Mutex::new(BeamtermCoreBackendSuite {}));
-
-struct BeamtermCoreApplicationHandler<'a, F: FnMut(BeamtermBackend)> {
-    backend: &'a mut BeamtermCoreBackendSuite,
-    runner: F,
+struct BeamtermCoreApplicationHandler<'a, A: TerminalApp<BackendType>> {
+    backend_suite: &'a mut BeamtermCoreBackendSuite,
+    terminal_app: A,
+    window_state: Option<WindowState>,
 }
 
-impl<F: FnMut(BeamtermBackend)> ApplicationHandler for BeamtermCoreApplicationHandler<'_, F> {
+struct WindowState {
+    win: GlWindow,
+    gl: Rc<glow::Context>,
+    gl_state: GlState,
+}
+
+impl WindowState {
+    fn create_backend(&self) -> BackendType {
+        let physical_size = self.win.window.inner_size();
+        let pixel_ratio = self.win.window.scale_factor();
+        let atlas_data = FontAtlasData::default();
+        let atlas = StaticFontAtlas::load(&self.gl, atlas_data).expect("failed to load font atlas");
+        let grid = TerminalGrid::new(
+            &self.gl,
+            atlas.into(),
+            physical_size.into(),
+            pixel_ratio as f32,
+            &GlslVersion::Gl330,
+        )
+        .expect("failed to create terminal grid");
+        BackendType::new(grid, self.gl.clone())
+    }
+}
+
+impl<A: TerminalApp<BackendType>> ApplicationHandler for BeamtermCoreApplicationHandler<'_, A> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        (self.runner)(BeamtermCoreBackendSuite::get_backend(event_loop));
+        let window_state = BeamtermCoreBackendSuite::get_window_state(event_loop);
+        self.window_state = Some(window_state);
+        let backend = self.window_state.as_ref().unwrap().create_backend();
+        self.terminal_app.init(backend).unwrap();
     }
 
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
-        window_id: WindowId,
+        _window_id: WindowId,
         event: WindowEvent,
     ) {
-        todo!()
+        let Some(state) = self.window_state.as_mut() else {
+            return;
+        };
+
+        match event {
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                todo!()
+            }
+            WindowEvent::Resized(new_size) => {
+                if new_size.width > 0 && new_size.height > 0 {
+                    state.win.resize_surface(new_size);
+                    let _ = self.terminal_app.backend_mut().grid_mut().resize(
+                        &state.gl,
+                        (new_size.width as i32, new_size.height as i32),
+                        state.win.pixel_ratio(),
+                    );
+                    state.win.window.request_redraw();
+                }
+            }
+            WindowEvent::RedrawRequested => {
+                self.terminal_app.frame().expect("failed to draw");
+
+                // GL render
+                let (w, h) = self.terminal_app.backend().grid().canvas_size();
+                state.gl_state.viewport(&state.gl, 0, 0, w, h);
+                state.gl_state.clear_color(&state.gl, 0.0, 0.0, 0.0, 1.0);
+
+                unsafe {
+                    use glow::HasContext;
+                    state.gl.clear(glow::COLOR_BUFFER_BIT);
+                }
+
+                let mut ctx = RenderContext {
+                    gl: &state.gl,
+                    state: &mut state.gl_state,
+                };
+                let grid = self.terminal_app.backend().grid();
+                grid.prepare(&mut ctx).expect("failed to prepare grid");
+                grid.draw(&mut ctx);
+                grid.cleanup(&mut ctx);
+
+                state.win.swap_buffers();
+            }
+            _ => {}
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        if let Some(state) = self.window_state.as_ref() {
+            state.win.window.request_redraw();
+        }
     }
 }
 

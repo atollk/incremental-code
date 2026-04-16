@@ -1,32 +1,89 @@
-#[cfg(feature = "opengl")]
-mod beamterm_native;
-#[cfg(feature = "tui")]
-mod crossterm;
-#[cfg(any(feature = "egui-web", feature = "egui-desktop"))]
-mod egui;
 mod backend;
-pub mod app;
 
-const FEATURE_COUNT: usize =
-    cfg!(feature = "opengl") as usize +
-        cfg!(feature = "tui")    as usize +
-        cfg!(feature = "egui-web")    as usize +
-        cfg!(feature = "egui-desktop")    as usize;
+use crate::backend::backend::{BackendSuite, TerminalApp};
+use ratatui::widgets::{Block, Paragraph};
+use ratatui_core::buffer::Buffer;
+use ratatui_core::layout::Rect;
+use ratatui_core::style::Stylize;
+use ratatui_core::symbols::border;
+use ratatui_core::text::{Line, Text};
+use ratatui_core::widgets::Widget;
 
-const _: () = {
-    assert!(FEATURE_COUNT == 1, "Exactly one feature must be enabled");
-};
+pub fn main() {
+    let tapp = TApp {
+        terminal: None,
+        app_state: AppState {
+            counter: 0,
+            exit: false,
+        },
+    };
+    backend::BACKEND_INSTANCE
+        .lock()
+        .unwrap()
+        .run(tapp)
+        .unwrap();
+}
 
-fn main() {
-    #[cfg(feature = "opengl")]
-    beamterm_native::main().unwrap();
+struct AppState {
+    counter: i32,
+    exit: bool,
+}
 
-    #[cfg(feature = "tui")]
-    crossterm::main().unwrap();
+struct TApp {
+    terminal: Option<ratatui::Terminal<backend::BackendType>>,
+    app_state: AppState,
+}
 
-    #[cfg(feature = "egui-web")]
-    egui::main_web();
+impl TerminalApp<backend::BackendType> for TApp {
+    fn init(&mut self, backend: backend::BackendType) -> anyhow::Result<()> {
+        let terminal = ratatui::Terminal::new(backend).unwrap();
+        self.terminal = Some(terminal);
+        Ok(())
+    }
 
-    #[cfg(feature = "egui-desktop")]
-    egui::main_desktop().unwrap();
+    fn frame(&mut self) -> anyhow::Result<()> {
+        let mut terminal = self.terminal.as_mut().unwrap();
+        let app_state = &self.app_state;
+        terminal.draw(|frame| frame.render_widget(app_state, frame.area()))?;
+        if self.app_state.exit {
+            return Err(anyhow::anyhow!("exit"));
+        }
+        Ok(())
+    }
+
+    fn backend(&self) -> &backend::BackendType {
+        todo!()
+    }
+
+    fn backend_mut(&self) -> &mut backend::BackendType {
+        todo!()
+    }
+}
+
+impl Widget for &AppState {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let title = Line::from(" Counter App Tutorial ".bold());
+        let instructions = Line::from(vec![
+            " Decrement ".into(),
+            "<Left>".blue().bold(),
+            " Increment ".into(),
+            "<Right>".blue().bold(),
+            " Quit ".into(),
+            "<Q> ".blue().bold(),
+        ]);
+        let block = Block::bordered()
+            .title(title.centered())
+            .title_bottom(instructions.centered())
+            .border_set(border::THICK);
+
+        let counter_text = Text::from(vec![Line::from(vec![
+            "Value: ".into(),
+            self.counter.to_string().yellow(),
+        ])]);
+
+        Paragraph::new(counter_text)
+            .centered()
+            .block(block)
+            .render(area, buf);
+    }
 }

@@ -1,18 +1,24 @@
-use crate::backend::backend::BackendSuite;
+use crate::backend::backend::{BackendSuite, TerminalApp};
 use ratatui::backend::CrosstermBackend;
 use std::io::Stdout;
-use std::sync::LazyLock;
+use std::sync::{LazyLock, Mutex};
+use glow::BACK;
+use crate::backend::beamterm_native::BeamtermCoreBackendSuite;
+
+pub type BackendType = CrosstermBackend<Stdout>;
+
+pub static BACKEND_INSTANCE: LazyLock<Mutex<CrosstermBackendSuite>> =
+    LazyLock::new(|| Mutex::new(CrosstermBackendSuite {}));
 
 #[derive(Default)]
 pub struct CrosstermBackendSuite {}
 
-impl BackendSuite<CrosstermBackend<Stdout>> for CrosstermBackendSuite {
-    fn run(&mut self, mut runner: impl FnMut(CrosstermBackend<Stdout>)) -> anyhow::Result<()> {
-        let backend = CrosstermBackend::new(std::io::stdout());
-        runner(backend);
-        Ok(())
+impl BackendSuite<BackendType> for CrosstermBackendSuite {
+    fn run(&mut self, mut app: impl TerminalApp<BackendType>) -> anyhow::Result<()> {
+        let backend = BackendType::new(std::io::stdout());
+        app.init(backend)?;
+        loop {
+            app.frame()?;
+        }
     }
 }
-
-pub static BACKEND_INSTANCE: LazyLock<CrosstermBackendSuite> =
-    LazyLock::new(|| CrosstermBackendSuite {});

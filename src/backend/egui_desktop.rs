@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use crate::backend::backend::BackendSuite;
+use std::io::Stdout;
+use crate::backend::backend::{BackendSuite, TerminalApp};
 use eframe::{AppCreator, CreationContext, Frame, egui};
 use egui::Context;
 use egui_ratatui::RataguiBackend;
@@ -12,11 +13,19 @@ use soft_ratatui::embedded_graphics_unicodefonts::{
 };
 use soft_ratatui::{EmbeddedGraphics, SoftBackend};
 use std::rc::Rc;
+use std::sync::{LazyLock, Mutex};
+use ratatui::backend::CrosstermBackend;
+use crate::backend::crossterm::CrosstermBackendSuite;
+
+pub type BackendType = RataguiBackend<EmbeddedGraphics>;
+
+pub static BACKEND_INSTANCE: LazyLock<Mutex<EguiDesktopBackendSuite>> =
+    LazyLock::new(|| Mutex::new(EguiDesktopBackendSuite {}));
 
 pub struct EguiDesktopBackendSuite {}
 
 impl EguiDesktopBackendSuite {
-    fn make_backend(&self) -> RataguiBackend<EmbeddedGraphics> {
+    fn make_backend(&self) -> BackendType {
         let font_regular = mono_8x13_atlas();
         let font_italic = mono_8x13_italic_atlas();
         let font_bold = mono_8x13_bold_atlas();
@@ -27,13 +36,13 @@ impl EguiDesktopBackendSuite {
             Some(font_bold),
             Some(font_italic),
         );
-        let backend = RataguiBackend::new("soft_rat", soft_backend);
+        let backend = BackendType::new("soft_rat", soft_backend);
         backend
     }
 }
 
-impl BackendSuite<RataguiBackend<EmbeddedGraphics>> for EguiDesktopBackendSuite {
-    fn run(&mut self, runner: impl FnMut(RataguiBackend<EmbeddedGraphics>)) -> anyhow::Result<()> {
+impl BackendSuite<BackendType> for EguiDesktopBackendSuite {
+    fn run(&mut self, mut terminal_app: impl TerminalApp<BackendType>) -> anyhow::Result<()> {
         env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
         let native_options = eframe::NativeOptions {
@@ -43,65 +52,45 @@ impl BackendSuite<RataguiBackend<EmbeddedGraphics>> for EguiDesktopBackendSuite 
             ..Default::default()
         };
         let app_creator = Box::new(|cc| {
-            Ok(Box::new(EguiDesktopApplicationHandler::new(
-                cc, self, runner,
-            )))
+            let handler = EguiDesktopApplicationHandler::new(cc, self, terminal_app);
+            let backend =self.make_backend();
+            terminal_app.init(backend).unwrap();
+            Ok(Box::new(handler))
         });
         eframe::run_native("eframe template", native_options, app_creator)?;
         Ok(())
     }
 }
 
-pub struct EguiDesktopApplicationHandler<'a, F: FnMut(RataguiBackend<EmbeddedGraphics>)> {
+pub struct EguiDesktopApplicationHandler<'a, A: TerminalApp<BackendType>> {
     backend_suite: &'a EguiDesktopBackendSuite,
-    runner: F,
+    terminal_app: A,
 }
 
-impl<'a> EguiDesktopApplicationHandler<'a> {
+impl<'a, A: TerminalApp<BackendType>> EguiDesktopApplicationHandler<'a, A> {
     /// Called once before the first frame.
     pub fn new(
         _cc: &CreationContext<'_>,
         backend_suite: &'a EguiDesktopBackendSuite,
-        runner: impl FnMut(RataguiBackend<EmbeddedGraphics>),
+        terminal_app: A,
     ) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         EguiDesktopApplicationHandler {
             backend_suite,
-            runner,
+            terminal_app,
         }
     }
 }
 
-impl<F: FnMut(RataguiBackend<EmbeddedGraphics>)> eframe::App for EguiDesktopApplicationHandler<'_, F> {
-    /// Called by the framework to save state before shutdown.
+impl<A: TerminalApp<BackendType>> eframe::App
+    for EguiDesktopApplicationHandler<'_, A>
+{
+    fn ui(&mut self, _ui: &mut egui::Ui, _frame: &mut Frame) {
+        self.terminal_app.frame().unwrap();
+    }
+
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {
         todo!()
     }
-
-    /// Called each time the UI needs repainting, which may be many times per second.
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        ui.label("this is a label");
-
-        self.terminal
-            .draw(|frame| {
-                let area = frame.area();
-                let textik = format!("Hello eframe! The window area is {}", area);
-                frame.render_widget(
-                    Paragraph::new(textik)
-                        .block(Block::new().title("Ratatui").borders(Borders::ALL))
-                        .white()
-                        .on_blue()
-                        .wrap(Wrap { trim: false }),
-                    area,
-                );
-            })
-            .expect("epic fail");
-
-        egui::CentralPanel::default().show_inside(ui, |ui| {
-            ui.add(self.terminal.backend_mut()); // <-- uncomment this
-        });
-    }
-
-    fn update(&mut self, _ctx: &Context, _frame: &mut Frame) {}
 }
