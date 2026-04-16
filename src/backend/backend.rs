@@ -1,11 +1,13 @@
 
 pub trait BackendSuite<B: ratatui::backend::Backend> {
-    fn run(&mut self, app: impl TerminalApp<B>) -> anyhow::Result<()>;
+    fn run(&mut self, app: impl TerminalApp<B> + 'static) -> anyhow::Result<()>;
 }
 
 pub trait TerminalApp<B: ratatui::backend::Backend> {
     fn init(&mut self, backend: B) -> anyhow::Result<()>;
     fn frame(&mut self) -> anyhow::Result<()>;
+    #[allow(dead_code)]
     fn backend(&self) -> &B;
+    #[allow(dead_code)]
     fn backend_mut(&mut self) -> &mut B;
 }

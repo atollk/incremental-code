@@ -14,7 +14,7 @@ pub static BACKEND_INSTANCE: LazyLock<Mutex<CrosstermBackendSuite>> =
 pub struct CrosstermBackendSuite {}
 
 impl BackendSuite<BackendType> for CrosstermBackendSuite {
-    fn run(&mut self, mut app: impl TerminalApp<BackendType>) -> anyhow::Result<()> {
+    fn run(&mut self, mut app: impl TerminalApp<BackendType> + 'static) -> anyhow::Result<()> {
         let backend = BackendType::new(std::io::stdout());
         enable_raw_mode()?;
         execute!(stdout(), EnterAlternateScreen)?;

@@ -46,7 +46,7 @@ impl BackendSuite<BackendType> for EguiDesktopBackendSuite {
         let backend = self.make_backend();
         let app_creator: AppCreator = Box::new(|cc| {
             terminal_app.init(backend).unwrap();
-            let handler = EguiDesktopApplicationHandler::new(cc, self, terminal_app);
+            let handler = EguiDesktopApplicationHandler::new(cc, terminal_app);
             Ok(Box::new(handler))
         });
         eframe::run_native("eframe template", native_options, app_creator)?;
@@ -54,32 +54,32 @@ impl BackendSuite<BackendType> for EguiDesktopBackendSuite {
     }
 }
 
-pub struct EguiDesktopApplicationHandler<'a, A: TerminalApp<BackendType>> {
-    backend_suite: &'a EguiDesktopBackendSuite,
+pub struct EguiDesktopApplicationHandler<A: TerminalApp<BackendType>> {
     terminal_app: A,
 }
 
-impl<'a, A: TerminalApp<BackendType>> EguiDesktopApplicationHandler<'a, A> {
+impl<'a, A: TerminalApp<BackendType>> EguiDesktopApplicationHandler<A> {
     /// Called once before the first frame.
     pub fn new(
         _cc: &CreationContext<'_>,
-        backend_suite: &'a EguiDesktopBackendSuite,
         terminal_app: A,
     ) -> Self {
         // This is also where you can customize the look and feel of egui using
         // `cc.egui_ctx.set_visuals` and `cc.egui_ctx.set_fonts`.
         EguiDesktopApplicationHandler {
-            backend_suite,
             terminal_app,
         }
     }
 }
 
 impl<A: TerminalApp<BackendType>> eframe::App
-    for EguiDesktopApplicationHandler<'_, A>
+    for EguiDesktopApplicationHandler<A>
 {
-    fn ui(&mut self, _ui: &mut egui::Ui, _frame: &mut Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut Frame) {
         self.terminal_app.frame().unwrap();
+        egui::CentralPanel::default().show_inside(ui, |ui| {
+            ui.add(self.terminal_app.backend_mut());
+        });
     }
 
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {

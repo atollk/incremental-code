@@ -33,7 +33,7 @@ soft_ratatui = { version = "0.2", optional = true, features = ["unicodefonts"] }
 
 # egui-web dependencies
 wasm-bindgen = { version = "0.2", optional = true }
-web-sys = { version = "0.3", features = ["EventTarget", "Worker", "WorkerOptions", "WorkerType", "MessageEvent", "HtmlCanvasElement"], optional = true }
+web-sys = { version = "0.3", features = ["EventTarget", "Worker", "WorkerOptions", "WorkerType", "MessageEvent", "HtmlCanvasElement", "Window", "Document"], optional = true }
 wasm-bindgen-futures = { version = "0.4.50", optional = true }
 
 # egui-desktop dependencies

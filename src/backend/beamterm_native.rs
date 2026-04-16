@@ -17,7 +17,6 @@ use raw_window_handle::HasWindowHandle;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::sync::{LazyLock, Mutex};
-use tachyonfx::Interpolation::*;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -50,7 +49,6 @@ impl BackendSuite<BackendType> for BeamtermCoreBackendSuite {
     fn run(&mut self, terminal_app: impl TerminalApp<BackendType>) -> anyhow::Result<()> {
         let event_loop = EventLoop::new().expect("failed to create event loop");
         let mut app = BeamtermCoreApplicationHandler {
-            backend_suite: self,
             terminal_app,
             window_state: None,
         };
@@ -59,8 +57,7 @@ impl BackendSuite<BackendType> for BeamtermCoreBackendSuite {
     }
 }
 
-struct BeamtermCoreApplicationHandler<'a, A: TerminalApp<BackendType>> {
-    backend_suite: &'a mut BeamtermCoreBackendSuite,
+struct BeamtermCoreApplicationHandler<A: TerminalApp<BackendType>> {
     terminal_app: A,
     window_state: Option<WindowState>,
 }
@@ -89,7 +86,7 @@ impl WindowState {
     }
 }
 
-impl<A: TerminalApp<BackendType>> ApplicationHandler for BeamtermCoreApplicationHandler<'_, A> {
+impl<A: TerminalApp<BackendType>> ApplicationHandler for BeamtermCoreApplicationHandler<A> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_state = BeamtermCoreBackendSuite::get_window_state(event_loop);
         self.window_state = Some(window_state);
@@ -254,15 +251,6 @@ impl GlWindowBuilder {
             gl_surface: self.gl_surface,
         };
         (win, self.gl)
-    }
-
-    fn physical_size(&self) -> (i32, i32) {
-        let s = self.window.inner_size();
-        (s.width as i32, s.height as i32)
-    }
-
-    fn pixel_ratio(&self) -> f32 {
-        self.window.scale_factor() as f32
     }
 }
 

@@ -24,3 +24,8 @@ pub use beamterm_native::{BackendType, BACKEND_INSTANCE};
 mod egui_desktop;
 #[cfg(feature = "egui-desktop")]
 pub use egui_desktop::{BackendType, BACKEND_INSTANCE};
+
+#[cfg(feature = "egui-web")]
+mod egui_web;
+#[cfg(feature = "egui-web")]
+pub use egui_web::{BackendType, BACKEND_INSTANCE};
