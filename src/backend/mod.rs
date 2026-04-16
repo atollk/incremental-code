@@ -11,3 +11,9 @@ mod beamterm_native;
 
 #[cfg(feature = "opengl")]
 pub use beamterm_native::BACKEND_INSTANCE;
+
+#[cfg(feature = "egui-desktop")]
+mod egui_desktop;
+
+#[cfg(feature = "egui-desktop")]
+pub use egui_desktop::BACKEND_INSTANCE;

@@ -1,4 +1,4 @@
-use crate::backend::backend::IntegrationBackend;
+use crate::backend::backend::BackendSuite;
 use beamterm_core::{FontAtlasData, GlState, GlslVersion, StaticFontAtlas, TerminalGrid};
 use glutin::surface::GlSurface;
 use glutin::{
@@ -27,9 +27,9 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-pub struct BeamtermCoreIntegrationBackend {}
+pub struct BeamtermCoreBackendSuite {}
 
-impl BeamtermCoreIntegrationBackend {
+impl BeamtermCoreBackendSuite {
     fn get_backend(event_loop: &ActiveEventLoop) -> BeamtermBackend {
         let builder = GlWindowBuilder::new(event_loop, "ratbeam demo", (1280, 800));
         let physical_size = builder.physical_size();
@@ -55,11 +55,11 @@ impl BeamtermCoreIntegrationBackend {
     }
 }
 
-impl IntegrationBackend<BeamtermBackend> for BeamtermCoreIntegrationBackend {
+impl BackendSuite<BeamtermBackend> for BeamtermCoreBackendSuite {
     fn run(&mut self, runner: impl FnMut(BeamtermBackend)) -> anyhow::Result<()> {
         let event_loop = EventLoop::new().expect("failed to create event loop");
         let mut app = BeamtermCoreApplicationHandler {
-            backend: &mut self,
+            backend: self,
             runner,
         };
         event_loop.run_app(&mut app)?;
@@ -67,17 +67,17 @@ impl IntegrationBackend<BeamtermBackend> for BeamtermCoreIntegrationBackend {
     }
 }
 
-pub static BACKEND_INSTANCE: LazyLock<Mutex<BeamtermCoreIntegrationBackend>> =
-    LazyLock::new(|| Mutex::new(BeamtermCoreIntegrationBackend {}));
+pub static BACKEND_INSTANCE: LazyLock<Mutex<BeamtermCoreBackendSuite>> =
+    LazyLock::new(|| Mutex::new(BeamtermCoreBackendSuite {}));
 
 struct BeamtermCoreApplicationHandler<'a, F: FnMut(BeamtermBackend)> {
-    backend: &'a mut BeamtermCoreIntegrationBackend,
+    backend: &'a mut BeamtermCoreBackendSuite,
     runner: F,
 }
 
 impl<F: FnMut(BeamtermBackend)> ApplicationHandler for BeamtermCoreApplicationHandler<'_, F> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        (self.runner)(BeamtermCoreIntegrationBackend::get_backend(event_loop));
+        (self.runner)(BeamtermCoreBackendSuite::get_backend(event_loop));
     }
 
     fn window_event(

@@ -1,12 +1,12 @@
-use crate::backend::backend::IntegrationBackend;
+use crate::backend::backend::BackendSuite;
 use ratatui::backend::CrosstermBackend;
 use std::io::Stdout;
 use std::sync::LazyLock;
 
 #[derive(Default)]
-pub struct CrosstermIntegrationBackend {}
+pub struct CrosstermBackendSuite {}
 
-impl IntegrationBackend<CrosstermBackend<Stdout>> for CrosstermIntegrationBackend {
+impl BackendSuite<CrosstermBackend<Stdout>> for CrosstermBackendSuite {
     fn run(&mut self, mut runner: impl FnMut(CrosstermBackend<Stdout>)) -> anyhow::Result<()> {
         let backend = CrosstermBackend::new(std::io::stdout());
         runner(backend);
@@ -14,5 +14,5 @@ impl IntegrationBackend<CrosstermBackend<Stdout>> for CrosstermIntegrationBacken
     }
 }
 
-pub static BACKEND_INSTANCE: LazyLock<CrosstermIntegrationBackend> =
-    LazyLock::new(|| CrosstermIntegrationBackend {});
+pub static BACKEND_INSTANCE: LazyLock<CrosstermBackendSuite> =
+    LazyLock::new(|| CrosstermBackendSuite {});

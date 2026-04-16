@@ -1,4 +1,4 @@
-use crate::backend::backend::IntegrationBackend;
+use crate::backend::backend::BackendSuite;
 use ratatui::DefaultTerminal;
 use ratatui::widgets::{Block, Paragraph};
 use ratatui_core::buffer::Buffer;
@@ -11,15 +11,14 @@ use ratatui_core::widgets::Widget;
 use std::io;
 
 pub fn main() {
-    let backend = crate::backend::BACKEND_INSTANCE.lock();
-    backend.unwrap().run(|be| {
+    crate::backend::BACKEND_INSTANCE.lock().unwrap().run(|be| {
         let mut terminal = ratatui::Terminal::new(be).unwrap();
         let mut app = App {
             counter: 0,
             exit: false,
         };
-        app.run(&mut terminal);
-    })
+        app.run(&mut terminal).unwrap();
+    }).unwrap();
 }
 
 struct App {
