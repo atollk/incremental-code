@@ -8,6 +8,8 @@ use ratatui_core::style::Stylize;
 use ratatui_core::symbols::border;
 use ratatui_core::text::{Line, Text};
 use ratatui_core::widgets::Widget;
+use crate::backend::events::Event;
+use crate::backend::input::KeyCode;
 
 pub fn main() {
     let tapp = TApp {
@@ -41,14 +43,31 @@ impl TerminalApp<backend::BackendType> for TApp {
         Ok(())
     }
 
-    fn frame(&mut self) -> anyhow::Result<()> {
+    fn frame(&mut self, events: &[Event]) -> anyhow::Result<bool> {
         let terminal = self.terminal.as_mut().unwrap();
         let app_state = &self.app_state;
         terminal.draw(|frame: &mut ratatui::Frame| frame.render_widget(app_state, frame.area()))?;
-        if self.app_state.exit {
-            return Err(anyhow::anyhow!("exit"));
+
+        for event in events {
+            match event {
+                Event::KeyEvent(key) => {
+                    match key.code {
+                        KeyCode::Left => {
+                            self.app_state.counter -= 1;
+                        }
+                        KeyCode::Right => {
+                            self.app_state.counter += 1;
+                        }
+                        KeyCode::Char('q') => {
+                            self.app_state.exit = true;
+                        }
+                        _ => {}
+                    }
+                }
+                Event::MouseEvent(_) => {}
+            }
         }
-        Ok(())
+        Ok(self.app_state.exit)
     }
 
     fn backend(&self) -> &backend::BackendType {

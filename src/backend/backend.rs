@@ -6,7 +6,7 @@ pub trait BackendSuite<B: ratatui::backend::Backend> {
 
 pub trait TerminalApp<B: ratatui::backend::Backend> {
     fn init(&mut self, backend: B) -> anyhow::Result<()>;
-    fn frame(&mut self, events: &[Event]) -> anyhow::Result<()>;
+    fn frame(&mut self, events: &[Event]) -> anyhow::Result<bool>;
     #[allow(dead_code)]
     fn backend(&self) -> &B;
     #[allow(dead_code)]

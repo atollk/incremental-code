@@ -1,7 +1,6 @@
 pub mod backend;
 pub mod input;
 pub mod events;
-i;
 
 const FEATURE_COUNT: usize =
     cfg!(feature = "opengl") as usize +

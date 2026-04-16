@@ -129,7 +129,10 @@ impl<A: TerminalApp<BackendType>> ApplicationHandler for BeamtermCoreApplication
                 }
             }
             WindowEvent::RedrawRequested => {
-                self.terminal_app.frame(&self.events).expect("failed to draw");
+                let exit = self.terminal_app.frame(&self.events).expect("failed to draw");
+                if exit {
+                    event_loop.exit();
+                }
                 self.events.clear();
 
                 // GL render
@@ -166,7 +169,71 @@ impl<A: TerminalApp<BackendType>> ApplicationHandler for BeamtermCoreApplication
 
 impl IntoEvent for KeyEvent {
     fn into_event(self) -> Option<Event> {
-        todo!()
+        use crate::backend::input::{
+            KeyCode, KeyEvent as IKeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+        };
+        use winit::event::ElementState;
+        use winit::keyboard::{Key, NamedKey};
+
+        let code = match self.logical_key.as_ref() {
+            Key::Named(named) => match named {
+                NamedKey::Backspace => KeyCode::Backspace,
+                NamedKey::Enter => KeyCode::Enter,
+                NamedKey::ArrowLeft => KeyCode::Left,
+                NamedKey::ArrowRight => KeyCode::Right,
+                NamedKey::ArrowUp => KeyCode::Up,
+                NamedKey::ArrowDown => KeyCode::Down,
+                NamedKey::Home => KeyCode::Home,
+                NamedKey::End => KeyCode::End,
+                NamedKey::PageUp => KeyCode::PageUp,
+                NamedKey::PageDown => KeyCode::PageDown,
+                NamedKey::Tab => KeyCode::Tab,
+                NamedKey::Delete => KeyCode::Delete,
+                NamedKey::Insert => KeyCode::Insert,
+                NamedKey::F1 => KeyCode::F(1),
+                NamedKey::F2 => KeyCode::F(2),
+                NamedKey::F3 => KeyCode::F(3),
+                NamedKey::F4 => KeyCode::F(4),
+                NamedKey::F5 => KeyCode::F(5),
+                NamedKey::F6 => KeyCode::F(6),
+                NamedKey::F7 => KeyCode::F(7),
+                NamedKey::F8 => KeyCode::F(8),
+                NamedKey::F9 => KeyCode::F(9),
+                NamedKey::F10 => KeyCode::F(10),
+                NamedKey::F11 => KeyCode::F(11),
+                NamedKey::F12 => KeyCode::F(12),
+                NamedKey::Escape => KeyCode::Esc,
+                NamedKey::CapsLock => KeyCode::CapsLock,
+                NamedKey::ScrollLock => KeyCode::ScrollLock,
+                NamedKey::NumLock => KeyCode::NumLock,
+                NamedKey::PrintScreen => KeyCode::PrintScreen,
+                NamedKey::Pause => KeyCode::Pause,
+                NamedKey::ContextMenu => KeyCode::Menu,
+                _ => return None,
+            },
+            Key::Character(s) => {
+                let mut chars = s.chars();
+                let c = chars.next()?;
+                if chars.next().is_some() {
+                    return None;
+                }
+                KeyCode::Char(c)
+            }
+            _ => return None,
+        };
+
+        let kind = match (self.state, self.repeat) {
+            (ElementState::Pressed, true) => KeyEventKind::Repeat,
+            (ElementState::Pressed, false) => KeyEventKind::Press,
+            (ElementState::Released, _) => KeyEventKind::Release,
+        };
+
+        Some(Event::KeyEvent(IKeyEvent {
+            code,
+            modifiers: KeyModifiers::NONE,
+            kind,
+            state: KeyEventState::NONE,
+        }))
     }
 }
 

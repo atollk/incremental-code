@@ -1,3 +1,9 @@
+check:
+    cargo check --features tui
+    cargo check --features opengl
+    cargo check --features egui-desktop
+    cargo check --features egui-web --target wasm32-unknown-unknown
+
 [parallel]
 build-all: build-tui build-opengl build-egui-desktop build-egui-web
 
