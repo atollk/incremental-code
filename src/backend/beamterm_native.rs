@@ -27,6 +27,8 @@ use winit::{
     dpi::LogicalSize,
     window::{Window, WindowAttributes},
 };
+use winit::event::KeyEvent;
+use crate::backend::events::{Event, IntoEvent};
 
 pub static BACKEND_INSTANCE: LazyLock<Mutex<BeamtermCoreBackendSuite>> =
     LazyLock::new(|| Mutex::new(BeamtermCoreBackendSuite {}));
@@ -51,6 +53,7 @@ impl BackendSuite<BackendType> for BeamtermCoreBackendSuite {
         let mut app = BeamtermCoreApplicationHandler {
             terminal_app,
             window_state: None,
+             events: Vec::new(),
         };
         event_loop.run_app(&mut app)?;
         Ok(())
@@ -60,6 +63,7 @@ impl BackendSuite<BackendType> for BeamtermCoreBackendSuite {
 struct BeamtermCoreApplicationHandler<A: TerminalApp<BackendType>> {
     terminal_app: A,
     window_state: Option<WindowState>,
+    events: Vec<Event>,
 }
 
 struct WindowState {
@@ -109,7 +113,9 @@ impl<A: TerminalApp<BackendType>> ApplicationHandler for BeamtermCoreApplication
                 event_loop.exit();
             }
             WindowEvent::KeyboardInput { event, .. } => {
-                todo!()
+                if let Some(event) = event.into_event() {
+                    self.events.push(event);
+                }
             }
             WindowEvent::Resized(new_size) => {
                 if new_size.width > 0 && new_size.height > 0 {
@@ -123,7 +129,8 @@ impl<A: TerminalApp<BackendType>> ApplicationHandler for BeamtermCoreApplication
                 }
             }
             WindowEvent::RedrawRequested => {
-                self.terminal_app.frame().expect("failed to draw");
+                self.terminal_app.frame(&self.events).expect("failed to draw");
+                self.events.clear();
 
                 // GL render
                 let (w, h) = self.terminal_app.backend().grid().canvas_size();
@@ -154,6 +161,12 @@ impl<A: TerminalApp<BackendType>> ApplicationHandler for BeamtermCoreApplication
         if let Some(state) = self.window_state.as_ref() {
             state.win.window.request_redraw();
         }
+    }
+}
+
+impl IntoEvent for KeyEvent {
+    fn into_event(self) -> Option<Event> {
+        todo!()
     }
 }
 

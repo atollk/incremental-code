@@ -1,3 +1,4 @@
+use crate::backend::events::Event;
 
 pub trait BackendSuite<B: ratatui::backend::Backend> {
     fn run(&mut self, app: impl TerminalApp<B> + 'static) -> anyhow::Result<()>;
@@ -5,7 +6,7 @@ pub trait BackendSuite<B: ratatui::backend::Backend> {
 
 pub trait TerminalApp<B: ratatui::backend::Backend> {
     fn init(&mut self, backend: B) -> anyhow::Result<()>;
-    fn frame(&mut self) -> anyhow::Result<()>;
+    fn frame(&mut self, events: &[Event]) -> anyhow::Result<()>;
     #[allow(dead_code)]
     fn backend(&self) -> &B;
     #[allow(dead_code)]
