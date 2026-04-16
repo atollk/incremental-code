@@ -1,11 +1,12 @@
 check:
     cargo check --features tui
     cargo check --features opengl
+    cargo check --features ratzilla
     cargo check --features egui-desktop
     cargo check --features egui-web --target wasm32-unknown-unknown
 
 [parallel]
-build-all: build-tui build-opengl build-egui-desktop build-egui-web
+build-all: build-tui build-opengl build-ratzilla build-egui-desktop build-egui-web
 
 build-tui:
     cargo build --features tui
@@ -18,6 +19,12 @@ build-opengl:
 
 run-opengl:
     cargo run --features opengl
+
+build-ratzilla:
+    cargo bin trunk build --features ratzilla
+
+run-ratzilla:
+    cargo bin trunk serve --features ratzilla
 
 build-egui-desktop:
     cargo build --features egui-desktop

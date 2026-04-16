@@ -7,7 +7,7 @@
 //! cargo run -p demo
 //! ```
 
-use std::time::Instant;
+use web_time::Instant;
 
 use crate::backend::events::Event;
 use crate::backend::input::KeyCode;

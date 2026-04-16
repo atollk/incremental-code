@@ -494,11 +494,28 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "beamterm-core"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ede1fea2497ca8e830cfef6e12476cef80fe9fdb5a4088a7d61a2eb24a69b67"
+dependencies = [
+ "beamterm-data 0.17.0",
+ "bitflags 2.11.1",
+ "compact_str",
+ "emojis",
+ "glow",
+ "lru",
+ "rustc-hash 2.1.2",
+ "thiserror 2.0.18",
+ "unicode-width",
+]
+
+[[package]]
+name = "beamterm-core"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0375f7f3df163a52a06807f2150bac9a5da1933864ed40d52dda7dcd7cfa193b"
 dependencies = [
- "beamterm-data",
+ "beamterm-data 1.0.0",
  "beamterm-unicode",
  "bitflags 2.11.1",
  "compact_str",
@@ -511,6 +528,17 @@ dependencies = [
 
 [[package]]
 name = "beamterm-data"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "807afb61cd85b78f4218c8f10c8a2ee12ee22b4504ac99b1ac7c4d11412336b8"
+dependencies = [
+ "compact_str",
+ "miniz_oxide 0.9.1",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "beamterm-data"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f21ff1fc630079352bae9b024f85519bf1f641cf7f326623f4c0b59f7ea834fd"
@@ -518,6 +546,46 @@ dependencies = [
  "compact_str",
  "miniz_oxide 0.9.1",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "beamterm-renderer"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9bf24d97fcf8104c12e4e394c8fac55576bca0ee25bd70d9eac87ac72987d3e5"
+dependencies = [
+ "beamterm-core 0.17.0",
+ "beamterm-data 0.17.0",
+ "bitflags 2.11.1",
+ "compact_str",
+ "console_error_panic_hook",
+ "glow",
+ "js-sys",
+ "thiserror 2.0.18",
+ "unicode-width",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "beamterm-renderer"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8db76d04d575a0534ad5dba63acc05ccbe69597f977f11c59a612cbea199112"
+dependencies = [
+ "beamterm-core 1.0.0",
+ "beamterm-data 1.0.0",
+ "bitflags 2.11.1",
+ "compact_str",
+ "console_error_panic_hook",
+ "glow",
+ "js-sys",
+ "thiserror 2.0.18",
+ "unicode-width",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
@@ -572,6 +640,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4512299f36f043ab09a583e57bceb5a5aab7a73db1805848e8fef3c9e8c78b3"
 dependencies = [
  "serde_core",
+]
+
+[[package]]
+name = "bitvec"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bc2832c24239b0141d5674bb9174f9d68a8b5b3f2753311927c172ca46f7e9c"
+dependencies = [
+ "funty",
+ "radium",
+ "tap",
+ "wyz",
 ]
 
 [[package]]
@@ -852,6 +932,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ca0197aee26d1ae37445ee532fefce43251d24cc7c166799f4d46817f1d3973"
 dependencies = [
  "crossbeam-utils",
+]
+
+[[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -1267,7 +1357,8 @@ dependencies = [
 [[package]]
 name = "egui_ratatui"
 version = "2.2.0"
-source = "git+https://github.com/atollk/egui_ratatui?rev=aaa4821#aaa48212ca060e18af4ad1d21921b3eb3c36a939"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb9e1d91659f1981994bc7b4e6b3a5d566498a7bf880d6c9caea6b1fdde3e762"
 dependencies = [
  "egui",
  "ratatui-core",
@@ -1320,6 +1411,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a82ef1580d1bff3e89bd3e68069acb24910b66001aaab1738ce9de8d03d2ab1e"
 dependencies = [
  "embedded-graphics",
+]
+
+[[package]]
+name = "emojis"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afd562179989ec12b5c82f63a9423be4d4f0c5651930837074488ef4d07f2886"
+dependencies = [
+ "phf 0.13.1",
 ]
 
 [[package]]
@@ -1629,6 +1729,12 @@ checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
 ]
+
+[[package]]
+name = "funty"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
 name = "futures-core"
@@ -2065,7 +2171,8 @@ name = "incremental-code"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "beamterm-core",
+ "beamterm-core 1.0.0",
+ "beamterm-renderer 1.0.0",
  "bitflags 2.11.1",
  "crossterm",
  "eframe",
@@ -2076,11 +2183,11 @@ dependencies = [
  "glutin",
  "glutin-winit",
  "log",
- "once_cell",
  "ratatui",
  "ratatui-code-editor",
  "ratatui-core",
  "ratbeam",
+ "ratzilla",
  "raw-window-handle",
  "serde",
  "soft_ratatui",
@@ -2089,6 +2196,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "web-time",
  "winit",
 ]
 
@@ -3391,6 +3499,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
+name = "radium"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
+
+[[package]]
 name = "rand"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3517,11 +3631,26 @@ name = "ratbeam"
 version = "0.2.0"
 source = "git+https://github.com/atollk/ratbeam?branch=main#4ac621f05b81bd612d6990f5d1a540cb47109af2"
 dependencies = [
- "beamterm-core",
- "beamterm-data",
+ "beamterm-core 1.0.0",
+ "beamterm-data 1.0.0",
  "glow",
  "ratatui",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "ratzilla"
+version = "0.3.0"
+source = "git+https://github.com/atollk/ratzilla?branch=main#0d3d2279691efffcd92240a9ec548fcb102e509e"
+dependencies = [
+ "beamterm-renderer 0.17.0",
+ "bitvec",
+ "compact_str",
+ "console_error_panic_hook",
+ "ratatui",
+ "thiserror 2.0.18",
+ "unicode-width",
+ "web-sys",
 ]
 
 [[package]]
@@ -4145,7 +4274,14 @@ dependencies = [
  "ratatui-core",
  "thiserror 2.0.18",
  "unicode-width",
+ "web-time",
 ]
+
+[[package]]
+name = "tap"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tempfile"
@@ -5528,6 +5664,15 @@ name = "writeable"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
+
+[[package]]
+name = "wyz"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05f360fc0b24296329c78fda852a1e9ae82de9cf7b27dae4b7f62f118f77b9ed"
+dependencies = [
+ "tap",
+]
 
 [[package]]
 name = "x11-dl"

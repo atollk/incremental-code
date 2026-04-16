@@ -8,7 +8,7 @@ use crate::beamterm_demo::BeamtermDemo;
 use crate::counter_demo::CounterDemo;
 
 pub fn main() {
-    let app = BasicTerminalApp::<CounterDemo>::new();
-    // let app = BasicTerminalApp::<BeamtermDemo>::new();
+    // let app = BasicTerminalApp::<CounterDemo>::new();
+    let app = BasicTerminalApp::<BeamtermDemo>::new();
     app.run().unwrap();
 }
