@@ -1,6 +1,7 @@
 mod backend;
 mod basic_terminal_app;
 pub mod demos;
+pub mod blinking_cursor;
 
 use crate::basic_terminal_app::BasicTerminalApp;
 

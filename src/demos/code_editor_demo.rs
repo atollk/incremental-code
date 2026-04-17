@@ -1,15 +1,20 @@
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 use crate::basic_terminal_app::App;
-use ratatui_code_editor::actions::{
-    DefaultAction
-};
+use crate::blinking_cursor::BlinkingCursor;
+use ratatui_code_editor::actions::DefaultAction;
 use ratatui_code_editor::editor::Editor;
 use ratatui_code_editor::theme::vesper;
 use ratatui_core::layout::{Position, Rect};
+use std::sync::OnceLock;
 
 pub struct CodeEditorDemo {
     editor: Editor,
+}
+
+fn epoch() -> web_time::Instant {
+    static EPOCH: OnceLock<web_time::Instant> = OnceLock::new();
+    *EPOCH.get_or_init(web_time::Instant::now)
 }
 
 fn key_to_action(key: &KeyEvent) -> Option<DefaultAction> {
@@ -78,6 +83,7 @@ impl App for CodeEditorDemo {
         let cursor = self.editor.get_visible_cursor(&frame.area());
         if let Some((x, y)) = cursor {
             frame.set_cursor_position(Position::new(x, y));
+            frame.render_widget(BlinkingCursor::new(x, y), frame.area());
         }
 
         Ok(false)
@@ -87,8 +93,14 @@ impl App for CodeEditorDemo {
 impl Default for CodeEditorDemo {
     fn default() -> Self {
         let code = "def foo():\n  pass";
-        CodeEditorDemo {
-            editor: Editor::new(Some(tree_sitter_python::LANGUAGE.into()), code, vesper()).unwrap(),
-        }
+        let lang = Some(tree_sitter_python::LANGUAGE.into());
+        let editor = Editor::new_with_highlights(
+            lang,
+            code,
+            vesper(),
+            Some(tree_sitter_python::HIGHLIGHTS_QUERY.to_string()),
+        )
+        .unwrap();
+        CodeEditorDemo { editor }
     }
 }

@@ -178,6 +178,7 @@ impl IntoEvent for KeyEvent {
         let code = match self.logical_key.as_ref() {
             Key::Named(named) => match named {
                 NamedKey::Backspace => KeyCode::Backspace,
+                NamedKey::Space => KeyCode::Char(' '),
                 NamedKey::Enter => KeyCode::Enter,
                 NamedKey::ArrowLeft => KeyCode::Left,
                 NamedKey::ArrowRight => KeyCode::Right,
