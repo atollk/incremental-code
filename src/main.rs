@@ -1,14 +1,12 @@
 mod backend;
 mod basic_terminal_app;
-mod beamterm_demo;
-mod counter_demo;
+pub mod demos;
 
 use crate::basic_terminal_app::BasicTerminalApp;
-use crate::beamterm_demo::BeamtermDemo;
-use crate::counter_demo::CounterDemo;
 
 pub fn main() {
-    // let app = BasicTerminalApp::<CounterDemo>::new();
-    let app = BasicTerminalApp::<BeamtermDemo>::new();
+    let app = BasicTerminalApp::<demos::CodeEditorDemo>::new();
+    // let app = BasicTerminalApp::<demos::CounterDemo>::new();
+    // let app = BasicTerminalApp::<BeamtermDemo>::new();
     app.run().unwrap();
 }
