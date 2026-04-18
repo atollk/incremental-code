@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 use crate::basic_terminal_app::App;
-use crate::blinking_cursor::BlinkingCursor;
+use crate::widgets::blinking_cursor::BlinkingCursor;
 use ratatui_core::layout::{Position, Rect};
 use std::sync::OnceLock;
 use ratatui_core::style::{Color, Style};
@@ -15,10 +15,6 @@ pub struct CodeEditorDemo {
     editor: Editor,
 }
 
-fn epoch() -> web_time::Instant {
-    static EPOCH: OnceLock<web_time::Instant> = OnceLock::new();
-    *EPOCH.get_or_init(web_time::Instant::now)
-}
 
 fn key_to_action(key: &KeyEvent) -> Option<DefaultAction> {
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);

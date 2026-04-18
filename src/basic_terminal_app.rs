@@ -7,16 +7,16 @@ pub trait App {
     fn frame(&mut self, events: &[Event], frame: &mut ratatui::Frame) -> anyhow::Result<bool>;
 }
 
-pub struct BasicTerminalApp<A: App + Default> {
+pub struct BasicTerminalApp<A: App> {
     terminal: Option<ratatui::Terminal<backend::BackendType>>,
     app: A,
 }
 
-impl<A: App + Default + 'static> BasicTerminalApp<A> {
-    pub(crate) fn new() -> Self {
+impl<A: App + 'static> BasicTerminalApp<A> {
+    pub(crate) fn new(app: A) -> Self {
         BasicTerminalApp {
             terminal: None,
-            app: A::default(),
+            app,
         }
     }
 
@@ -28,7 +28,7 @@ impl<A: App + Default + 'static> BasicTerminalApp<A> {
     }
 }
 
-impl<A: App + Default> TerminalApp<backend::BackendType> for BasicTerminalApp<A> {
+impl<A: App> TerminalApp<backend::BackendType> for BasicTerminalApp<A> {
     fn init(&mut self, backend: backend::BackendType) -> anyhow::Result<()> {
         let terminal = ratatui::Terminal::new(backend).unwrap();
         self.terminal = Some(terminal);

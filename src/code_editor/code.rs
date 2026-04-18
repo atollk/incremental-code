@@ -212,7 +212,7 @@ impl Code {
 
         results
             .into_iter()
-            .map(|(range, value)| (range.start, range.end - 1, value))
+            .map(|(range, value)| (range.start, range.end, value))
             .collect()
     }
 

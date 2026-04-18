@@ -1,3 +1,4 @@
+use std::sync::OnceLock;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
@@ -7,9 +8,6 @@ use ratatui::{
 use web_time::Instant;
 
 /// A blinking cursor that paints a single cell at `(x, y)`.
-///
-/// Stateless between frames — keep a reference `Instant` in your app state
-/// (e.g. when the field gained focus) and pass it in to drive the blink.
 pub struct BlinkingCursor {
     x: u16,
     y: u16,
@@ -35,8 +33,8 @@ impl BlinkingCursor {
 
     /// Derive blink state from an `Instant`. `period_ms` is the full
     /// on+off cycle; the cursor is visible for the first half.
-    pub fn with_blink(mut self, since: Instant, period_ms: u64) -> Self {
-        let elapsed = since.elapsed().as_millis() as u64;
+    pub fn with_blink(mut self, period_ms: u64) -> Self {
+        let elapsed = epoch().elapsed().as_millis() as u64;
         let half = (period_ms / 2).max(1);
         self.blink_on = (elapsed / half) % 2 == 0;
         self
@@ -81,4 +79,9 @@ impl Widget for BlinkingCursor {
         }
         cell.set_style(self.style);
     }
+}
+
+fn epoch() -> Instant {
+    static EPOCH: OnceLock<Instant> = OnceLock::new();
+    *EPOCH.get_or_init(Instant::now)
 }

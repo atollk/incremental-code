@@ -1,6 +1,6 @@
 use crate::backend::input::{KeyEvent, MouseEvent};
 
-pub(crate) enum Event {
+pub enum Event {
     KeyEvent(KeyEvent),
     MouseEvent(MouseEvent),
 }
