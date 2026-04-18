@@ -7,13 +7,17 @@ edition = "2024"
 # general dependencies
 ratatui = { version = "0.30.0", default-features = false }
 ratatui-core = { version = "0.1.0" }
-ratatui-code-editor = { git = "https://github.com/atollk/ratatui-code-editor/", branch = "action-as-enum", default-features = false }
-tree-sitter-python = "0.25"
 tachyonfx = { version = "0.25.0", features = ["std"] }
 log = "0.4.29"
-serde = { version = "1.0.228", features = ["derive"] }
-tree-sitter = { version = "0.26.8", default-features = false, features = ["std"] }
 web-time = { version = "1.1" }
+
+# code editor
+ropey = "^1.6"
+rust-embed = { version = "^8.7", features = ["include-exclude"] }
+streaming-iterator = "~0.1"
+unicode-width = "~0.2"
+unicode-segmentation = "^1.12"
+logos = "0.16.1"
 
 # tui dependencies
 crossterm = { version = "0.29.0", optional = true }
@@ -54,7 +58,6 @@ trunk = { version = "0.21.14" }
 tui = [
     "dep:crossterm",
     "ratatui/crossterm",
-    "ratatui-code-editor/crossterm",
 ]
 opengl = [
     "dep:beamterm-core",
