@@ -8,6 +8,7 @@ use ratatui::{
 use web_time::Instant;
 
 /// A blinking cursor that paints a single cell at `(x, y)`.
+#[derive(Clone)]
 pub struct BlinkingCursor {
     x: u16,
     y: u16,
@@ -49,6 +50,13 @@ impl BlinkingCursor {
     /// Override the cursor style. Default is inverted white-on-black bold.
     pub fn style(mut self, style: Style) -> Self {
         self.style = style;
+        self
+    }
+
+    /// Reposition the cursor; useful when the position is only known at render time.
+    pub fn at(mut self, x: u16, y: u16) -> Self {
+        self.x = x;
+        self.y = y;
         self
     }
 

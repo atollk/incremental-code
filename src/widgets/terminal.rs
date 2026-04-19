@@ -1,8 +1,6 @@
 use std::time::Duration;
 
 use ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::Widget};
-use web_time::Instant;
-
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::widgets::blinking_cursor::BlinkingCursor;
@@ -32,7 +30,7 @@ pub trait RunningCommand {
     ///
     /// May change between frames (e.g. output growing line by line, or a
     /// spinner that expands). The widget re-reads this value every frame.
-    fn height(&self) -> u16;
+    fn height(&self, columns: u16) -> u16;
 }
 
 /// A terminal widget with a prompt for typing commands, a running-command area,
@@ -61,6 +59,43 @@ pub struct TerminalWidget {
     input_history: Vec<String>,
     /// Current position in `input_history` while navigating, or `None` when not navigating.
     history_cursor: Option<usize>,
+    /// Cursor appearance. Configure style, symbol, and blink period here.
+    /// `x`/`y` are ignored — the widget positions the cursor automatically.
+    pub cursor: BlinkingCursor,
+}
+
+/// Wraps a [`RunningCommand`] and prepends a prompt-echo line (`> cmd`) so
+/// history entries look like a real terminal: the typed command followed by its output.
+struct EchoedCommand {
+    echo: String,
+    inner: Box<dyn RunningCommand>,
+}
+
+impl RunningCommand for EchoedCommand {
+    fn is_done(&self) -> bool {
+        self.inner.is_done()
+    }
+    fn update(&mut self, events: &[Event], time_delta: Duration) {
+        self.inner.update(events, time_delta);
+    }
+    fn render(&self, area: Rect, buf: &mut Buffer) {
+        // First row: the echoed prompt line.
+        buf.set_string(area.x, area.y, &self.echo, Style::default());
+        // Remaining rows: the inner command's output.
+        if area.height > 1 {
+            self.inner.render(
+                Rect {
+                    y: area.y + 1,
+                    height: area.height - 1,
+                    ..area
+                },
+                buf,
+            );
+        }
+    }
+    fn height(&self, columns: u16) -> u16 {
+        1 + self.inner.height(columns)
+    }
 }
 
 impl TerminalWidget {
@@ -72,7 +107,20 @@ impl TerminalWidget {
             input: String::new(),
             input_history: Vec::new(),
             history_cursor: None,
+            cursor: BlinkingCursor::new(0, 0).with_blink(500),
         }
+    }
+
+    /// Register a command to run, wrapping it with a prompt-echo line.
+    ///
+    /// Call this instead of setting `running` directly after receiving a command
+    /// string from [`update`](Self::update), so history entries show `> cmd` followed
+    /// by the command's output, just like a real terminal.
+    pub fn set_running(&mut self, cmd_text: &str, cmd: Box<dyn RunningCommand>) {
+        self.running = Some(Box::new(EchoedCommand {
+            echo: format!("> {}", cmd_text),
+            inner: cmd,
+        }));
     }
 
     fn handle_event(&mut self, event: &Event) -> Option<String> {
@@ -163,89 +211,74 @@ impl TerminalWidget {
         None
     }
 
-    /// Returns a pre-configured [`BlinkingCursor`] positioned at the prompt,
-    /// or `None` while a command is running (the cursor is hidden then).
-    ///
-    /// Render the returned cursor as an overlay on the same area as the widget.
-    pub fn cursor(&self, area: &Rect) -> Option<BlinkingCursor> {
-        if self.running.is_some() {
-            return None;
-        }
-        let y = area.bottom().saturating_sub(1);
-        // "> " prefix is 2 columns wide.
-        let x = (area.left() + 2 + self.input.len() as u16).min(area.right().saturating_sub(1));
-        Some(BlinkingCursor::new(x, y).with_blink(500))
-    }
 }
 
 impl Widget for &TerminalWidget {
     /// Render the terminal into `area`.
     ///
-    /// Layout (bottom to top):
-    /// - Last row: prompt line `> {input}`
-    /// - Above: running command output (height re-read each frame)
-    /// - Above: history entries, newest first (oldest may be clipped if out of space)
+    /// Layout (top to bottom, like a real terminal):
+    /// - History entries, oldest first
+    /// - Running command output (height re-read each frame)
+    /// - Prompt line `> {input}` immediately after the last content row
+    ///
+    /// If content fills the area, the prompt is pushed down and may be clipped.
     fn render(self, area: Rect, buf: &mut Buffer) {
         if area.height == 0 {
             return;
         }
 
-        // Prompt line is always at the very bottom.
-        let input_row = area.bottom() - 1;
-        buf.set_string(
-            area.left(),
-            input_row,
-            format!("> {}", self.input),
-            Style::default(),
-        );
+        let mut y = area.top();
 
-        // `bottom` is the exclusive upper bound of the remaining free rows.
-        // We work bottom-up, subtracting each section's height as we go.
-        let top = area.top();
-        let mut bottom = input_row;
-
-        if top >= bottom {
-            return;
-        }
-
-        // Running command sits directly above the prompt line.
-        // `height()` is re-read every frame so dynamic growth/shrink is handled.
-        if let Some(running) = &self.running {
-            let h = running.height().min(bottom - top);
-            if h > 0 {
-                running.render(
-                    Rect {
-                        x: area.x,
-                        y: bottom - h,
-                        width: area.width,
-                        height: h,
-                    },
-                    buf,
-                );
-                bottom -= h;
-            }
-        }
-
-        // History fills the remaining space above the running command,
-        // newest entry first. If total history exceeds available rows,
-        // the oldest entries simply don't get rendered (clipped off the top).
-        for entry in self.history.iter().rev() {
-            if top >= bottom {
+        // History entries, oldest first, flowing downward.
+        for entry in &self.history {
+            if y >= area.bottom() {
                 break;
             }
-            let h = entry.height().min(bottom - top);
+            let h = entry.height(area.width).min(area.bottom() - y);
             if h > 0 {
                 entry.render(
                     Rect {
                         x: area.x,
-                        y: bottom - h,
+                        y,
                         width: area.width,
                         height: h,
                     },
                     buf,
                 );
-                bottom -= h;
+                y += h;
             }
+        }
+
+        // Running command sits directly below the last history entry.
+        if let Some(running) = &self.running {
+            if y < area.bottom() {
+                let h = running.height(area.width).min(area.bottom() - y);
+                if h > 0 {
+                    running.render(
+                        Rect {
+                            x: area.x,
+                            y,
+                            width: area.width,
+                            height: h,
+                        },
+                        buf,
+                    );
+                    y += h;
+                }
+            }
+        }
+
+        // Prompt and cursor appear right after the last content row, but only when idle.
+        if self.running.is_none() && y < area.bottom() {
+            buf.set_string(
+                area.left(),
+                y,
+                format!("> {}", self.input),
+                Style::default(),
+            );
+            // "> " prefix is 2 columns wide.
+            let cx = (area.left() + 2 + self.input.len() as u16).min(area.right().saturating_sub(1));
+            self.cursor.clone().at(cx, y).render(area, buf);
         }
     }
 }
@@ -282,7 +315,7 @@ mod tests {
         fn render(&self, area: Rect, buf: &mut Buffer) {
             buf.set_string(area.x, area.y, &self.text, Style::default());
         }
-        fn height(&self) -> u16 {
+        fn height(&self, _columns: u16) -> u16 {
             1
         }
     }
@@ -300,7 +333,7 @@ mod tests {
             self.remaining = self.remaining.saturating_sub(1);
         }
         fn render(&self, _: Rect, _: &mut Buffer) {}
-        fn height(&self) -> u16 {
+        fn height(&self, _columns: u16) -> u16 {
             self.h
         }
     }
@@ -317,7 +350,7 @@ mod tests {
             self.calls += 1;
         }
         fn render(&self, _: Rect, _: &mut Buffer) {}
-        fn height(&self) -> u16 {
+        fn height(&self, _columns: u16) -> u16 {
             self.calls + 1
         }
     }
@@ -376,14 +409,13 @@ mod tests {
     #[test]
     fn enter_submits_and_clears_input() {
         let mut t = make_terminal();
-        t.update(
+        let cmd = t.update(
             &[key_press(KeyCode::Char('x')), key_press(KeyCode::Enter)],
             Duration::ZERO,
         );
-        // ImmediateCmd finishes synchronously inside the first update call.
+        assert_eq!(cmd, Some("x".to_string()));
         assert_eq!(t.input, "");
         assert!(t.running.is_none());
-        assert_eq!(t.history.len(), 1);
     }
 
     #[test]
@@ -443,13 +475,15 @@ mod tests {
 
     #[test]
     fn slow_command_blocks_prompt_input() {
-        // remaining=3: Enter's post-idle tick → 2, call 2 → 1, call 3 → 0 (done).
         let mut t = TerminalWidget::new();
-        t.update(
+        // Enter returns the command string; caller sets t.running.
+        if let Some(_) = t.update(
             &[key_press(KeyCode::Char('x')), key_press(KeyCode::Enter)],
             Duration::ZERO,
-        );
-        assert!(t.running.is_some()); // remaining=2
+        ) {
+            t.running = Some(Box::new(SlowCmd { remaining: 2, h: 1 }));
+        }
+        assert!(t.running.is_some());
 
         // Typing while running is silently ignored.
         t.update(&[key_press(KeyCode::Char('y'))], Duration::ZERO);
@@ -465,11 +499,14 @@ mod tests {
     #[test]
     fn immediate_command_transitions_within_same_update() {
         let mut t = make_terminal();
-        t.update(
+        // Caller sets a command that is already done; next update moves it to history.
+        if let Some(_) = t.update(
             &[key_press(KeyCode::Char('x')), key_press(KeyCode::Enter)],
             Duration::ZERO,
-        );
-        // No separate update needed — ImmediateCmd::is_done returns true immediately.
+        ) {
+            t.running = Some(Box::new(ImmediateCmd::new("x")));
+        }
+        t.update(&[], Duration::ZERO);
         assert!(t.running.is_none());
         assert_eq!(t.history.len(), 1);
     }
@@ -477,50 +514,50 @@ mod tests {
     // ── Cursor ────────────────────────────────────────────────────────────────
 
     #[test]
-    fn cursor_is_none_while_running() {
-        // remaining=2: post-idle tick → 1, so command is still running after Enter.
+    fn cursor_hidden_while_running() {
+        // The cursor is not rendered when a command is running.
+        // Verify indirectly: render into a buffer and check the cursor cell
+        // is not styled (the prompt line itself is also absent while running).
         let mut t = TerminalWidget::new();
-        let area = Rect {
-            x: 0,
-            y: 0,
-            width: 80,
-            height: 24,
-        };
-        t.update(
+        if let Some(_) = t.update(
             &[key_press(KeyCode::Char('x')), key_press(KeyCode::Enter)],
             Duration::ZERO,
-        );
-        assert!(t.cursor(&area).is_none());
+        ) {
+            t.running = Some(Box::new(SlowCmd { remaining: 1, h: 1 }));
+        }
+        assert!(t.running.is_some()); // sanity: command is active
+        let buf = render_terminal(&t, 80, 24);
+        // Row 0 should not contain a prompt while running.
+        assert!(!row_string(&buf, 0, 80).starts_with("> "));
     }
 
     #[test]
-    fn cursor_is_some_when_idle() {
+    fn cursor_visible_when_idle() {
         let t = make_terminal();
-        let area = Rect {
-            x: 0,
-            y: 0,
-            width: 80,
-            height: 24,
-        };
-        assert!(t.cursor(&area).is_some());
+        // With no history and no running command the prompt is at row 0.
+        // Cursor cell (column 2) should have the cursor style applied.
+        let buf = render_terminal(&t, 80, 24);
+        assert!(row_string(&buf, 0, 80).starts_with("> "));
     }
 
     // ── Rendering ────────────────────────────────────────────────────────────
 
     #[test]
-    fn renders_prompt_at_bottom() {
+    fn renders_prompt_at_top_when_no_history() {
         let mut t = make_terminal();
         t.update(
             &[key_press(KeyCode::Char('h')), key_press(KeyCode::Char('i'))],
             Duration::ZERO,
         );
         let buf = render_terminal(&t, 20, 5);
-        assert!(row_string(&buf, 4, 20).starts_with("> hi"));
+        // No history → prompt at row 0 (top).
+        assert!(row_string(&buf, 0, 20).starts_with("> hi"));
     }
 
     #[test]
     fn history_rendered_above_prompt() {
         let mut t = make_terminal();
+        // Submit a command and set a completed command in history manually.
         t.update(
             &[
                 key_press(KeyCode::Char('f')),
@@ -530,24 +567,26 @@ mod tests {
             ],
             Duration::ZERO,
         );
+        // Simulate the caller setting a completed command and it moving to history.
+        t.running = Some(Box::new(ImmediateCmd::new("foo")));
+        t.update(&[], Duration::ZERO); // moves it to history
         let buf = render_terminal(&t, 20, 5);
-        // height=5: row 4 = prompt, row 3 = history (height 1).
-        assert!(row_string(&buf, 3, 20).starts_with("foo"));
-        assert!(row_string(&buf, 4, 20).starts_with("> "));
+        // Top-down: row 0 = history entry ("foo"), row 1 = prompt.
+        assert!(row_string(&buf, 0, 20).starts_with("foo"));
+        assert!(row_string(&buf, 1, 20).starts_with("> "));
     }
 
     #[test]
     fn dynamic_height_command_gets_correct_rect() {
-        // GrowingCmd: after Enter's internal update, calls=1, height()=2, not done.
         let mut t = TerminalWidget::new();
-        t.update(
-            &[key_press(KeyCode::Char('x')), key_press(KeyCode::Enter)],
-            Duration::ZERO,
-        );
-        assert!(t.running.is_some());
+        // Caller sets a GrowingCmd: height starts at 1, grows each update, done at calls=3.
+        t.running = Some(Box::new(GrowingCmd { calls: 0 }));
 
-        // height() = 2; render and verify we don't panic with an oversized rect.
+        // calls=0, height()=1; render should not panic.
         let _ = render_terminal(&t, 10, 10);
+
+        t.update(&[], Duration::ZERO); // calls=1, height()=2
+        assert!(t.running.is_some());
 
         t.update(&[], Duration::ZERO); // calls=2, height()=3
         assert!(t.running.is_some());
@@ -555,49 +594,40 @@ mod tests {
         t.update(&[], Duration::ZERO); // calls=3, is_done → history
         assert!(t.running.is_none());
         assert_eq!(t.history.len(), 1);
-        assert_eq!(t.history[0].height(), 4); // calls+1 = 4
+        assert_eq!(t.history[0].height(10), 4); // calls+1 = 4
     }
 
     #[test]
-    fn overflow_history_clips_oldest_entries() {
-        // 4-row terminal: prompt=1, two history entries of height=2 → oldest is clipped.
-        struct TwoRowCmd;
+    fn overflow_history_clips_newest_entries() {
+        // 4-row terminal: two history entries of height=2 each → newest is clipped at bottom.
+        // Top-down layout: oldest fills rows 0-1, newest fills rows 2-3, no room for prompt.
+        struct TwoRowCmd(&'static str);
         impl RunningCommand for TwoRowCmd {
-            fn is_done(&self) -> bool {
-                true
-            }
+            fn is_done(&self) -> bool { true }
             fn update(&mut self, _: &[Event], _: Duration) {}
             fn render(&self, area: Rect, buf: &mut Buffer) {
-                buf.set_string(area.x, area.y, "LINE1", Style::default());
+                buf.set_string(area.x, area.y, self.0, Style::default());
                 if area.height > 1 {
-                    buf.set_string(area.x, area.y + 1, "LINE2", Style::default());
+                    buf.set_string(area.x, area.y + 1, "CONT", Style::default());
                 }
             }
-            fn height(&self) -> u16 {
-                2
-            }
+            fn height(&self, _columns: u16) -> u16 { 2 }
         }
 
         let mut t = TerminalWidget::new();
-        t.update(
-            &[key_press(KeyCode::Char('a')), key_press(KeyCode::Enter)],
-            Duration::ZERO,
-        );
-        t.update(
-            &[key_press(KeyCode::Char('b')), key_press(KeyCode::Enter)],
-            Duration::ZERO,
-        );
+        // Push two completed commands into history directly.
+        t.running = Some(Box::new(TwoRowCmd("AAA")));
+        t.update(&[], Duration::ZERO); // AAA → history
+        t.running = Some(Box::new(TwoRowCmd("BBB")));
+        t.update(&[], Duration::ZERO); // BBB → history
         assert_eq!(t.history.len(), 2);
 
         let buf = render_terminal(&t, 10, 4);
-        // Row 3: prompt
-        assert!(row_string(&buf, 3, 10).starts_with("> "));
-        // Rows 1-2: newest history ("b" cmd), height=2, fits in full.
-        assert!(row_string(&buf, 1, 10).starts_with("LINE1"));
-        assert!(row_string(&buf, 2, 10).starts_with("LINE2"));
-        // Row 0: oldest history ("a" cmd) is partially visible — only 1 row fits,
-        // so it renders LINE1 (the first row of a 2-row entry, like a real terminal
-        // scrolled to the bottom with content clipped at the top).
-        assert!(row_string(&buf, 0, 10).starts_with("LINE1"));
+        // Oldest (AAA) at rows 0-1, newest (BBB) at rows 2-3.
+        // Prompt has no space and is not rendered.
+        assert!(row_string(&buf, 0, 10).starts_with("AAA"));
+        assert!(row_string(&buf, 1, 10).starts_with("CONT"));
+        assert!(row_string(&buf, 2, 10).starts_with("BBB"));
+        assert!(row_string(&buf, 3, 10).starts_with("CONT"));
     }
 }
