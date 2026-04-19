@@ -1,15 +1,14 @@
-use std::collections::HashMap;
 use crate::backend::events::Event;
-use crate::backend::input::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use crate::backend::input::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crate::basic_terminal_app::App;
-use crate::widgets::blinking_cursor::BlinkingCursor;
-use ratatui_core::layout::{Position, Rect};
-use std::sync::OnceLock;
-use ratatui_core::style::{Color, Style};
 use crate::code_editor;
 use crate::code_editor::actions::DefaultAction;
 use crate::code_editor::editor::Editor;
 use crate::code_editor::python_logos::PythonLangToken;
+use crate::widgets::blinking_cursor::BlinkingCursor;
+use ratatui_core::layout::{Position, Rect};
+use ratatui_core::style::{Color, Style};
+use std::collections::HashMap;
 
 pub struct CodeEditorDemo {
     editor: Editor,

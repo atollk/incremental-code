@@ -80,7 +80,6 @@ impl IntoEvent for egui::Event {
                 modifiers,
                 ..
             } => {
-                let shift = modifiers.shift;
                 let code = match key {
                     egui::Key::ArrowDown => KeyCode::Down,
                     egui::Key::ArrowLeft => KeyCode::Left,
@@ -208,8 +207,6 @@ impl IntoEvent for egui::Event {
 #[cfg(feature = "egui-desktop")]
 impl BackendSuite<BackendType> for EguiBackendSuite {
     fn run(&mut self, mut terminal_app: impl TerminalApp<BackendType>) -> anyhow::Result<()> {
-        use crate::backend::backend::TerminalApp;
-        use crate::backend::egui::EguiApplicationHandler;
         use eframe::{AppCreator, egui};
 
         env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).

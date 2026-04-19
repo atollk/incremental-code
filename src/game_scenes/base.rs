@@ -10,7 +10,7 @@ pub trait Scene {
     ) -> SceneSwitch;
 }
 
-pub(crate) enum SceneSwitch {
+pub enum SceneSwitch {
     NoSwitch,
     ExitGame,
     SwitchTo(Box<dyn Scene>),

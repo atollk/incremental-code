@@ -55,6 +55,8 @@ pub struct TerminalWidget {
     pub running: Option<Box<dyn RunningCommand>>,
     /// Text currently being typed in the prompt.
     input: String,
+    /// Byte offset of the cursor within `input`.
+    input_cursor: usize,
     /// Previously submitted command strings, for up/down arrow navigation.
     input_history: Vec<String>,
     /// Current position in `input_history` while navigating, or `None` when not navigating.
@@ -105,6 +107,7 @@ impl TerminalWidget {
             history: Vec::new(),
             running: None,
             input: String::new(),
+            input_cursor: 0,
             input_history: Vec::new(),
             history_cursor: None,
             cursor: BlinkingCursor::new(0, 0).with_blink(500),
@@ -133,18 +136,47 @@ impl TerminalWidget {
 
         match key.code {
             KeyCode::Char(c) => {
-                self.input.push(c);
+                self.input.insert(self.input_cursor, c);
+                self.input_cursor += c.len_utf8();
                 self.history_cursor = None;
             }
             KeyCode::Backspace => {
-                self.input.pop();
+                if self.input_cursor > 0 {
+                    // Find the start of the character just before the cursor.
+                    let prev = self.input[..self.input_cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    self.input.remove(prev);
+                    self.input_cursor = prev;
+                }
                 self.history_cursor = None;
+            }
+            KeyCode::Left => {
+                if self.input_cursor > 0 {
+                    self.input_cursor = self.input[..self.input_cursor]
+                        .char_indices()
+                        .next_back()
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                }
+            }
+            KeyCode::Right => {
+                if self.input_cursor < self.input.len() {
+                    let c = self.input[self.input_cursor..]
+                        .chars()
+                        .next()
+                        .unwrap();
+                    self.input_cursor += c.len_utf8();
+                }
             }
             KeyCode::Enter => {
                 let cmd = self.input.clone();
                 if !cmd.is_empty() {
                     self.input_history.push(cmd.clone());
                     self.input.clear();
+                    self.input_cursor = 0;
                     self.history_cursor = None;
                     return Some(cmd);
                 }
@@ -160,16 +192,19 @@ impl TerminalWidget {
                 };
                 self.history_cursor = Some(idx);
                 self.input = self.input_history[idx].clone();
+                self.input_cursor = self.input.len();
             }
             KeyCode::Down => match self.history_cursor {
                 None => {}
                 Some(i) if i + 1 >= self.input_history.len() => {
                     self.history_cursor = None;
                     self.input.clear();
+                    self.input_cursor = 0;
                 }
                 Some(i) => {
                     self.history_cursor = Some(i + 1);
                     self.input = self.input_history[i + 1].clone();
+                    self.input_cursor = self.input.len();
                 }
             },
             _ => {}
@@ -276,8 +311,9 @@ impl Widget for &TerminalWidget {
                 format!("> {}", self.input),
                 Style::default(),
             );
-            // "> " prefix is 2 columns wide.
-            let cx = (area.left() + 2 + self.input.len() as u16).min(area.right().saturating_sub(1));
+            // "> " prefix is 2 columns wide; cursor column is char count before byte offset.
+            let char_col = self.input[..self.input_cursor].chars().count() as u16;
+            let cx = (area.left() + 2 + char_col).min(area.right().saturating_sub(1));
             self.cursor.clone().at(cx, y).render(area, buf);
         }
     }

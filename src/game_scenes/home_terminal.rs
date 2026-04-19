@@ -34,7 +34,7 @@ impl Scene for HomeTerminalScene {
         &mut self,
         events: &[Event],
         frame: &mut Frame,
-        time_delta: web_time::Duration,
+        time_delta: Duration,
     ) -> SceneSwitch {
         let cmd = self.terminal_widget.update(events, time_delta);
         if let Some(cmd) = cmd {
