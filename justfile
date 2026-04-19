@@ -7,10 +7,10 @@ check:
 
 clippy:
     cargo clippy --fix --features tui
-    cargo clippy --fix --features opengl
-    cargo clippy --fix --features ratzilla
-    cargo clippy --fix --features egui-desktop
-    cargo clippy --fix --features egui-web --target wasm32-unknown-unknown
+    cargo clippy --fix --features opengl --allow-dirty
+    cargo clippy --fix --features ratzilla --allow-dirty
+    cargo clippy --fix --features egui-desktop --allow-dirty
+    cargo clippy --fix --features egui-web --target wasm32-unknown-unknown --allow-dirty
 
 [parallel]
 build-all: build-tui build-opengl build-ratzilla build-egui-desktop build-egui-web

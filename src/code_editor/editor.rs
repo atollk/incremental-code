@@ -76,7 +76,7 @@ impl Editor {
         let total_lines = self.code.len_lines();
         let max_line_number = total_lines.max(1);
         let line_number_digits = max_line_number.to_string().len().max(5);
-        let line_number_width = (line_number_digits + 2);
+        let line_number_width = line_number_digits + 2 ;
 
         let line = self.code.char_to_line(self.cursor);
         let col = self.cursor - self.code.line_to_char(line);
