@@ -50,7 +50,7 @@ impl CodeEditorDemo {
         if let Some(action) = key_to_action(key) {
             self.editor.apply(action);
         }
-        self.editor.focus(&area);
+        self.editor.focus(area);
         Ok(())
     }
 }

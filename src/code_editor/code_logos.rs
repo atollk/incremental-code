@@ -49,7 +49,7 @@ where
             .into_iter()
             .filter_map(|(token, span)| {
                 let style = self.theme.get(&token);
-                style.map(|style| (span, style.clone()))
+                style.map(|style| (span, *style))
             })
             .collect()
     }

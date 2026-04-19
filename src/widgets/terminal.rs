@@ -237,7 +237,7 @@ impl TerminalWidget {
         }
 
         if let Some(running) = &mut self.running {
-            running.update(&events, time_delta);
+            running.update(events, time_delta);
             if running.is_done() {
                 let done = self.running.take().unwrap();
                 self.history.push(done);
@@ -285,8 +285,8 @@ impl Widget for &TerminalWidget {
         }
 
         // Running command sits directly below the last history entry.
-        if let Some(running) = &self.running {
-            if y < area.bottom() {
+        if let Some(running) = &self.running
+            && y < area.bottom() {
                 let h = running.height(area.width).min(area.bottom() - y);
                 if h > 0 {
                     running.render(
@@ -301,7 +301,6 @@ impl Widget for &TerminalWidget {
                     y += h;
                 }
             }
-        }
 
         // Prompt and cursor appear right after the last content row, but only when idle.
         if self.running.is_none() && y < area.bottom() {

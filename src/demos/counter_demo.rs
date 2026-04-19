@@ -9,6 +9,7 @@ use ratatui_core::symbols::border;
 use ratatui_core::text::{Line, Text};
 use ratatui_core::widgets::Widget;
 
+#[derive(Default)]
 pub struct CounterDemo {
     counter: i32,
 }
@@ -41,11 +42,6 @@ impl App for CounterDemo {
     }
 }
 
-impl Default for CounterDemo {
-    fn default() -> Self {
-        CounterDemo { counter: 0 }
-    }
-}
 
 impl Widget for &CounterDemo {
     fn render(self, area: Rect, buf: &mut Buffer) {

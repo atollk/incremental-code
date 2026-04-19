@@ -37,7 +37,7 @@ impl BlinkingCursor {
     pub fn with_blink(mut self, period_ms: u64) -> Self {
         let elapsed = epoch().elapsed().as_millis() as u64;
         let half = (period_ms / 2).max(1);
-        self.blink_on = (elapsed / half) % 2 == 0;
+        self.blink_on = (elapsed / half).is_multiple_of(2);
         self
     }
 

@@ -14,6 +14,12 @@ pub struct HomeTerminalScene {
     terminal_widget: TerminalWidget,
 }
 
+impl Default for HomeTerminalScene {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HomeTerminalScene {
     pub fn new() -> Self {
         HomeTerminalScene {

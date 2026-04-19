@@ -54,7 +54,7 @@ impl Widget for &Editor {
 
             let visible_chars = code.char_slice(char_start, char_end);
 
-            let displayed_line = visible_chars.to_string().replace("\t", &" ");
+            let displayed_line = visible_chars.to_string().replace("\t", " ");
 
             let text_x = area.left() + line_number_width as u16;
             if text_x < area.left() + area.width && draw_y < area.top() + area.height {

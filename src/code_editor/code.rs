@@ -25,6 +25,12 @@ pub struct EditBatch {
     pub state_after: Option<EditState>,
 }
 
+impl Default for EditBatch {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EditBatch {
     pub fn new() -> Self {
         Self {
@@ -309,7 +315,7 @@ impl Code {
             return 0;
         }
         let line_str = self.line(line);
-        count_indent_units(line_str, &self.indent(), Some(col))
+        count_indent_units(line_str, self.indent(), Some(col))
     }
 
     pub fn is_only_indentation_before(&self, r: usize, c: usize) -> bool {
@@ -324,9 +330,9 @@ impl Code {
             return line.chars().take(c).all(|ch| ch.is_whitespace());
         }
 
-        let count_units = count_indent_units(line, &indent_unit, Some(c));
-        let only_indent = count_units * indent_unit.chars().count() >= c;
-        only_indent
+        let count_units = count_indent_units(line, indent_unit, Some(c));
+        
+        count_units * indent_unit.chars().count() >= c
     }
 
     pub fn find_indent_at_line_start(&self, line_idx: usize) -> Option<usize> {
@@ -340,7 +346,7 @@ impl Code {
             return None;
         }
 
-        let count_units = count_indent_units(line, &indent_unit, None);
+        let count_units = count_indent_units(line, indent_unit, None);
         let col = count_units * indent_unit.chars().count();
         if col > 0 { Some(col) } else { None }
     }
@@ -378,7 +384,7 @@ impl Code {
         for line in &lines {
             let mut lvl = 0;
             let mut rest = *line;
-            while rest.starts_with(&indent_unit) {
+            while rest.starts_with(indent_unit) {
                 lvl += 1;
                 rest = &rest[indent_unit.len()..];
             }
@@ -484,7 +490,7 @@ impl<'a> RopeGraphemes<'a> {
         let first_chunk = chunks.next().unwrap_or("");
         RopeGraphemes {
             text: *slice,
-            chunks: chunks,
+            chunks,
             cur_chunk: first_chunk,
             cur_chunk_start: 0,
             cursor: GraphemeCursor::new(0, slice.len_bytes(), true),

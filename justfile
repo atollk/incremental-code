@@ -5,6 +5,13 @@ check:
     cargo check --features egui-desktop
     cargo check --features egui-web --target wasm32-unknown-unknown
 
+clippy:
+    cargo clippy --fix --features tui
+    cargo clippy --fix --features opengl
+    cargo clippy --fix --features ratzilla
+    cargo clippy --fix --features egui-desktop
+    cargo clippy --fix --features egui-web --target wasm32-unknown-unknown
+
 [parallel]
 build-all: build-tui build-opengl build-ratzilla build-egui-desktop build-egui-web
 

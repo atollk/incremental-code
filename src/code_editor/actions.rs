@@ -108,16 +108,14 @@ impl Action for DefaultAction {
                 let shift = *shift;
                 let cursor = editor.get_cursor();
 
-                if !shift {
-                    if let Some(sel) = editor.get_selection() {
-                        if !sel.is_empty() {
+                if !shift
+                    && let Some(sel) = editor.get_selection()
+                        && !sel.is_empty() {
                             let (_, end) = sel.sorted();
                             editor.set_cursor(end);
                             editor.clear_selection();
                             return;
                         }
-                    }
-                }
 
                 if cursor < editor.code_mut().len() {
                     let new_cursor = cursor.saturating_add(1);
@@ -134,16 +132,14 @@ impl Action for DefaultAction {
                 let shift = *shift;
                 let cursor = editor.get_cursor();
 
-                if !shift {
-                    if let Some(sel) = editor.get_selection() {
-                        if !sel.is_empty() {
+                if !shift
+                    && let Some(sel) = editor.get_selection()
+                        && !sel.is_empty() {
                             let (start, _) = sel.sorted();
                             editor.set_cursor(start);
                             editor.clear_selection();
                             return;
                         }
-                    }
-                }
 
                 if cursor > 0 {
                     let new_cursor = cursor.saturating_sub(1);
@@ -211,13 +207,12 @@ impl Action for DefaultAction {
                 code.tx();
                 code.set_state_before(cursor, selection);
 
-                if let Some(sel) = &selection {
-                    if !sel.is_empty() {
+                if let Some(sel) = &selection
+                    && !sel.is_empty() {
                         let (start, end) = sel.sorted();
                         code.remove(start, end);
                         cursor = start;
                     }
-                }
                 selection = None;
 
                 code.insert(cursor, &text);
@@ -565,7 +560,7 @@ impl Action for DefaultAction {
                 let mut selection = editor.get_selection();
 
                 let sel = match &selection {
-                    Some(sel) if !sel.is_empty() => sel.clone(),
+                    Some(sel) if !sel.is_empty() => *sel,
                     _ => return,
                 };
 
@@ -611,14 +606,13 @@ impl Action for DefaultAction {
                 code.tx();
                 code.set_state_before(cursor, selection);
 
-                if let Some(sel) = &selection {
-                    if !sel.is_empty() {
+                if let Some(sel) = &selection
+                    && !sel.is_empty() {
                         let (start, end) = sel.sorted();
                         code.remove(start, end);
                         cursor = start;
                         selection = None;
                     }
-                }
 
                 let inserted = code.smart_paste(cursor, &text);
                 cursor += inserted;
