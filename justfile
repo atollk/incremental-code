@@ -6,11 +6,8 @@ check:
     cargo check --features egui-web --target wasm32-unknown-unknown
 
 clippy:
-    cargo clippy --fix --features tui
-    cargo clippy --fix --features opengl --allow-dirty
-    cargo clippy --fix --features ratzilla --allow-dirty
-    cargo clippy --fix --features egui-desktop --allow-dirty
-    cargo clippy --fix --features egui-web --target wasm32-unknown-unknown --allow-dirty
+    cargo clippy --fix --features tui --features opengl --features egui-desktop
+    cargo clippy --fix --features egui-web --features ratzilla --target wasm32-unknown-unknown --allow-dirty
 
 [parallel]
 build-all: build-tui build-opengl build-ratzilla build-egui-desktop build-egui-web

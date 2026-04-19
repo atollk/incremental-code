@@ -1,3 +1,5 @@
+#![allow(clippy::all, unused_imports)]
+
 pub mod backend;
 pub mod events;
 pub mod input;

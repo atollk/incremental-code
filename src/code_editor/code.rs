@@ -361,7 +361,7 @@ impl Code {
     /// 4. Empty lines are inserted as-is and do not affect subsequent indentation.
     ///
     /// This ensures that pasted blocks keep their relative structure while aligning to the cursor.
-
+    /// 
     /// Inserts `text` with indentation-awareness at `offset`.
     /// Returns number of characters inserted.
     pub fn smart_paste(&mut self, offset: usize, text: &str) -> usize {
