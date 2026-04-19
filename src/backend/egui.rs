@@ -29,8 +29,8 @@ impl EguiBackendSuite {
             Some(font_bold),
             Some(font_italic),
         );
-        let backend = BackendType::new("soft_rat", soft_backend);
-        backend
+        
+        BackendType::new("soft_rat", soft_backend)
     }
 }
 
