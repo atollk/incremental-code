@@ -327,7 +327,7 @@ impl Code {
         let indent_unit = self.indent();
 
         if indent_unit.is_empty() {
-            return line.chars().take(c).all(|ch| ch.is_whitespace());
+            return false;
         }
 
         let count_units = count_indent_units(line, indent_unit, Some(c));
@@ -635,7 +635,7 @@ mod tests {
     }
 
     pub static INDENT_LANG: LazyLock<LogosCodeLanguage<crate::code_editor::code_logos::PlainTextToken>> =
-        LazyLock::new(|| LogosCodeLanguage::new("  ", "#", HashMap::new()));
+        LazyLock::new(|| LogosCodeLanguage::new("    ", "#", HashMap::new()));
 
     #[test]
     fn test_indentation_level() {

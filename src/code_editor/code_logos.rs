@@ -57,7 +57,7 @@ where
 
 pub fn plain_text_lang() -> Box<dyn CodeLanguage> {
     Box::new(LogosCodeLanguage {
-        indent: "  ",
+        indent: "",
         comment_prefix: "//",
         theme: HashMap::new(),
         token: PhantomData::<PlainTextToken>,

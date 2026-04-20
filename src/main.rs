@@ -4,6 +4,8 @@ pub mod demos;
 pub mod code_editor;
 pub mod game_scenes;
 pub mod widgets;
+pub mod game_state;
+pub mod language;
 
 use crate::basic_terminal_app::BasicTerminalApp;
 use crate::game_scenes::base::SceneGame;
