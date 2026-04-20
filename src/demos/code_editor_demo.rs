@@ -1,10 +1,10 @@
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crate::basic_terminal_app::App;
-use crate::code_editor;
-use crate::code_editor::actions::DefaultAction;
-use crate::code_editor::editor::Editor;
-use crate::code_editor::python_logos::PythonLangToken;
+use crate::widgets::code_editor;
+use crate::widgets::code_editor::actions::DefaultAction;
+use crate::widgets::code_editor::editor::Editor;
+use crate::widgets::code_editor::python_logos::PythonLangToken;
 use crate::widgets::blinking_cursor::BlinkingCursor;
 use ratatui_core::layout::{Position, Rect};
 use ratatui_core::style::{Color, Style};

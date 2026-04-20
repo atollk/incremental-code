@@ -1,4 +1,4 @@
-use crate::code_editor::code::EditBatch;
+use crate::widgets::code_editor::code::EditBatch;
 use std::collections::VecDeque;
 
 pub struct History {

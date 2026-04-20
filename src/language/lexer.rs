@@ -1,4 +1,4 @@
-use crate::code_editor::code_logos::LogosCodeLanguage;
+use crate::widgets::code_editor::code_logos::LogosCodeLanguage;
 use logos::Logos;
 use ratatui_core::style::Style;
 use std::collections::HashMap;

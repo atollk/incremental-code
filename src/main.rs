@@ -1,7 +1,6 @@
 mod backend;
 mod basic_terminal_app;
 pub mod demos;
-pub mod code_editor;
 pub mod game_scenes;
 pub mod widgets;
 pub mod game_state;

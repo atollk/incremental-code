@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use logos::Logos;
 use ratatui_core::style::Style;
-use crate::code_editor::code_logos::LogosCodeLanguage;
+use crate::widgets::code_editor::code_logos::LogosCodeLanguage;
 
 pub fn python_language<'a>(theme: HashMap<PythonLangToken, Style>) -> LogosCodeLanguage<'a, PythonLangToken> {
     LogosCodeLanguage::new("  ", "#", theme)

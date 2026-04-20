@@ -1,6 +1,6 @@
-use crate::code_editor::history::History;
-use crate::code_editor::selection::Selection;
-use crate::code_editor::utils::{calculate_end_position, count_indent_units};
+use crate::widgets::code_editor::history::History;
+use crate::widgets::code_editor::selection::Selection;
+use crate::widgets::code_editor::utils::{calculate_end_position, count_indent_units};
 use ratatui_core::style::Style;
 use ropey::{Rope, RopeSlice};
 use std::ops::Range;
@@ -572,10 +572,10 @@ pub fn grapheme_width(g: RopeSlice) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::code_editor::code_logos::plain_text_lang;
+    use crate::widgets::code_editor::code_logos::plain_text_lang;
     use std::collections::HashMap;
     use std::sync::LazyLock;
-    use crate::code_editor::code_logos::LogosCodeLanguage;
+    use crate::widgets::code_editor::code_logos::LogosCodeLanguage;
     use super::*;
 
     #[test]
@@ -634,7 +634,7 @@ mod tests {
         assert_eq!(code.indentation_level(0, 10), 0);
     }
 
-    pub static INDENT_LANG: LazyLock<LogosCodeLanguage<crate::code_editor::code_logos::PlainTextToken>> =
+    pub static INDENT_LANG: LazyLock<LogosCodeLanguage<crate::widgets::code_editor::code_logos::PlainTextToken>> =
         LazyLock::new(|| LogosCodeLanguage::new("    ", "#", HashMap::new()));
 
     #[test]

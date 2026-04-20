@@ -1,6 +1,6 @@
-use crate::code_editor::code::EditKind;
-use crate::code_editor::editor::Editor;
-use crate::code_editor::selection::Selection;
+use crate::widgets::code_editor::code::EditKind;
+use crate::widgets::code_editor::editor::Editor;
+use crate::widgets::code_editor::selection::Selection;
 
 pub trait Action {
     fn apply(&mut self, editor: &mut Editor);

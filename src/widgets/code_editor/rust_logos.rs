@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use logos::Logos;
 use ratatui_core::style::Style;
-use crate::code_editor::code_logos::LogosCodeLanguage;
+use crate::widgets::code_editor::code_logos::LogosCodeLanguage;
 
 pub fn rust_language<'a>(theme: HashMap<RustLangToken, Style>) -> LogosCodeLanguage<'a, RustLangToken> {
     LogosCodeLanguage::new("  ", "//", theme)

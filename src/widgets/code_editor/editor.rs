@@ -1,10 +1,10 @@
-use crate::code_editor::actions::*;
-use crate::code_editor::click::{ClickKind, ClickTracker};
-use crate::code_editor::code::{grapheme_width, grapheme_width_and_chars_len, RopeGraphemes};
-use crate::code_editor::code::{Code, CodeLanguage};
-use crate::code_editor::code::{EditBatch, EditKind};
-use crate::code_editor::selection::{Selection, SelectionSnap};
-use crate::code_editor::utils;
+use crate::widgets::code_editor::actions::*;
+use crate::widgets::code_editor::click::{ClickKind, ClickTracker};
+use crate::widgets::code_editor::code::{grapheme_width, grapheme_width_and_chars_len, RopeGraphemes};
+use crate::widgets::code_editor::code::{Code, CodeLanguage};
+use crate::widgets::code_editor::code::{EditBatch, EditKind};
+use crate::widgets::code_editor::selection::{Selection, SelectionSnap};
+use crate::widgets::code_editor::utils;
 use anyhow::Result;
 use ratatui_core::layout::Rect;
 use ratatui_core::style::{Color, Style};
