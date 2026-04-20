@@ -3,6 +3,7 @@ use crate::game_scenes::base::Scene;
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_state::with_game_state;
 use crate::widgets::terminal::{RunningCommand, TerminalWidget};
+use itertools::Itertools;
 use ratatui::widgets::Paragraph;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
@@ -13,7 +14,7 @@ use std::cell::RefCell;
 use web_time::Duration;
 
 pub struct HomeTerminalScene {
-    terminal_widget: TerminalWidget,
+    terminal_widget: TerminalWidget<SceneSwitch>,
 }
 
 impl Default for HomeTerminalScene {
@@ -29,11 +30,12 @@ impl HomeTerminalScene {
         }
     }
 
-    fn handle_terminal_command(&self, cmd: &str) -> Box<dyn RunningCommand> {
-        match cmd.trim() {
-            "help" => help_cmd(),
-            "compile" => compile_cmd(),
-            _ => unknown_cmd(cmd.to_owned()),
+    fn handle_terminal_command(&self, cmd: &str) -> Box<dyn RunningCommand<SceneSwitch>> {
+        let commands = command_list();
+        if let Ok(cmd) = commands.iter().filter(|c| c.name == cmd).exactly_one() {
+            (cmd.runner)()
+        } else {
+            unknown_cmd(cmd.to_owned())
         }
     }
 }
@@ -46,11 +48,41 @@ impl Scene for HomeTerminalScene {
                 .set_running(&cmd, self.handle_terminal_command(&cmd));
         }
         frame.render_widget(&self.terminal_widget, frame.area());
-        SceneSwitch::NoSwitch
+        if let Some(cmd) = &self.terminal_widget.running {
+            cmd.get_metadata()
+        } else {
+            SceneSwitch::NoSwitch
+        }
     }
 }
 
-fn unknown_cmd(cmd: String) -> Box<dyn RunningCommand> {
+struct Command {
+    name: &'static str,
+    help_description: &'static str,
+    runner: fn() -> Box<dyn RunningCommand<SceneSwitch>>,
+}
+
+fn command_list() -> Vec<Command> {
+    vec![
+        Command {
+            name: "help",
+            help_description: "Displays this help text",
+            runner: help_cmd,
+        },
+        Command {
+            name: "exit",
+            help_description: "Exits the game",
+            runner: exit_cmd,
+        },
+        Command {
+            name: "compile",
+            help_description: "Compiles the program code to make it executable",
+            runner: compile_cmd,
+        },
+    ]
+}
+
+fn unknown_cmd(cmd: String) -> Box<dyn RunningCommand<SceneSwitch>> {
     let text = format!("Unknown command '{cmd}'. For a list of available commands, try 'help'.");
     let text = Text::raw(text);
     Box::new(ParagraphCmd {
@@ -58,20 +90,17 @@ fn unknown_cmd(cmd: String) -> Box<dyn RunningCommand> {
     })
 }
 
-fn help_cmd() -> Box<dyn RunningCommand> {
+fn help_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
     struct HelpCommand {
         name: &'static str,
         text: &'static str,
     }
-    let available_commands = vec![HelpCommand {
-        name: "help",
-        text: "Displays this help text",
-    }];
+    let available_commands = command_list();
     let lines = std::iter::once("List of available commands:".to_string())
         .chain(
             available_commands
                 .iter()
-                .map(|c| format!("  {}\t - {}", c.name, c.text)),
+                .map(|c| format!("  {}\t - {}", c.name, c.help_description)),
         )
         .map(Line::from)
         .collect::<Vec<_>>();
@@ -81,8 +110,32 @@ fn help_cmd() -> Box<dyn RunningCommand> {
     })
 }
 
-fn compile_cmd() -> Box<dyn RunningCommand> {
-    with_game_state(|game_state| -> Box<dyn RunningCommand> {
+fn exit_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
+    todo!()
+}
+
+struct ExitCmd {}
+
+impl RunningCommand<SceneSwitch> for ExitCmd {
+    fn is_done(&self) -> bool {
+        true
+    }
+
+    fn update(&mut self, events: &[Event], time_delta: Duration) {}
+
+    fn render(&self, area: Rect, buf: &mut Buffer) {}
+
+    fn height(&self, columns: u16) -> u16 {
+        0
+    }
+
+    fn get_metadata(&self) -> SceneSwitch {
+        SceneSwitch::ExitGame
+    }
+}
+
+fn compile_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
+    with_game_state(|game_state| -> Box<dyn RunningCommand<SceneSwitch>> {
         if game_state.program_code.is_empty() {
             let text = "There is no program to compile. Use 'code' the open the code editor and write a program before compiling.";
             let text = Text::raw(text);
@@ -100,7 +153,7 @@ struct ParagraphCmd<'a> {
     paragraph: Paragraph<'a>,
 }
 
-impl RunningCommand for ParagraphCmd<'_> {
+impl RunningCommand<SceneSwitch> for ParagraphCmd<'_> {
     fn is_done(&self) -> bool {
         true
     }
@@ -113,6 +166,10 @@ impl RunningCommand for ParagraphCmd<'_> {
 
     fn height(&self, columns: u16) -> u16 {
         self.paragraph.line_count(columns) as u16
+    }
+
+    fn get_metadata(&self) -> SceneSwitch {
+        SceneSwitch::NoSwitch
     }
 }
 
@@ -138,16 +195,16 @@ impl CompileCmd {
     }
 }
 
-impl RunningCommand for CompileCmd {
+impl RunningCommand<SceneSwitch> for CompileCmd {
     fn is_done(&self) -> bool {
         self.compile_duration <= self.running_duration
     }
 
     fn update(&mut self, _events: &[Event], time_delta: Duration) {
         self.running_duration += time_delta;
-        let target_throbber_index = self
-            .running_duration
-            .div_duration_f32(CompileCmd::THROBBER_STEP_SPEED) as i8;
+        let target_throbber_index =
+            self.running_duration
+                .div_duration_f32(CompileCmd::THROBBER_STEP_SPEED) as i8;
         let mut throbber_state = self.throbber_state.borrow_mut();
         let step = target_throbber_index - throbber_state.index() - self.throbber_start_index;
         if step > 0 {
@@ -184,5 +241,9 @@ impl RunningCommand for CompileCmd {
 
     fn height(&self, _columns: u16) -> u16 {
         1
+    }
+
+    fn get_metadata(&self) -> SceneSwitch {
+        SceneSwitch::NoSwitch
     }
 }

@@ -1,16 +1,16 @@
 use std::time::Duration;
 
-use ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::Widget};
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::widgets::blinking_cursor::BlinkingCursor;
+use ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::Widget};
 
 /// Trait for commands that run inside the terminal widget.
 ///
 /// While a command is running, it receives all input events and a time delta
 /// each frame. Commands can render animated output (spinners, progress bars)
 /// while running, and their final output stays on screen after they finish.
-pub trait RunningCommand {
+pub trait RunningCommand<Meta = ()> {
     /// Returns true once the command has produced its final output and is done.
     fn is_done(&self) -> bool;
 
@@ -31,6 +31,9 @@ pub trait RunningCommand {
     /// May change between frames (e.g. output growing line by line, or a
     /// spinner that expands). The widget re-reads this value every frame.
     fn height(&self, columns: u16) -> u16;
+
+    /// Gets the metadata of this command.
+    fn get_metadata(&self) -> Meta;
 }
 
 /// A terminal widget with a prompt for typing commands, a running-command area,
@@ -48,11 +51,11 @@ pub trait RunningCommand {
 ///     frame.render_widget(cursor, area);
 /// }
 /// ```
-pub struct TerminalWidget {
+pub struct TerminalWidget<Meta> {
     /// Completed commands, oldest first. Their output stays visible above the prompt.
-    history: Vec<Box<dyn RunningCommand>>,
+    history: Vec<Box<dyn RunningCommand<Meta>>>,
     /// The currently running command, if any. Input is blocked while this is set.
-    pub running: Option<Box<dyn RunningCommand>>,
+    pub running: Option<Box<dyn RunningCommand<Meta>>>,
     /// Text currently being typed in the prompt.
     input: String,
     /// Byte offset of the cursor within `input`.
@@ -68,18 +71,20 @@ pub struct TerminalWidget {
 
 /// Wraps a [`RunningCommand`] and prepends a prompt-echo line (`> cmd`) so
 /// history entries look like a real terminal: the typed command followed by its output.
-struct EchoedCommand {
+struct EchoedCommand<Meta> {
     echo: String,
-    inner: Box<dyn RunningCommand>,
+    inner: Box<dyn RunningCommand<Meta>>,
 }
 
-impl RunningCommand for EchoedCommand {
+impl<Meta> RunningCommand<Meta> for EchoedCommand<Meta> {
     fn is_done(&self) -> bool {
         self.inner.is_done()
     }
+
     fn update(&mut self, events: &[Event], time_delta: Duration) {
         self.inner.update(events, time_delta);
     }
+
     fn render(&self, area: Rect, buf: &mut Buffer) {
         // First row: the echoed prompt line.
         buf.set_string(area.x, area.y, &self.echo, Style::default());
@@ -95,12 +100,17 @@ impl RunningCommand for EchoedCommand {
             );
         }
     }
+
     fn height(&self, columns: u16) -> u16 {
         1 + self.inner.height(columns)
     }
+
+    fn get_metadata(&self) -> Meta {
+        self.inner.get_metadata()
+    }
 }
 
-impl TerminalWidget {
+impl<Meta: 'static> TerminalWidget<Meta> {
     /// Create a new terminal widget.
     pub fn new() -> Self {
         Self {
@@ -119,7 +129,7 @@ impl TerminalWidget {
     /// Call this instead of setting `running` directly after receiving a command
     /// string from [`update`](Self::update), so history entries show `> cmd` followed
     /// by the command's output, just like a real terminal.
-    pub fn set_running(&mut self, cmd_text: &str, cmd: Box<dyn RunningCommand>) {
+    pub fn set_running(&mut self, cmd_text: &str, cmd: Box<dyn RunningCommand<Meta>>) {
         self.running = Some(Box::new(EchoedCommand {
             echo: format!("> {}", cmd_text),
             inner: cmd,
@@ -164,10 +174,7 @@ impl TerminalWidget {
             }
             KeyCode::Right => {
                 if self.input_cursor < self.input.len() {
-                    let c = self.input[self.input_cursor..]
-                        .chars()
-                        .next()
-                        .unwrap();
+                    let c = self.input[self.input_cursor..].chars().next().unwrap();
                     self.input_cursor += c.len_utf8();
                 }
             }
@@ -245,10 +252,9 @@ impl TerminalWidget {
         }
         None
     }
-
 }
 
-impl Widget for &TerminalWidget {
+impl<Meta> Widget for &TerminalWidget<Meta> {
     /// Render the terminal into `area`.
     ///
     /// Layout (top to bottom, like a real terminal):
@@ -286,21 +292,22 @@ impl Widget for &TerminalWidget {
 
         // Running command sits directly below the last history entry.
         if let Some(running) = &self.running
-            && y < area.bottom() {
-                let h = running.height(area.width).min(area.bottom() - y);
-                if h > 0 {
-                    running.render(
-                        Rect {
-                            x: area.x,
-                            y,
-                            width: area.width,
-                            height: h,
-                        },
-                        buf,
-                    );
-                    y += h;
-                }
+            && y < area.bottom()
+        {
+            let h = running.height(area.width).min(area.bottom() - y);
+            if h > 0 {
+                running.render(
+                    Rect {
+                        x: area.x,
+                        y,
+                        width: area.width,
+                        height: h,
+                    },
+                    buf,
+                );
+                y += h;
             }
+        }
 
         // Prompt and cursor appear right after the last content row, but only when idle.
         if self.running.is_none() && y < area.bottom() {
@@ -353,6 +360,9 @@ mod tests {
         fn height(&self, _columns: u16) -> u16 {
             1
         }
+        fn get_metadata(&self) -> () {
+            ()
+        }
     }
 
     // Takes `remaining` update calls to finish.
@@ -360,7 +370,7 @@ mod tests {
         remaining: u32,
         h: u16,
     }
-    impl RunningCommand for SlowCmd {
+    impl RunningCommand<()> for SlowCmd {
         fn is_done(&self) -> bool {
             self.remaining == 0
         }
@@ -371,13 +381,16 @@ mod tests {
         fn height(&self, _columns: u16) -> u16 {
             self.h
         }
+        fn get_metadata(&self) -> () {
+            ()
+        }
     }
 
     // Height grows by 1 each update call; finishes after 3 calls.
     struct GrowingCmd {
         calls: u16,
     }
-    impl RunningCommand for GrowingCmd {
+    impl RunningCommand<()> for GrowingCmd {
         fn is_done(&self) -> bool {
             self.calls >= 3
         }
@@ -388,13 +401,16 @@ mod tests {
         fn height(&self, _columns: u16) -> u16 {
             self.calls + 1
         }
+        fn get_metadata(&self) -> () {
+            ()
+        }
     }
 
-    fn make_terminal() -> TerminalWidget {
+    fn make_terminal() -> TerminalWidget<()> {
         TerminalWidget::new()
     }
 
-    fn render_terminal(t: &TerminalWidget, width: u16, height: u16) -> Buffer {
+    fn render_terminal(t: &TerminalWidget<()>, width: u16, height: u16) -> Buffer {
         let area = Rect {
             x: 0,
             y: 0,
@@ -637,8 +653,10 @@ mod tests {
         // 4-row terminal: two history entries of height=2 each → newest is clipped at bottom.
         // Top-down layout: oldest fills rows 0-1, newest fills rows 2-3, no room for prompt.
         struct TwoRowCmd(&'static str);
-        impl RunningCommand for TwoRowCmd {
-            fn is_done(&self) -> bool { true }
+        impl RunningCommand<()> for TwoRowCmd {
+            fn is_done(&self) -> bool {
+                true
+            }
             fn update(&mut self, _: &[Event], _: Duration) {}
             fn render(&self, area: Rect, buf: &mut Buffer) {
                 buf.set_string(area.x, area.y, self.0, Style::default());
@@ -646,7 +664,12 @@ mod tests {
                     buf.set_string(area.x, area.y + 1, "CONT", Style::default());
                 }
             }
-            fn height(&self, _columns: u16) -> u16 { 2 }
+            fn height(&self, _columns: u16) -> u16 {
+                2
+            }
+            fn get_metadata(&self) -> () {
+                ()
+            }
         }
 
         let mut t = TerminalWidget::new();

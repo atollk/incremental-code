@@ -2208,6 +2208,7 @@ dependencies = [
  "glow",
  "glutin",
  "glutin-winit",
+ "itertools",
  "log",
  "logos",
  "ratatui",
