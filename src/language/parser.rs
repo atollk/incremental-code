@@ -170,7 +170,8 @@ where
                 NotPythonExpr::Index(Box::new(NotPythonExpr::Identifier(name)), Box::new(idx))
             });
         let base = call.or(index).or(list_or_dict).or(atom);
-        let op = {
+
+        {
             let arith_op = {
                 let neg = wrap_unary_op(
                     base,
@@ -190,11 +191,11 @@ where
                         just(NotPythonLangToken::Minus).to(NotPythonExprOp::Sub as fn(_, _) -> _),
                     )),
                 );
-                let mod_ = wrap_binary_op(
+
+                wrap_binary_op(
                     add_sub,
                     just(NotPythonLangToken::Percent).to(NotPythonExprOp::Mod as fn(_, _) -> _),
-                );
-                mod_
+                )
             };
             let bool_op = wrap_binary_op(
                 arith_op,
@@ -214,7 +215,8 @@ where
                 bool_op,
                 just(NotPythonLangToken::KwIn).to(NotPythonExprOp::In as fn(_, _) -> _),
             );
-            let comp_op = {
+
+            {
                 let not_op = wrap_unary_op(
                     in_op,
                     just(NotPythonLangToken::KwNot).to(NotPythonExprOp::Not as fn(_) -> _),
@@ -227,10 +229,8 @@ where
                     and_op,
                     just(NotPythonLangToken::KwOr).to(NotPythonExprOp::Or as fn(_, _) -> _),
                 )
-            };
-            comp_op
-        };
-        op
+            }
+        }
     });
     let statement = recursive(|stmt| {
         // Each simple statement ends with `;\n` (or `;<EOI>`).
@@ -261,7 +261,7 @@ where
         let return_ = just(NotPythonLangToken::KwReturn)
             .ignore_then(expression.clone().or_not())
             .then_ignore(semi_line_end.clone())
-            .map(|expr| NotPythonStmt::Return(expr));
+            .map(NotPythonStmt::Return);
 
         // name := expr;
         let decl = select! { NotPythonLangToken::Identifier(s) => s }

@@ -20,8 +20,6 @@ getrandom = { version = "*", features = ["wasm_js"] }
 
 # code editor
 ropey = "^1.6"
-rust-embed = { version = "^8.7", features = ["include-exclude"] }
-streaming-iterator = "~0.1"
 unicode-width = "~0.2"
 unicode-segmentation = "^1.12"
 logos = "0.16.1"
@@ -96,3 +94,8 @@ egui-desktop = [
     "egui",
     "dep:env_logger"
 ]
+
+[lints.clippy]
+new_without_default = "allow"
+style = "allow"
+complexity = "allow"

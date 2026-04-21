@@ -16,6 +16,12 @@ pub struct CodeEditorScene {
     confirm_dialog: Option<ConfirmDialog>,
 }
 
+impl Default for CodeEditorScene {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CodeEditorScene {
     pub fn new() -> Self {
         let code = with_game_state(|state| state.program_code.clone());

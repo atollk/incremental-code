@@ -4,7 +4,7 @@ use std::sync::{LazyLock, Mutex};
 
 pub fn with_game_state<T>(f: impl Fn(&mut GameState) -> T) -> T {
     let mut lock = GLOBAL_GAME_STATE.lock().unwrap();
-    f(&mut *lock)
+    f(&mut lock)
 }
 
 static GLOBAL_GAME_STATE: LazyLock<Mutex<GameState>> =

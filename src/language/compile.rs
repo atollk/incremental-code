@@ -58,20 +58,11 @@ enum ProgramExecutionControlFlow {
     Return(ProgramValue),
 }
 
+#[derive(Default)]
 struct ProgramExecutionCallState<'a> {
     variables: HashMap<&'a str, ProgramValue>,
     functions: HashMap<&'a str, &'a NotPythonStmt>,
     loop_nesting: usize,
-}
-
-impl<'a> Default for ProgramExecutionCallState<'a> {
-    fn default() -> Self {
-        ProgramExecutionCallState {
-            variables: HashMap::new(),
-            functions: HashMap::new(),
-            loop_nesting: 0,
-        }
-    }
 }
 
 struct ProgramExecutionState<'a> {
@@ -154,8 +145,7 @@ fn compile_stmt<'a>(
             stmts
                 .iter()
                 .map(|s| compile_stmt(s, state))
-                .fold(Ok(zero_compile), |acc, b| {
-                    let acc = acc?;
+                .try_fold(zero_compile, |acc, b| {
                     let b = b?;
                     Ok(CompiledProgram {
                         execution_time: acc.execution_time + b.execution_time,
@@ -203,7 +193,7 @@ fn compile_stmt<'a>(
                     else_.as_ref().map(|s| &**s)
                 };
                 let rec = if let Some(stmt) = stmt {
-                    compile_stmt(&stmt, state)? + atom_compile
+                    compile_stmt(stmt, state)? + atom_compile
                 } else {
                     atom_compile
                 };
