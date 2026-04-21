@@ -1,10 +1,10 @@
-use crate::language::parser::{NotPythonExpr, NotPythonProgram, NotPythonStmt};
+use crate::language::parser::{NotPythonExpr, NotPythonExprOp, NotPythonProgram, NotPythonStmt};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::ops::Add;
+use std::ops::{Add, Deref};
 
 #[derive(Serialize, Deserialize)]
 pub struct CompiledProgram {
@@ -85,13 +85,13 @@ impl<'a> ProgramExecutionState<'a> {
         1.0 / self.instruction_speedup_count as f64
     }
 
-    fn get_variable(&self, name: &str) -> Option<&ProgramValue> {
+    fn get_variable(&self, name: &str) -> anyhow::Result<&ProgramValue> {
         for call_state in self.call_stack.iter().rev() {
             if let Some(value) = call_state.variables.get(name) {
-                return Some(value);
+                return Ok(value);
             }
         }
-        None
+        Err(anyhow::format_err!("Variable {name} not found"))
     }
 
     fn decl_variable(&mut self, name: &'a str, value: ProgramValue) {
@@ -158,15 +158,13 @@ fn compile_stmt<'a>(
             Ok(atom_compile)
         }
         NotPythonStmt::Decl(name, expr) => {
-            let expr = eval_expr(expr, state);
+            let expr = eval_expr(expr, state)?;
             state.decl_variable(name, expr);
             Ok(atom_compile)
         }
         NotPythonStmt::Assign(name, expr) => {
-            if state.get_variable(name).is_none() {
-                todo!("Error")
-            }
-            let expr = eval_expr(expr, state);
+            state.get_variable(name)?;
+            let expr = eval_expr(expr, state)?;
             state.assign_variable(name, expr)?;
             Ok(atom_compile)
         }
@@ -174,7 +172,7 @@ fn compile_stmt<'a>(
             condition,
             then,
             else_,
-        } => match eval_expr(&**condition, state) {
+        } => match eval_expr(&**condition, state)? {
             ProgramValue::Hashable(HashableProgramValue::Bool(b)) => {
                 let stmt = if b {
                     Some(&**then)
@@ -203,6 +201,90 @@ fn compile_stmt<'a>(
     }
 }
 
-fn eval_expr(expr: &NotPythonExpr, state: &mut ProgramExecutionState) -> ProgramValue {
+fn eval_unary_op(
+    val: ProgramValue,
+    op: &NotPythonExprOp,
+    state: &mut ProgramExecutionState,
+) -> anyhow::Result<ProgramValue> {
     todo!()
+}
+
+fn eval_binary_op(
+    lhs: ProgramValue,
+    rhs: ProgramValue,
+    op: &NotPythonExprOp,
+    state: &mut ProgramExecutionState,
+) -> anyhow::Result<ProgramValue> {
+    todo!()
+}
+
+fn eval_expr(
+    expr: &NotPythonExpr,
+    state: &mut ProgramExecutionState,
+) -> anyhow::Result<ProgramValue> {
+    match expr {
+        NotPythonExpr::Int(i) => Ok(ProgramValue::Hashable(HashableProgramValue::Int(*i))),
+        NotPythonExpr::Float(f) => Ok(ProgramValue::Float(*f)),
+        NotPythonExpr::String(s) => Ok(ProgramValue::Hashable(HashableProgramValue::String(
+            s.clone(),
+        ))),
+        NotPythonExpr::Boolean(b) => Ok(ProgramValue::Hashable(HashableProgramValue::Bool(*b))),
+        NotPythonExpr::None => Ok(ProgramValue::None),
+        NotPythonExpr::Identifier(name) => state.get_variable(name).map(|x| *x),
+        NotPythonExpr::List(l) => {
+            let values: Result<Vec<_>, _> = l.iter().map(|ex| eval_expr(ex, state)).collect();
+            Ok(ProgramValue::List(values?))
+        }
+        NotPythonExpr::Dict(d) => {}
+        NotPythonExpr::Op(o) => match o {
+            NotPythonExprOp::Add(lhs, rhs)
+            | NotPythonExprOp::Sub(lhs, rhs)
+            | NotPythonExprOp::Mul(lhs, rhs)
+            | NotPythonExprOp::Div(lhs, rhs)
+            | NotPythonExprOp::Mod(lhs, rhs)
+            | NotPythonExprOp::And(lhs, rhs)
+            | NotPythonExprOp::Or(lhs, rhs)
+            | NotPythonExprOp::Equal(lhs, rhs)
+            | NotPythonExprOp::NotEqual(lhs, rhs)
+            | NotPythonExprOp::Greater(lhs, rhs)
+            | NotPythonExprOp::Less(lhs, rhs)
+            | NotPythonExprOp::GreaterEqual(lhs, rhs)
+            | NotPythonExprOp::LessEqual(lhs, rhs)
+            | NotPythonExprOp::In(lhs, rhs) => {
+                eval_binary_op(eval_expr(lhs, state)?, eval_expr(rhs, state)?, o, state)
+            }
+            NotPythonExprOp::Neg(val) | NotPythonExprOp::Not(val) => {
+                eval_unary_op(eval_expr(val, state)?, o, state)
+            }
+        },
+        NotPythonExpr::Call(name, args) => {
+            todo!()
+        }
+        NotPythonExpr::Index(lhs, rhs) => {
+            let lhs = eval_expr(lhs, state)?;
+            let rhs = eval_expr(rhs, state)?;
+            match lhs {
+                ProgramValue::List(l) => match rhs {
+                    ProgramValue::Hashable(HashableProgramValue::Int(i)) => l
+                        .get(i as usize)
+                        .ok_or(anyhow!("Index {i} out of range"))
+                        .map(|v| *v),
+                    _ => Err(anyhow!(
+                        "Index operator on lists can only be used with integers."
+                    )),
+                },
+                ProgramValue::Dict(d) => match rhs {
+                    ProgramValue::Hashable(rhs) => {
+                        todo!()
+                    }
+                    _ => Err(anyhow!(
+                        "Index operator on lists can only be used with integers, bools, or strings."
+                    )),
+                },
+                _ => Err(anyhow!(
+                    "Index operator can only be used on lists or dicts."
+                )),
+            }
+        }
+    }
 }

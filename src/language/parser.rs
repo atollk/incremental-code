@@ -6,7 +6,7 @@ use chumsky::{
 use logos::Logos;
 
 #[derive(Debug, Clone, PartialEq)]
-enum NotPythonExprOp {
+pub(super) enum NotPythonExprOp {
     // Arithmetic
     Add(Box<NotPythonExpr>, Box<NotPythonExpr>),
     Sub(Box<NotPythonExpr>, Box<NotPythonExpr>),
