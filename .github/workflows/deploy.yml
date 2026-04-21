@@ -27,7 +27,7 @@ jobs:
         with:
           version: "v0.21.14"
       - name: Build
-        run: trunk build --release --features ratzilla
+        run: trunk build --release --features ratzilla --public-url "/${{ github.event.repository.name }}/"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
