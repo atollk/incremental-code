@@ -14,10 +14,6 @@ pub struct GameState {
     pub compiled_program: Option<CompiledProgram>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct CompiledProgram {
-    instructions: u32,
-}
 
 impl GameState {
     pub fn new() -> Self {

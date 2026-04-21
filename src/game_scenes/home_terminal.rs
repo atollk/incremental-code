@@ -1,9 +1,11 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::Scene;
 use crate::game_scenes::base::SceneSwitch;
+use crate::game_scenes::code_editor::CodeEditorScene;
 use crate::game_state::with_game_state;
 use crate::widgets::terminal::{RunningCommand, TerminalWidget};
 use itertools::Itertools;
+use rand::random_range;
 use ratatui::widgets::Paragraph;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
@@ -11,6 +13,7 @@ use ratatui_core::terminal::Frame;
 use ratatui_core::text::{Line, Text};
 use ratatui_core::widgets::{StatefulWidget, Widget};
 use std::cell::RefCell;
+use std::clone::Clone;
 use web_time::Duration;
 
 pub struct HomeTerminalScene {
@@ -75,6 +78,11 @@ fn command_list() -> Vec<Command> {
             runner: exit_cmd,
         },
         Command {
+            name: "code",
+            help_description: "Opens the code editor to write or modify your program",
+            runner: code_cmd,
+        },
+        Command {
             name: "compile",
             help_description: "Compiles the program code to make it executable",
             runner: compile_cmd,
@@ -121,11 +129,11 @@ impl RunningCommand<SceneSwitch> for ExitCmd {
         true
     }
 
-    fn update(&mut self, events: &[Event], time_delta: Duration) {}
+    fn update(&mut self, _events: &[Event], _time_delta: Duration) {}
 
-    fn render(&self, area: Rect, buf: &mut Buffer) {}
+    fn render(&self, _area: Rect, _buf: &mut Buffer) {}
 
-    fn height(&self, columns: u16) -> u16 {
+    fn height(&self, _columns: u16) -> u16 {
         0
     }
 
@@ -134,10 +142,34 @@ impl RunningCommand<SceneSwitch> for ExitCmd {
     }
 }
 
+fn code_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
+    Box::new(CodeCmd {})
+}
+
+struct CodeCmd {}
+
+impl RunningCommand<SceneSwitch> for CodeCmd {
+    fn is_done(&self) -> bool {
+        true
+    }
+
+    fn update(&mut self, _events: &[Event], _time_delta: Duration) {}
+
+    fn render(&self, _area: Rect, _buf: &mut Buffer) {}
+
+    fn height(&self, _columns: u16) -> u16 {
+        0
+    }
+
+    fn get_metadata(&self) -> SceneSwitch {
+        SceneSwitch::SwitchTo(Box::new(CodeEditorScene::new()))
+    }
+}
+
 fn compile_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
     with_game_state(|game_state| -> Box<dyn RunningCommand<SceneSwitch>> {
         if game_state.program_code.is_empty() {
-            let text = "There is no program to compile. Use 'code' the open the code editor and write a program before compiling.";
+            let text = "There is no program to compile. Use 'code' to open the code editor and write a program before compiling.";
             let text = Text::raw(text);
             Box::new(ParagraphCmd {
                 paragraph: Paragraph::new(text),
@@ -176,20 +208,19 @@ impl RunningCommand<SceneSwitch> for ParagraphCmd<'_> {
 struct CompileCmd {
     running_duration: Duration,
     compile_duration: Duration,
-    throbber_start_index: i8,
     throbber_state: RefCell<throbber_widgets_tui::ThrobberState>,
 }
 
 impl CompileCmd {
     const THROBBER_STEP_SPEED: Duration = Duration::from_millis(300);
+    const THROBBER_SET: throbber_widgets_tui::Set = throbber_widgets_tui::BRAILLE_SIX;
 
     fn new() -> Self {
         let mut throbber_state = RefCell::new(throbber_widgets_tui::ThrobberState::default());
-        throbber_state.get_mut().calc_step(0); // randomize starting step
+        throbber_state.get_mut().calc_step(0); // randomize animation start
         CompileCmd {
             running_duration: Duration::from_millis(0),
             compile_duration: Duration::from_secs(5),
-            throbber_start_index: throbber_state.get_mut().index(),
             throbber_state,
         }
     }
@@ -201,14 +232,12 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
     }
 
     fn update(&mut self, _events: &[Event], time_delta: Duration) {
+        let throbber_animation_steps = |d: Duration| d.div_duration_f32(CompileCmd::THROBBER_STEP_SPEED) as i8;
+        let old_duration = self.running_duration;
         self.running_duration += time_delta;
-        let target_throbber_index =
-            self.running_duration
-                .div_duration_f32(CompileCmd::THROBBER_STEP_SPEED) as i8;
-        let mut throbber_state = self.throbber_state.borrow_mut();
-        let step = target_throbber_index - throbber_state.index() - self.throbber_start_index;
-        if step > 0 {
-            throbber_state.calc_step(step);
+        let throbber_animation_step_div = throbber_animation_steps(self.running_duration) - throbber_animation_steps(old_duration);
+        if throbber_animation_step_div > 0 {
+            self.throbber_state.borrow_mut().calc_step(throbber_animation_step_div);
         }
     }
 

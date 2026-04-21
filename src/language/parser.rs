@@ -30,7 +30,7 @@ enum NotPythonExprOp {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum NotPythonExpr {
+pub(super) enum NotPythonExpr {
     // Atoms
     Int(i64),
     Float(f64),
@@ -48,7 +48,7 @@ enum NotPythonExpr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum NotPythonStmt {
+pub(super) enum NotPythonStmt {
     // Basic
     Call(String, Vec<NotPythonExpr>),
     Pass,
@@ -375,7 +375,7 @@ fn parse<'a>(src: &'a str) -> Result<NotPythonStmt, Vec<Rich<'a, NotPythonLangTo
 }
 
 pub struct NotPythonProgram {
-    statement: NotPythonStmt,
+    pub(super) statement: NotPythonStmt,
 }
 
 pub fn parse_program(src: &str) -> NotPythonProgram {
