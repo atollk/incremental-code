@@ -1,5 +1,6 @@
 use std::sync::{LazyLock, Mutex};
 use serde::{Deserialize, Serialize};
+use crate::language::compile::CompiledProgram;
 
 pub fn with_game_state<T>(f: impl Fn(&mut GameState) -> T) -> T {
     let mut lock = GLOBAL_GAME_STATE.lock().unwrap();

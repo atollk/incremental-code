@@ -9,6 +9,9 @@ clippy:
     cargo clippy --fix --features tui --features opengl --features egui-desktop
     cargo clippy --fix --features egui-web --features ratzilla --target wasm32-unknown-unknown --allow-dirty
 
+test:
+    cargo test --features tui
+
 [parallel]
 build-all: build-tui build-opengl build-ratzilla build-egui-desktop build-egui-web
 

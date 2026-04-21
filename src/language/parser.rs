@@ -60,11 +60,12 @@ pub(super) enum NotPythonStmt {
 
     // Control
     If {
-        condition: Box<NotPythonExpr>,
+        condition: NotPythonExpr,
         then: Box<NotPythonStmt>,
         else_: Option<Box<NotPythonStmt>>,
     },
     Loop(Box<NotPythonStmt>),
+    Return(Option<NotPythonExpr>),
     Break,
     Continue,
 
@@ -256,6 +257,12 @@ where
             .then_ignore(semi_line_end.clone())
             .to(NotPythonStmt::Continue);
 
+        // return <expr>;
+        let return_ = just(NotPythonLangToken::KwReturn)
+            .ignore_then(expression.clone().or_not())
+            .then_ignore(semi_line_end.clone())
+            .map(|expr| NotPythonStmt::Return(expr));
+
         // name := expr;
         let decl = select! { NotPythonLangToken::Identifier(s) => s }
             .then_ignore(just(NotPythonLangToken::ColonEqual))
@@ -323,13 +330,13 @@ where
                 let mut else_ = else_block.map(Box::new);
                 for (elif_cond, elif_block) in elifs.into_iter().rev() {
                     else_ = Some(Box::new(NotPythonStmt::If {
-                        condition: Box::new(elif_cond),
+                        condition: elif_cond,
                         then: Box::new(elif_block),
                         else_,
                     }));
                 }
                 NotPythonStmt::If {
-                    condition: Box::new(cond),
+                    condition: cond,
                     then: Box::new(then_block),
                     else_,
                 }
@@ -367,7 +374,8 @@ where
             });
 
         choice((
-            pass, break_, continue_, if_stmt, loop_stmt, func_stmt, decl, assign, call_stmt,
+            pass, break_, continue_, return_, if_stmt, loop_stmt, func_stmt, decl, assign,
+            call_stmt,
         ))
     });
 
@@ -543,7 +551,7 @@ mod tests {
         assert_eq!(
             stmts("if True:\npass;\nend\n"),
             vec![NotPythonStmt::If {
-                condition: Box::new(NotPythonExpr::Boolean(true)),
+                condition: NotPythonExpr::Boolean(true),
                 then: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Pass])),
                 else_: None,
             }]
@@ -555,7 +563,7 @@ mod tests {
         assert_eq!(
             stmts("if True:\npass;\nelse:\nbreak;\nend\n"),
             vec![NotPythonStmt::If {
-                condition: Box::new(NotPythonExpr::Boolean(true)),
+                condition: NotPythonExpr::Boolean(true),
                 then: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Pass])),
                 else_: Some(Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Break]))),
             }]
@@ -568,10 +576,10 @@ mod tests {
         assert_eq!(
             stmts("if True:\npass;\nelif False:\nbreak;\nelse:\ncontinue;\nend\n"),
             vec![NotPythonStmt::If {
-                condition: Box::new(NotPythonExpr::Boolean(true)),
+                condition: NotPythonExpr::Boolean(true),
                 then: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Pass])),
                 else_: Some(Box::new(NotPythonStmt::If {
-                    condition: Box::new(NotPythonExpr::Boolean(false)),
+                    condition: NotPythonExpr::Boolean(false),
                     then: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Break])),
                     else_: Some(Box::new(NotPythonStmt::Block(vec![
                         NotPythonStmt::Continue
@@ -621,7 +629,7 @@ mod tests {
             stmts("loop:\nif True:\nbreak;\nend\nend\n"),
             vec![NotPythonStmt::Loop(Box::new(NotPythonStmt::Block(vec![
                 NotPythonStmt::If {
-                    condition: Box::new(NotPythonExpr::Boolean(true)),
+                    condition: NotPythonExpr::Boolean(true),
                     then: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Break])),
                     else_: None,
                 }

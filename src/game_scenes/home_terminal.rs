@@ -5,7 +5,6 @@ use crate::game_scenes::code_editor::CodeEditorScene;
 use crate::game_state::with_game_state;
 use crate::widgets::terminal::{RunningCommand, TerminalWidget};
 use itertools::Itertools;
-use rand::random_range;
 use ratatui::widgets::Paragraph;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
@@ -13,7 +12,6 @@ use ratatui_core::terminal::Frame;
 use ratatui_core::text::{Line, Text};
 use ratatui_core::widgets::{StatefulWidget, Widget};
 use std::cell::RefCell;
-use std::clone::Clone;
 use web_time::Duration;
 
 pub struct HomeTerminalScene {
@@ -99,10 +97,6 @@ fn unknown_cmd(cmd: String) -> Box<dyn RunningCommand<SceneSwitch>> {
 }
 
 fn help_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    struct HelpCommand {
-        name: &'static str,
-        text: &'static str,
-    }
     let available_commands = command_list();
     let lines = std::iter::once("List of available commands:".to_string())
         .chain(
@@ -119,7 +113,7 @@ fn help_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
 }
 
 fn exit_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    todo!()
+    Box::new(ExitCmd {})
 }
 
 struct ExitCmd {}
@@ -242,7 +236,6 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
     }
 
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        let throbber_set = throbber_widgets_tui::BRAILLE_SIX;
         let label = if self.is_done() {
             "Compiling done".to_string()
         } else {
@@ -263,7 +256,7 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
             .throbber_style(
                 ratatui::style::Style::default().add_modifier(ratatui::style::Modifier::BOLD),
             )
-            .throbber_set(throbber_set)
+            .throbber_set(CompileCmd::THROBBER_SET)
             .use_type(throbber_widgets_tui::WhichUse::Spin);
         StatefulWidget::render(full, area, buf, &mut *self.throbber_state.borrow_mut());
     }
