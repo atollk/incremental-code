@@ -1,10 +1,10 @@
-use std::sync::OnceLock;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
     style::{Color, Modifier, Style},
     widgets::Widget,
 };
+use std::sync::OnceLock;
 use web_time::Instant;
 
 /// A blinking cursor that paints a single cell at `(x, y)`.

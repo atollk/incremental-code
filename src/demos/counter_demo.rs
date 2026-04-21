@@ -42,7 +42,6 @@ impl App for CounterDemo {
     }
 }
 
-
 impl Widget for &CounterDemo {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from(" Counter App Tutorial ".bold());

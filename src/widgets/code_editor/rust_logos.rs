@@ -1,9 +1,11 @@
-use std::collections::HashMap;
+use crate::widgets::code_editor::code_logos::LogosCodeLanguage;
 use logos::Logos;
 use ratatui_core::style::Style;
-use crate::widgets::code_editor::code_logos::LogosCodeLanguage;
+use std::collections::HashMap;
 
-pub fn rust_language<'a>(theme: HashMap<RustLangToken, Style>) -> LogosCodeLanguage<'a, RustLangToken> {
+pub fn rust_language<'a>(
+    theme: HashMap<RustLangToken, Style>,
+) -> LogosCodeLanguage<'a, RustLangToken> {
     LogosCodeLanguage::new("  ", "//", theme)
 }
 
@@ -47,15 +49,15 @@ pub enum RustLangToken {
     // Comments
     // =========================================================================
     /// Outer doc line comment: `/// …`
-    #[regex(r"///[^\n]*", allow_greedy=true)]
+    #[regex(r"///[^\n]*", allow_greedy = true)]
     LineDocOuter,
 
     /// Inner doc line comment: `//! …`
-    #[regex(r"//![^\n]*", allow_greedy=true)]
+    #[regex(r"//![^\n]*", allow_greedy = true)]
     LineDocInner,
 
     /// Ordinary line comment: `// …`  (must come after doc variants)
-    #[regex(r"//[^\n]*", allow_greedy=true)]
+    #[regex(r"//[^\n]*", allow_greedy = true)]
     LineComment,
 
     /// Block comment `/* … */` with correct nested-comment handling.

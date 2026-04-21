@@ -226,12 +226,16 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
     }
 
     fn update(&mut self, _events: &[Event], time_delta: Duration) {
-        let throbber_animation_steps = |d: Duration| d.div_duration_f32(CompileCmd::THROBBER_STEP_SPEED) as i8;
+        let throbber_animation_steps =
+            |d: Duration| d.div_duration_f32(CompileCmd::THROBBER_STEP_SPEED) as i8;
         let old_duration = self.running_duration;
         self.running_duration += time_delta;
-        let throbber_animation_step_div = throbber_animation_steps(self.running_duration) - throbber_animation_steps(old_duration);
+        let throbber_animation_step_div = throbber_animation_steps(self.running_duration)
+            - throbber_animation_steps(old_duration);
         if throbber_animation_step_div > 0 {
-            self.throbber_state.borrow_mut().calc_step(throbber_animation_step_div);
+            self.throbber_state
+                .borrow_mut()
+                .calc_step(throbber_animation_step_div);
         }
     }
 

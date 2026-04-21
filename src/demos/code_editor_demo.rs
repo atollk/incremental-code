@@ -1,11 +1,11 @@
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crate::basic_terminal_app::App;
+use crate::widgets::blinking_cursor::BlinkingCursor;
 use crate::widgets::code_editor;
 use crate::widgets::code_editor::actions::DefaultAction;
 use crate::widgets::code_editor::editor::Editor;
 use crate::widgets::code_editor::python_logos::PythonLangToken;
-use crate::widgets::blinking_cursor::BlinkingCursor;
 use ratatui_core::layout::{Position, Rect};
 use ratatui_core::style::{Color, Style};
 use std::collections::HashMap;
@@ -13,7 +13,6 @@ use std::collections::HashMap;
 pub struct CodeEditorDemo {
     editor: Editor,
 }
-
 
 fn key_to_action(key: &KeyEvent) -> Option<DefaultAction> {
     let shift = key.modifiers.contains(KeyModifiers::SHIFT);
@@ -96,7 +95,6 @@ impl Default for CodeEditorDemo {
         CodeEditorDemo { editor }
     }
 }
-
 
 fn prism_theme() -> HashMap<PythonLangToken, Style> {
     let colors = [

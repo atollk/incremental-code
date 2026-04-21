@@ -1,9 +1,11 @@
-use std::collections::HashMap;
+use crate::widgets::code_editor::code_logos::LogosCodeLanguage;
 use logos::Logos;
 use ratatui_core::style::Style;
-use crate::widgets::code_editor::code_logos::LogosCodeLanguage;
+use std::collections::HashMap;
 
-pub fn python_language<'a>(theme: HashMap<PythonLangToken, Style>) -> LogosCodeLanguage<'a, PythonLangToken> {
+pub fn python_language<'a>(
+    theme: HashMap<PythonLangToken, Style>,
+) -> LogosCodeLanguage<'a, PythonLangToken> {
     LogosCodeLanguage::new("  ", "#", theme)
 }
 
@@ -23,19 +25,16 @@ pub fn python_language<'a>(theme: HashMap<PythonLangToken, Style>) -> LogosCodeL
 #[derive(Logos, Debug, Clone, PartialEq, Eq, Hash)]
 #[logos(skip r"[ \t\f]+")] // skip horizontal whitespace only (newlines matter)
 pub enum PythonLangToken {
-
     // -------------------------------------------------------------------------
     // Comments
     // -------------------------------------------------------------------------
-
     /// A `#`-comment running to end of line (newline not included).
-    #[regex(r"#[^\r\n]*", allow_greedy=true)]
+    #[regex(r"#[^\r\n]*", allow_greedy = true)]
     Comment,
 
     // -------------------------------------------------------------------------
     // Literals
     // -------------------------------------------------------------------------
-
     /// Integer literals: decimal, hex, octal, binary (with optional underscores)
     /// e.g. 0, 42, 1_000_000, 0xFF, 0o77, 0b1010
     #[regex(r"0[xX][0-9a-fA-F][0-9a-fA-F_]*|0[oO][0-7][0-7_]*|0[bB][01][01_]*|0+|[1-9][0-9_]*")]
@@ -94,7 +93,6 @@ pub enum PythonLangToken {
     // require three consecutive unescaped quotes, which none of the above
     // alternatives produce.  Analogous logic applies for '''.
     // -------------------------------------------------------------------------
-
     /// Triple-quoted plain string:     """..."""   '''...'''
     /// Triple-quoted b/u-prefixed:  b"""..."""  u'''...'''
     #[regex(r#"[bBuU]?"""([^"\\]|\\.|"[^"\\]|""[^"\\])*""""#)]
@@ -134,51 +132,87 @@ pub enum PythonLangToken {
     // `#[token]` has higher priority than `#[regex]`, so keywords always win
     // over the Identifier regex below — no need for boundary assertions.
     // -------------------------------------------------------------------------
-
-    #[token("False")]    KwFalse,
-    #[token("None")]     KwNone,
-    #[token("True")]     KwTrue,
-    #[token("and")]      KwAnd,
-    #[token("as")]       KwAs,
-    #[token("assert")]   KwAssert,
-    #[token("async")]    KwAsync,
-    #[token("await")]    KwAwait,
-    #[token("break")]    KwBreak,
-    #[token("class")]    KwClass,
-    #[token("continue")] KwContinue,
-    #[token("def")]      KwDef,
-    #[token("del")]      KwDel,
-    #[token("elif")]     KwElif,
-    #[token("else")]     KwElse,
-    #[token("except")]   KwExcept,
-    #[token("finally")]  KwFinally,
-    #[token("for")]      KwFor,
-    #[token("from")]     KwFrom,
-    #[token("global")]   KwGlobal,
-    #[token("if")]       KwIf,
-    #[token("import")]   KwImport,
-    #[token("in")]       KwIn,
-    #[token("is")]       KwIs,
-    #[token("lambda")]   KwLambda,
-    #[token("match")]    KwMatch,    // soft keyword (context-dependent)
-    #[token("case")]     KwCase,     // soft keyword
-    #[token("type")]     KwType,     // soft keyword (PEP 695, Python 3.12+)
-    #[token("nonlocal")] KwNonlocal,
-    #[token("not")]      KwNot,
-    #[token("or")]       KwOr,
-    #[token("pass")]     KwPass,
-    #[token("raise")]    KwRaise,
-    #[token("return")]   KwReturn,
-    #[token("try")]      KwTry,
-    #[token("while")]    KwWhile,
-    #[token("with")]     KwWith,
-    #[token("yield")]    KwYield,
+    #[token("False")]
+    KwFalse,
+    #[token("None")]
+    KwNone,
+    #[token("True")]
+    KwTrue,
+    #[token("and")]
+    KwAnd,
+    #[token("as")]
+    KwAs,
+    #[token("assert")]
+    KwAssert,
+    #[token("async")]
+    KwAsync,
+    #[token("await")]
+    KwAwait,
+    #[token("break")]
+    KwBreak,
+    #[token("class")]
+    KwClass,
+    #[token("continue")]
+    KwContinue,
+    #[token("def")]
+    KwDef,
+    #[token("del")]
+    KwDel,
+    #[token("elif")]
+    KwElif,
+    #[token("else")]
+    KwElse,
+    #[token("except")]
+    KwExcept,
+    #[token("finally")]
+    KwFinally,
+    #[token("for")]
+    KwFor,
+    #[token("from")]
+    KwFrom,
+    #[token("global")]
+    KwGlobal,
+    #[token("if")]
+    KwIf,
+    #[token("import")]
+    KwImport,
+    #[token("in")]
+    KwIn,
+    #[token("is")]
+    KwIs,
+    #[token("lambda")]
+    KwLambda,
+    #[token("match")]
+    KwMatch, // soft keyword (context-dependent)
+    #[token("case")]
+    KwCase, // soft keyword
+    #[token("type")]
+    KwType, // soft keyword (PEP 695, Python 3.12+)
+    #[token("nonlocal")]
+    KwNonlocal,
+    #[token("not")]
+    KwNot,
+    #[token("or")]
+    KwOr,
+    #[token("pass")]
+    KwPass,
+    #[token("raise")]
+    KwRaise,
+    #[token("return")]
+    KwReturn,
+    #[token("try")]
+    KwTry,
+    #[token("while")]
+    KwWhile,
+    #[token("with")]
+    KwWith,
+    #[token("yield")]
+    KwYield,
 
     // -------------------------------------------------------------------------
     // Identifiers
     // Listed after keywords; `#[token]` priority ensures keywords win.
     // -------------------------------------------------------------------------
-
     /// ASCII-only fast path.
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*")]
     /// Full Unicode identifier per PEP 3131 / UAX #31.
@@ -193,71 +227,116 @@ pub enum PythonLangToken {
     // -------------------------------------------------------------------------
 
     // Augmented assignment (3-char)
-    #[token("**=")]  DoubleStarEqual,
-    #[token("//=")]  SlashSlashEqual,
-    #[token("<<=")]  LessLessEqual,
-    #[token(">>=")]  GreaterGreaterEqual,
+    #[token("**=")]
+    DoubleStarEqual,
+    #[token("//=")]
+    SlashSlashEqual,
+    #[token("<<=")]
+    LessLessEqual,
+    #[token(">>=")]
+    GreaterGreaterEqual,
 
     // Augmented assignment (2-char)
-    #[token("+=")]   PlusEqual,
-    #[token("-=")]   MinusEqual,
-    #[token("*=")]   StarEqual,
-    #[token("/=")]   SlashEqual,
-    #[token("%=")]   PercentEqual,
-    #[token("&=")]   AmpersandEqual,
-    #[token("|=")]   PipeEqual,
-    #[token("^=")]   CaretEqual,
-    #[token("@=")]   AtEqual,
+    #[token("+=")]
+    PlusEqual,
+    #[token("-=")]
+    MinusEqual,
+    #[token("*=")]
+    StarEqual,
+    #[token("/=")]
+    SlashEqual,
+    #[token("%=")]
+    PercentEqual,
+    #[token("&=")]
+    AmpersandEqual,
+    #[token("|=")]
+    PipeEqual,
+    #[token("^=")]
+    CaretEqual,
+    #[token("@=")]
+    AtEqual,
 
     // Comparison (2-char)
-    #[token("==")]   EqEqual,
-    #[token("!=")]   NotEqual,
-    #[token("<=")]   LessEqual,
-    #[token(">=")]   GreaterEqual,
+    #[token("==")]
+    EqEqual,
+    #[token("!=")]
+    NotEqual,
+    #[token("<=")]
+    LessEqual,
+    #[token(">=")]
+    GreaterEqual,
 
     // Other 2-char
-    #[token("->")]   Arrow,
-    #[token(":=")]   ColonEqual,   // walrus (PEP 572)
-    #[token("**")]   DoubleStar,
-    #[token("//")]   SlashSlash,
-    #[token("<<")]   LessLess,
-    #[token(">>")]   GreaterGreater,
+    #[token("->")]
+    Arrow,
+    #[token(":=")]
+    ColonEqual, // walrus (PEP 572)
+    #[token("**")]
+    DoubleStar,
+    #[token("//")]
+    SlashSlash,
+    #[token("<<")]
+    LessLess,
+    #[token(">>")]
+    GreaterGreater,
 
     // Single-char operators
-    #[token("<")]    Less,
-    #[token(">")]    Greater,
-    #[token("+")]    Plus,
-    #[token("-")]    Minus,
-    #[token("*")]    Star,
-    #[token("/")]    Slash,
-    #[token("%")]    Percent,
-    #[token("~")]    Tilde,
-    #[token("&")]    Ampersand,
-    #[token("|")]    Pipe,
-    #[token("^")]    Caret,
-    #[token("@")]    At,
-    #[token("=")]    Equal,
+    #[token("<")]
+    Less,
+    #[token(">")]
+    Greater,
+    #[token("+")]
+    Plus,
+    #[token("-")]
+    Minus,
+    #[token("*")]
+    Star,
+    #[token("/")]
+    Slash,
+    #[token("%")]
+    Percent,
+    #[token("~")]
+    Tilde,
+    #[token("&")]
+    Ampersand,
+    #[token("|")]
+    Pipe,
+    #[token("^")]
+    Caret,
+    #[token("@")]
+    At,
+    #[token("=")]
+    Equal,
 
     // -------------------------------------------------------------------------
     // Delimiters & punctuation
     // -------------------------------------------------------------------------
-
-    #[token("...")]  Ellipsis,   // must come before Dot
-    #[token("(")]    LParen,
-    #[token(")")]    RParen,
-    #[token("[")]    LBracket,
-    #[token("]")]    RBracket,
-    #[token("{")]    LBrace,
-    #[token("}")]    RBrace,
-    #[token(",")]    Comma,
-    #[token(":")]    Colon,
-    #[token(".")]    Dot,
-    #[token(";")]    Semi,
+    #[token("...")]
+    Ellipsis, // must come before Dot
+    #[token("(")]
+    LParen,
+    #[token(")")]
+    RParen,
+    #[token("[")]
+    LBracket,
+    #[token("]")]
+    RBracket,
+    #[token("{")]
+    LBrace,
+    #[token("}")]
+    RBrace,
+    #[token(",")]
+    Comma,
+    #[token(":")]
+    Colon,
+    #[token(".")]
+    Dot,
+    #[token(";")]
+    Semi,
 
     // -------------------------------------------------------------------------
     // Whitespace-sensitive tokens
     // -------------------------------------------------------------------------
-
     /// Physical newline (CR+LF, CR, or LF).
     /// Logical-newline / INDENT / DEDENT handling must be done in a
     /// post-processing pass that tracks this token plus bracket depth.

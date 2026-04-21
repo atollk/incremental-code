@@ -3,7 +3,7 @@ use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
 use crate::game_state::with_game_state;
 use crate::widgets::code_editor::editor::Editor;
-use crate::widgets::code_editor::input::{apply_key_event, apply_mouse_event, EditorCommand};
+use crate::widgets::code_editor::input::{EditorCommand, apply_key_event, apply_mouse_event};
 use crate::widgets::code_editor::python_logos;
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
 use ratatui_core::terminal::Frame;
@@ -51,7 +51,9 @@ impl Scene for CodeEditorScene {
                     self.save_code();
                     SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
                 }
-                Some(ConfirmResult::No) => SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new())),
+                Some(ConfirmResult::No) => {
+                    SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
+                }
                 Some(ConfirmResult::Cancel) => {
                     self.confirm_dialog = None;
                     SceneSwitch::NoSwitch
@@ -69,27 +71,25 @@ impl Scene for CodeEditorScene {
         let mut switch = SceneSwitch::NoSwitch;
         'events: for event in events {
             match event {
-                Event::KeyEvent(key) => {
-                    match apply_key_event(&mut self.editor, key) {
-                        Some(EditorCommand::SaveAndExit) => {
-                            self.save_code();
-                            switch = SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()));
-                            break 'events;
-                        }
-                        Some(EditorCommand::Exit) => {
-                            if self.editor.get_content() == self.original_code {
-                                switch = SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()));
-                            } else {
-                                self.confirm_dialog = Some(ConfirmDialog::new(
-                                    "Unsaved Changes",
-                                    "Save changes? [Y]es  [N]o  [Esc] Cancel",
-                                ));
-                            }
-                            break 'events;
-                        }
-                        Some(EditorCommand::Handled) | None => {}
+                Event::KeyEvent(key) => match apply_key_event(&mut self.editor, key) {
+                    Some(EditorCommand::SaveAndExit) => {
+                        self.save_code();
+                        switch = SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()));
+                        break 'events;
                     }
-                }
+                    Some(EditorCommand::Exit) => {
+                        if self.editor.get_content() == self.original_code {
+                            switch = SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()));
+                        } else {
+                            self.confirm_dialog = Some(ConfirmDialog::new(
+                                "Unsaved Changes",
+                                "Save changes? [Y]es  [N]o  [Esc] Cancel",
+                            ));
+                        }
+                        break 'events;
+                    }
+                    Some(EditorCommand::Handled) | None => {}
+                },
                 Event::MouseEvent(mouse) => {
                     apply_mouse_event(&mut self.editor, mouse, &area);
                 }

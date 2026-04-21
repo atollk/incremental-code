@@ -1,9 +1,11 @@
 use crate::backend::backend::{BackendSuite, TerminalApp};
 use crate::backend::events::{Event, IntoEvent};
-use ratzilla::event::{KeyCode as RzKeyCode, MouseButton as RzMouseButton, MouseEventKind as RzMouseEventKind};
-use ratzilla::{WebEventHandler, WebGl2Backend};
-use ratzilla::web_sys::wasm_bindgen::closure::Closure;
+use ratzilla::event::{
+    KeyCode as RzKeyCode, MouseButton as RzMouseButton, MouseEventKind as RzMouseEventKind,
+};
 use ratzilla::web_sys::wasm_bindgen::JsCast;
+use ratzilla::web_sys::wasm_bindgen::closure::Closure;
+use ratzilla::{WebEventHandler, WebGl2Backend};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{LazyLock, Mutex};
@@ -16,27 +18,34 @@ pub static BACKEND_INSTANCE: LazyLock<Mutex<RatzillaBackendSuite>> =
 pub struct RatzillaBackendSuite {}
 
 impl BackendSuite<BackendType> for RatzillaBackendSuite {
-    fn run(&mut self, mut terminal_app: impl TerminalApp<BackendType> + 'static) -> anyhow::Result<()> {
+    fn run(
+        &mut self,
+        mut terminal_app: impl TerminalApp<BackendType> + 'static,
+    ) -> anyhow::Result<()> {
         let mut backend = WebGl2Backend::new().map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
         let events: Rc<RefCell<Vec<Event>>> = Rc::new(RefCell::new(Vec::new()));
 
         {
             let events = events.clone();
-            backend.on_key_event(move |key_event| {
-                if let Some(event) = key_event.into_event() {
-                    events.borrow_mut().push(event);
-                }
-            }).ok();
+            backend
+                .on_key_event(move |key_event| {
+                    if let Some(event) = key_event.into_event() {
+                        events.borrow_mut().push(event);
+                    }
+                })
+                .ok();
         }
 
         {
             let events = events.clone();
-            backend.on_mouse_event(move |mouse_event| {
-                if let Some(event) = mouse_event.into_event() {
-                    events.borrow_mut().push(event);
-                }
-            }).ok();
+            backend
+                .on_mouse_event(move |mouse_event| {
+                    if let Some(event) = mouse_event.into_event() {
+                        events.borrow_mut().push(event);
+                    }
+                })
+                .ok();
         }
 
         terminal_app.init(backend)?;
@@ -48,7 +57,10 @@ impl BackendSuite<BackendType> for RatzillaBackendSuite {
 
         *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
             let current_events: Vec<Event> = events.borrow_mut().drain(..).collect();
-            let exit = terminal_app.borrow_mut().frame(&current_events).unwrap_or(true);
+            let exit = terminal_app
+                .borrow_mut()
+                .frame(&current_events)
+                .unwrap_or(true);
             if !exit {
                 ratzilla::web_sys::window()
                     .unwrap()
@@ -68,7 +80,9 @@ impl BackendSuite<BackendType> for RatzillaBackendSuite {
 
 impl IntoEvent for ratzilla::event::KeyEvent {
     fn into_event(self) -> Option<Event> {
-        use crate::backend::input::{KeyCode, KeyEvent as IKeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+        use crate::backend::input::{
+            KeyCode, KeyEvent as IKeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+        };
 
         let code = match self.code {
             RzKeyCode::Char(c) => KeyCode::Char(c),
@@ -90,9 +104,15 @@ impl IntoEvent for ratzilla::event::KeyEvent {
         };
 
         let mut modifiers = KeyModifiers::NONE;
-        if self.ctrl { modifiers |= KeyModifiers::CONTROL; }
-        if self.alt { modifiers |= KeyModifiers::ALT; }
-        if self.shift { modifiers |= KeyModifiers::SHIFT; }
+        if self.ctrl {
+            modifiers |= KeyModifiers::CONTROL;
+        }
+        if self.alt {
+            modifiers |= KeyModifiers::ALT;
+        }
+        if self.shift {
+            modifiers |= KeyModifiers::SHIFT;
+        }
 
         Some(Event::KeyEvent(IKeyEvent {
             code,
@@ -105,7 +125,9 @@ impl IntoEvent for ratzilla::event::KeyEvent {
 
 impl IntoEvent for ratzilla::event::MouseEvent {
     fn into_event(self) -> Option<Event> {
-        use crate::backend::input::{KeyModifiers, MouseButton, MouseEvent as IMouseEvent, MouseEventKind};
+        use crate::backend::input::{
+            KeyModifiers, MouseButton, MouseEvent as IMouseEvent, MouseEventKind,
+        };
 
         fn map_button(b: RzMouseButton) -> Option<MouseButton> {
             match b {
@@ -128,9 +150,15 @@ impl IntoEvent for ratzilla::event::MouseEvent {
         };
 
         let mut modifiers = KeyModifiers::NONE;
-        if self.ctrl { modifiers |= KeyModifiers::CONTROL; }
-        if self.alt { modifiers |= KeyModifiers::ALT; }
-        if self.shift { modifiers |= KeyModifiers::SHIFT; }
+        if self.ctrl {
+            modifiers |= KeyModifiers::CONTROL;
+        }
+        if self.alt {
+            modifiers |= KeyModifiers::ALT;
+        }
+        if self.shift {
+            modifiers |= KeyModifiers::SHIFT;
+        }
 
         Some(Event::MouseEvent(IMouseEvent {
             kind,

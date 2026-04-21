@@ -13,20 +13,20 @@ use crate::backend::events::Event;
 use crate::backend::input::KeyCode;
 use crate::basic_terminal_app::App;
 use ratatui::{
+    Frame,
     layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     symbols,
     text::{self, Span},
     widgets::{
-        canvas::{self, Canvas, Circle, Map, MapResolution, Rectangle}, Axis, BarChart, Block, Chart, Dataset, Gauge, LineGauge, List, ListItem,
-        ListState, Paragraph, Row, Sparkline, Table, Tabs,
-        Wrap,
+        Axis, BarChart, Block, Chart, Dataset, Gauge, LineGauge, List, ListItem, ListState,
+        Paragraph, Row, Sparkline, Table, Tabs, Wrap,
+        canvas::{self, Canvas, Circle, Map, MapResolution, Rectangle},
     },
-    Frame,
 };
 use tachyonfx::{
-    fx::*, CellFilter, ColorSpace, Duration, Effect, EffectManager, EffectTimer,
-    Interpolation::*, Motion, RangeSampler, SimpleRng,
+    CellFilter, ColorSpace, Duration, Effect, EffectManager, EffectTimer, Interpolation::*, Motion,
+    RangeSampler, SimpleRng, fx::*,
 };
 
 pub struct BeamtermDemo {
@@ -145,13 +145,8 @@ impl BeamtermDemo {
     }
 }
 
-
 impl App for BeamtermDemo {
-    fn frame(
-        &mut self,
-        events: &[Event],
-        frame: &mut Frame,
-    ) -> anyhow::Result<bool> {
+    fn frame(&mut self, events: &[Event], frame: &mut Frame) -> anyhow::Result<bool> {
         let tick_duration = self.on_tick();
         for event in events {
             match event {
@@ -170,13 +165,11 @@ impl App for BeamtermDemo {
                     KeyCode::Down => {
                         self.tasks.next();
                     }
-                    KeyCode::Char(c) => {
-                        match c {
-                            'q' => self.should_quit = true,
-                            't' => self.show_chart = !self.show_chart,
-                            _ => {}
-                        }
-                    }
+                    KeyCode::Char(c) => match c {
+                        'q' => self.should_quit = true,
+                        't' => self.show_chart = !self.show_chart,
+                        _ => {}
+                    },
                     _ => {}
                 },
                 Event::MouseEvent(_) => {}
@@ -450,7 +443,7 @@ fn fx_change_tab() -> Effect {
                 never_complete(dissolve_to(dissolved, (125, ExpoInOut))),
                 never_complete(fade_to_fg(BG_COLOR, (125, BounceOut))),
             ])
-                .with_color_space(ColorSpace::Rgb),
+            .with_color_space(ColorSpace::Rgb),
         ),
         parallel(&[
             style_all_cells(),
@@ -459,7 +452,7 @@ fn fx_change_tab() -> Effect {
                 .with_color_space(ColorSpace::Hsl),
         ]),
     ])
-        .with_filter(CellFilter::Layout(layout, 1))
+    .with_filter(CellFilter::Layout(layout, 1))
 }
 
 fn style_all_cells() -> Effect {
@@ -506,7 +499,7 @@ fn draw_first_tab(frame: &mut Frame, app: &mut BeamtermDemo, area: Rect) {
         Constraint::Min(8),
         Constraint::Length(7),
     ])
-        .split(area);
+    .split(area);
     draw_gauges(frame, app, chunks[0]);
     draw_charts(frame, app, chunks[1]);
     draw_text(frame, chunks[2]);
@@ -518,8 +511,8 @@ fn draw_gauges(frame: &mut Frame, app: &mut BeamtermDemo, area: Rect) {
         Constraint::Length(3),
         Constraint::Length(2),
     ])
-        .margin(1)
-        .split(area);
+    .margin(1)
+    .split(area);
     let block = Block::bordered().title("Graphs");
     frame.render_widget(block, area);
 
@@ -698,7 +691,9 @@ fn draw_charts(frame: &mut Frame, app: &mut BeamtermDemo, area: Rect) {
 
 fn draw_text(frame: &mut Frame, area: Rect) {
     let text = vec![
-        text::Line::from("This is a paragraph with several lines. You can change style your text the way you want"),
+        text::Line::from(
+            "This is a paragraph with several lines. You can change style your text the way you want",
+        ),
         text::Line::from(""),
         text::Line::from(vec![
             Span::from("For example: "),
@@ -713,16 +708,17 @@ fn draw_text(frame: &mut Frame, area: Rect) {
             Span::raw("Oh and if you didn't "),
             Span::styled("notice", Style::default().add_modifier(Modifier::ITALIC)),
             Span::raw(" you can "),
-            Span::styled("automatically", Style::default().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "automatically",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" "),
             Span::styled("wrap", Style::default().add_modifier(Modifier::REVERSED)),
             Span::raw(" your "),
             Span::styled("text", Style::default().add_modifier(Modifier::UNDERLINED)),
-            Span::raw(".")
+            Span::raw("."),
         ]),
-        text::Line::from(
-            "One more thing is that it should display unicode characters: 10\u{20ac}"
-        ),
+        text::Line::from("One more thing is that it should display unicode characters: 10\u{20ac}"),
     ];
     let block = Block::bordered().title(Span::styled(
         "Footer",
@@ -757,12 +753,12 @@ fn draw_second_tab(frame: &mut Frame, app: &mut BeamtermDemo, area: Rect) {
             Constraint::Length(10),
         ],
     )
-        .header(
-            Row::new(vec!["Server", "Location", "Status"])
-                .style(Style::default().fg(Color::Yellow))
-                .bottom_margin(1),
-        )
-        .block(Block::bordered().title("Servers"));
+    .header(
+        Row::new(vec!["Server", "Location", "Status"])
+            .style(Style::default().fg(Color::Yellow))
+            .bottom_margin(1),
+    )
+    .block(Block::bordered().title("Servers"));
     frame.render_widget(table, chunks[0]);
 
     let map = Canvas::default()
@@ -821,8 +817,7 @@ fn draw_second_tab(frame: &mut Frame, app: &mut BeamtermDemo, area: Rect) {
 }
 
 fn draw_third_tab(frame: &mut Frame, _app: &mut BeamtermDemo, area: Rect) {
-    let chunks =
-        Layout::horizontal([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]).split(area);
+    let chunks = Layout::horizontal([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]).split(area);
     let colors = [
         Color::Reset,
         Color::Black,
@@ -847,14 +842,8 @@ fn draw_third_tab(frame: &mut Frame, _app: &mut BeamtermDemo, area: Rect) {
         .map(|c| {
             let cells = vec![
                 ratatui::widgets::Cell::from(Span::raw(format!("{c:?}: "))),
-                ratatui::widgets::Cell::from(Span::styled(
-                    "Foreground",
-                    Style::default().fg(*c),
-                )),
-                ratatui::widgets::Cell::from(Span::styled(
-                    "Background",
-                    Style::default().bg(*c),
-                )),
+                ratatui::widgets::Cell::from(Span::styled("Foreground", Style::default().fg(*c))),
+                ratatui::widgets::Cell::from(Span::styled("Background", Style::default().bg(*c))),
             ];
             Row::new(cells)
         })
@@ -867,6 +856,6 @@ fn draw_third_tab(frame: &mut Frame, _app: &mut BeamtermDemo, area: Rect) {
             Constraint::Ratio(1, 3),
         ],
     )
-        .block(Block::bordered().title("Colors"));
+    .block(Block::bordered().title("Colors"));
     frame.render_widget(table, chunks[0]);
 }

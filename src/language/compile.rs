@@ -675,8 +675,8 @@ mod tests {
 
     #[test]
     fn loop_body_executes_multiple_times() {
-        // x counts iterations; loop runs 3 times then breaks.
-        let src = "x := 0;\nloop:\nif x == 3:\nbreak;\nend\nx = x + 1;\nend\n";
+        // x counts down from 3; loop runs 3 times then breaks.
+        let src = "x := 3;\nloop:\nif x == 1:\nbreak;\nend\nx = x + -1;\nend\n";
         let c = compiled(src);
         // More instructions than if there were no loop.
         assert!(c.instruction_count > 3);

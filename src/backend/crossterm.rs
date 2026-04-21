@@ -1,11 +1,11 @@
 use crate::backend::backend::{BackendSuite, TerminalApp};
+use crate::backend::events::{Event, IntoEvent};
+use crossterm::execute;
+use crossterm::terminal::{EnterAlternateScreen, enable_raw_mode};
 use ratatui::backend::CrosstermBackend;
-use std::io::{stdout, Stdout};
+use std::io::{Stdout, stdout};
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
-use crossterm::execute;
-use crossterm::terminal::{enable_raw_mode, EnterAlternateScreen};
-use crate::backend::events::{Event, IntoEvent};
 
 pub type BackendType = CrosstermBackend<Stdout>;
 
@@ -41,8 +41,8 @@ impl BackendSuite<BackendType> for CrosstermBackendSuite {
 impl IntoEvent for crossterm::event::Event {
     fn into_event(self) -> Option<Event> {
         use crate::backend::input::{
-            KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
-            MouseButton, MouseEvent, MouseEventKind,
+            KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers, MouseButton, MouseEvent,
+            MouseEventKind,
         };
         use crossterm::event as ct;
 
@@ -91,7 +91,12 @@ impl IntoEvent for crossterm::event::Event {
                     ct::KeyEventKind::Release => KeyEventKind::Release,
                 };
                 let state = KeyEventState::from_bits_truncate(k.state.bits());
-                Some(Event::KeyEvent(KeyEvent { code, modifiers, kind, state }))
+                Some(Event::KeyEvent(KeyEvent {
+                    code,
+                    modifiers,
+                    kind,
+                    state,
+                }))
             }
             ct::Event::Mouse(m) => {
                 let kind = match m.kind {

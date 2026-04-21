@@ -1,4 +1,6 @@
-use crate::widgets::code_editor::code::{RopeGraphemes, grapheme_width_and_bytes_len, grapheme_width_and_chars_len};
+use crate::widgets::code_editor::code::{
+    RopeGraphemes, grapheme_width_and_bytes_len, grapheme_width_and_chars_len,
+};
 use crate::widgets::code_editor::editor::Editor;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;

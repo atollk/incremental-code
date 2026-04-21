@@ -1,4 +1,6 @@
-use crate::backend::input::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use crate::backend::input::{
+    KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use crate::widgets::code_editor::actions::DefaultAction;
 use crate::widgets::code_editor::editor::Editor;
 use ratatui_core::layout::Rect;
@@ -60,7 +62,9 @@ pub fn apply_key_event(editor: &mut Editor, key: &KeyEvent) -> Option<EditorComm
             KeyCode::Enter => editor.apply(DefaultAction::InsertNewline),
             KeyCode::Tab => editor.apply(DefaultAction::Indent),
             KeyCode::BackTab => editor.apply(DefaultAction::UnIndent),
-            KeyCode::Char(c) => editor.apply(DefaultAction::InsertText { text: c.to_string() }),
+            KeyCode::Char(c) => editor.apply(DefaultAction::InsertText {
+                text: c.to_string(),
+            }),
             _ => return None,
         }
     }

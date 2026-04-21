@@ -1,4 +1,5 @@
 use crate::backend::backend::{BackendSuite, TerminalApp};
+use crate::backend::events::{Event, IntoEvent};
 use beamterm_core::{
     Drawable, FontAtlasData, GlState, GlslVersion, RenderContext, StaticFontAtlas, TerminalGrid,
 };
@@ -17,6 +18,7 @@ use raw_window_handle::HasWindowHandle;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::sync::{LazyLock, Mutex};
+use winit::event::KeyEvent;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -27,8 +29,6 @@ use winit::{
     dpi::LogicalSize,
     window::{Window, WindowAttributes},
 };
-use winit::event::KeyEvent;
-use crate::backend::events::{Event, IntoEvent};
 
 pub static BACKEND_INSTANCE: LazyLock<Mutex<BeamtermCoreBackendSuite>> =
     LazyLock::new(|| Mutex::new(BeamtermCoreBackendSuite {}));
@@ -53,7 +53,7 @@ impl BackendSuite<BackendType> for BeamtermCoreBackendSuite {
         let mut app = BeamtermCoreApplicationHandler {
             terminal_app,
             window_state: None,
-             events: Vec::new(),
+            events: Vec::new(),
         };
         event_loop.run_app(&mut app)?;
         Ok(())
@@ -129,7 +129,10 @@ impl<A: TerminalApp<BackendType>> ApplicationHandler for BeamtermCoreApplication
                 }
             }
             WindowEvent::RedrawRequested => {
-                let exit = self.terminal_app.frame(&self.events).expect("failed to draw");
+                let exit = self
+                    .terminal_app
+                    .frame(&self.events)
+                    .expect("failed to draw");
                 if exit {
                     event_loop.exit();
                 }

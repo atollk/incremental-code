@@ -110,12 +110,13 @@ impl Action for DefaultAction {
 
                 if !shift
                     && let Some(sel) = editor.get_selection()
-                        && !sel.is_empty() {
-                            let (_, end) = sel.sorted();
-                            editor.set_cursor(end);
-                            editor.clear_selection();
-                            return;
-                        }
+                    && !sel.is_empty()
+                {
+                    let (_, end) = sel.sorted();
+                    editor.set_cursor(end);
+                    editor.clear_selection();
+                    return;
+                }
 
                 if cursor < editor.code_mut().len() {
                     let new_cursor = cursor.saturating_add(1);
@@ -134,12 +135,13 @@ impl Action for DefaultAction {
 
                 if !shift
                     && let Some(sel) = editor.get_selection()
-                        && !sel.is_empty() {
-                            let (start, _) = sel.sorted();
-                            editor.set_cursor(start);
-                            editor.clear_selection();
-                            return;
-                        }
+                    && !sel.is_empty()
+                {
+                    let (start, _) = sel.sorted();
+                    editor.set_cursor(start);
+                    editor.clear_selection();
+                    return;
+                }
 
                 if cursor > 0 {
                     let new_cursor = cursor.saturating_sub(1);
@@ -208,11 +210,12 @@ impl Action for DefaultAction {
                 code.set_state_before(cursor, selection);
 
                 if let Some(sel) = &selection
-                    && !sel.is_empty() {
-                        let (start, end) = sel.sorted();
-                        code.remove(start, end);
-                        cursor = start;
-                    }
+                    && !sel.is_empty()
+                {
+                    let (start, end) = sel.sorted();
+                    code.remove(start, end);
+                    cursor = start;
+                }
                 selection = None;
 
                 code.insert(cursor, &text);
@@ -233,7 +236,10 @@ impl Action for DefaultAction {
                 let indent_level = code.indentation_level(row, col);
                 let indent_text = code.indent().repeat(indent_level);
                 let text_to_insert = format!("\n{}", indent_text);
-                DefaultAction::InsertText { text: text_to_insert }.apply(editor);
+                DefaultAction::InsertText {
+                    text: text_to_insert,
+                }
+                .apply(editor);
             }
 
             DefaultAction::Delete => {
@@ -607,12 +613,13 @@ impl Action for DefaultAction {
                 code.set_state_before(cursor, selection);
 
                 if let Some(sel) = &selection
-                    && !sel.is_empty() {
-                        let (start, end) = sel.sorted();
-                        code.remove(start, end);
-                        cursor = start;
-                        selection = None;
-                    }
+                    && !sel.is_empty()
+                {
+                    let (start, end) = sel.sorted();
+                    code.remove(start, end);
+                    cursor = start;
+                    selection = None;
+                }
 
                 let inserted = code.smart_paste(cursor, &text);
                 cursor += inserted;

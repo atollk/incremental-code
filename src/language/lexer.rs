@@ -27,7 +27,7 @@ pub enum NotPythonLangToken {
     // Literals
     // -------------------------------------------------------------------------
     /// Integer literals (with underscores allowed)
-    #[regex(r"[1-9][0-9_]*", |lex| lex.slice().to_string())]
+    #[regex(r"0|[1-9][0-9_]*", |lex| lex.slice().to_string())]
     Int(String),
 
     /// Floating-point literals
@@ -209,8 +209,14 @@ mod tests {
         assert_eq!(lex("False"), vec![NotPythonLangToken::KwFalse]);
         assert_eq!(lex("None"), vec![NotPythonLangToken::KwNone]);
         // Identifiers that merely start with a keyword prefix are not keywords.
-        assert_eq!(lex("iffy"), vec![NotPythonLangToken::Identifier("iffy".into())]);
-        assert_eq!(lex("end_game"), vec![NotPythonLangToken::Identifier("end_game".into())]);
+        assert_eq!(
+            lex("iffy"),
+            vec![NotPythonLangToken::Identifier("iffy".into())]
+        );
+        assert_eq!(
+            lex("end_game"),
+            vec![NotPythonLangToken::Identifier("end_game".into())]
+        );
     }
 
     #[test]

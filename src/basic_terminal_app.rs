@@ -1,7 +1,7 @@
 use crate::backend;
+use crate::backend::backend::BackendSuite;
 use crate::backend::backend::TerminalApp;
 use crate::backend::events::Event;
-use crate::backend::backend::BackendSuite;
 
 pub trait App {
     fn frame(&mut self, events: &[Event], frame: &mut ratatui::Frame) -> anyhow::Result<bool>;
@@ -21,10 +21,7 @@ impl<A: App + 'static> BasicTerminalApp<A> {
     }
 
     pub(crate) fn run(self) -> anyhow::Result<()> {
-        backend::BACKEND_INSTANCE
-            .lock()
-            .unwrap()
-            .run(self)
+        backend::BACKEND_INSTANCE.lock().unwrap().run(self)
     }
 }
 
@@ -51,4 +48,3 @@ impl<A: App> TerminalApp<backend::BackendType> for BasicTerminalApp<A> {
         self.terminal.as_mut().unwrap().backend_mut()
     }
 }
-

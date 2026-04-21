@@ -1,8 +1,10 @@
 use crate::widgets::code_editor::actions::*;
 use crate::widgets::code_editor::click::{ClickKind, ClickTracker};
-use crate::widgets::code_editor::code::{grapheme_width, grapheme_width_and_chars_len, RopeGraphemes};
 use crate::widgets::code_editor::code::{Code, CodeLanguage};
 use crate::widgets::code_editor::code::{EditBatch, EditKind};
+use crate::widgets::code_editor::code::{
+    RopeGraphemes, grapheme_width, grapheme_width_and_chars_len,
+};
 use crate::widgets::code_editor::selection::{Selection, SelectionSnap};
 use crate::widgets::code_editor::utils;
 use anyhow::Result;
@@ -52,10 +54,7 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn new(
-        language: Box<dyn CodeLanguage>,
-        text: &str,
-    ) -> Self {
+    pub fn new(language: Box<dyn CodeLanguage>, text: &str) -> Self {
         Self {
             code: Code::new(text, language),
             cursor: 0,
@@ -76,7 +75,7 @@ impl Editor {
         let total_lines = self.code.len_lines();
         let max_line_number = total_lines.max(1);
         let line_number_digits = max_line_number.to_string().len().max(5);
-        let line_number_width = line_number_digits + 2 ;
+        let line_number_width = line_number_digits + 2;
 
         let line = self.code.char_to_line(self.cursor);
         let col = self.cursor - self.code.line_to_char(line);
@@ -308,7 +307,6 @@ impl Editor {
         }
     }
 
-
     pub fn get_content(&self) -> String {
         self.code.get_content()
     }
@@ -404,11 +402,7 @@ impl Editor {
         self.code.set_change_callback(callback);
     }
 
-    pub fn highlight_interval(
-        &self,
-        start: usize,
-        end: usize,
-    ) -> Vec<(usize, usize, Style)> {
+    pub fn highlight_interval(&self, start: usize, end: usize) -> Vec<(usize, usize, Style)> {
         let mut cache = self.highlights_cache.borrow_mut();
         let key = (start, end);
         if let Some(v) = cache.get(&key) {

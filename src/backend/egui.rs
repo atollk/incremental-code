@@ -29,7 +29,7 @@ impl EguiBackendSuite {
             Some(font_bold),
             Some(font_italic),
         );
-        
+
         BackendType::new("soft_rat", soft_backend)
     }
 }

@@ -331,7 +331,7 @@ impl Code {
         }
 
         let count_units = count_indent_units(line, indent_unit, Some(c));
-        
+
         count_units * indent_unit.chars().count() >= c
     }
 
@@ -361,7 +361,7 @@ impl Code {
     /// 4. Empty lines are inserted as-is and do not affect subsequent indentation.
     ///
     /// This ensures that pasted blocks keep their relative structure while aligning to the cursor.
-    /// 
+    ///
     /// Inserts `text` with indentation-awareness at `offset`.
     /// Returns number of characters inserted.
     pub fn smart_paste(&mut self, offset: usize, text: &str) -> usize {
@@ -572,11 +572,11 @@ pub fn grapheme_width(g: RopeSlice) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::widgets::code_editor::code_logos::LogosCodeLanguage;
     use crate::widgets::code_editor::code_logos::plain_text_lang;
     use std::collections::HashMap;
     use std::sync::LazyLock;
-    use crate::widgets::code_editor::code_logos::LogosCodeLanguage;
-    use super::*;
 
     #[test]
     fn test_insert() {
@@ -634,8 +634,9 @@ mod tests {
         assert_eq!(code.indentation_level(0, 10), 0);
     }
 
-    pub static INDENT_LANG: LazyLock<LogosCodeLanguage<crate::widgets::code_editor::code_logos::PlainTextToken>> =
-        LazyLock::new(|| LogosCodeLanguage::new("    ", "#", HashMap::new()));
+    pub static INDENT_LANG: LazyLock<
+        LogosCodeLanguage<crate::widgets::code_editor::code_logos::PlainTextToken>,
+    > = LazyLock::new(|| LogosCodeLanguage::new("    ", "#", HashMap::new()));
 
     #[test]
     fn test_indentation_level() {
