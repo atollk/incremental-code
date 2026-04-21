@@ -123,6 +123,29 @@ where
             NotPythonLangToken::KwNone => NotPythonExpr::None,
             NotPythonLangToken::Identifier(s) => NotPythonExpr::Identifier(s),
         };
+        let list = expr
+            .clone()
+            .separated_by(just(NotPythonLangToken::Comma))
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .delimited_by(
+                just(NotPythonLangToken::LBracket),
+                just(NotPythonLangToken::RBracket),
+            )
+            .map(NotPythonExpr::List);
+        let dict = expr
+            .clone()
+            .then_ignore(just(NotPythonLangToken::Colon))
+            .then(expr.clone())
+            .separated_by(just(NotPythonLangToken::Comma))
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .delimited_by(
+                just(NotPythonLangToken::LBrace),
+                just(NotPythonLangToken::RBrace),
+            )
+            .map(NotPythonExpr::Dict);
+        let list_or_dict = list.or(dict);
         let call = select! { NotPythonLangToken::Identifier(s) => s }
             .then(
                 expr.clone()
@@ -145,7 +168,7 @@ where
             .map(|(name, idx)| {
                 NotPythonExpr::Index(Box::new(NotPythonExpr::Identifier(name)), Box::new(idx))
             });
-        let base = call.or(index).or(atom);
+        let base = call.or(index).or(list_or_dict).or(atom);
         let op = {
             let arith_op = {
                 let neg = wrap_unary_op(
