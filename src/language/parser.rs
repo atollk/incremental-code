@@ -123,7 +123,8 @@ where
             NotPythonLangToken::KwFalse => NotPythonExpr::Boolean(false),
             NotPythonLangToken::KwNone => NotPythonExpr::None,
             NotPythonLangToken::Identifier(s) => NotPythonExpr::Identifier(s),
-        };
+        }
+        .boxed();
         let list = expr
             .clone()
             .separated_by(just(NotPythonLangToken::Comma))
@@ -133,7 +134,8 @@ where
                 just(NotPythonLangToken::LBracket),
                 just(NotPythonLangToken::RBracket),
             )
-            .map(NotPythonExpr::List);
+            .map(NotPythonExpr::List)
+            .boxed();
         let dict = expr
             .clone()
             .then_ignore(just(NotPythonLangToken::Colon))
@@ -145,7 +147,8 @@ where
                 just(NotPythonLangToken::LBrace),
                 just(NotPythonLangToken::RBrace),
             )
-            .map(NotPythonExpr::Dict);
+            .map(NotPythonExpr::Dict)
+            .boxed();
         let list_or_dict = list.or(dict);
         let call = select! { NotPythonLangToken::Identifier(s) => s }
             .then(
@@ -160,7 +163,8 @@ where
             )
             .map(|(name, args)| {
                 NotPythonExpr::Call(Box::new(NotPythonExpr::Identifier(name)), args)
-            });
+            })
+            .boxed();
         let index = select! { NotPythonLangToken::Identifier(s) => s }
             .then(expr.clone().delimited_by(
                 just(NotPythonLangToken::LBracket),
@@ -168,7 +172,8 @@ where
             ))
             .map(|(name, idx)| {
                 NotPythonExpr::Index(Box::new(NotPythonExpr::Identifier(name)), Box::new(idx))
-            });
+            })
+            .boxed();
         let base = call.or(index).or(list_or_dict).or(atom);
 
         {
@@ -215,67 +220,76 @@ where
                 bool_op,
                 just(NotPythonLangToken::KwIn).to(NotPythonExprOp::In as fn(_, _) -> _),
             );
-
-            {
-                let not_op = wrap_unary_op(
-                    in_op,
-                    just(NotPythonLangToken::KwNot).to(NotPythonExprOp::Not as fn(_) -> _),
-                );
-                let and_op = wrap_binary_op(
-                    not_op,
-                    just(NotPythonLangToken::KwAnd).to(NotPythonExprOp::And as fn(_, _) -> _),
-                );
-                wrap_binary_op(
-                    and_op,
-                    just(NotPythonLangToken::KwOr).to(NotPythonExprOp::Or as fn(_, _) -> _),
-                )
-            }
+            let not_op = wrap_unary_op(
+                in_op,
+                just(NotPythonLangToken::KwNot).to(NotPythonExprOp::Not as fn(_) -> _),
+            );
+            let and_op = wrap_binary_op(
+                not_op,
+                just(NotPythonLangToken::KwAnd).to(NotPythonExprOp::And as fn(_, _) -> _),
+            );
+            wrap_binary_op(
+                and_op,
+                just(NotPythonLangToken::KwOr).to(NotPythonExprOp::Or as fn(_, _) -> _),
+            )
+            .boxed()
         }
-    });
+    })
+    .boxed();
     let statement = recursive(|stmt| {
         // Each simple statement ends with `;\n` (or `;<EOI>`).
         // Each block statement ends with `end\n` (or `end<EOI>`).
         // Block headers (if/elif/else/loop/def) end with `:\n`.
-        let line_end = just(NotPythonLangToken::Newline).ignored().or(end());
+        let line_end = just(NotPythonLangToken::Newline)
+            .ignored()
+            .or(end())
+            .boxed();
 
         let semi_line_end = just(NotPythonLangToken::Semi)
             .then(line_end.clone())
-            .ignored();
+            .ignored()
+            .boxed();
 
         // pass;
         let pass = just(NotPythonLangToken::KwPass)
             .then_ignore(semi_line_end.clone())
-            .to(NotPythonStmt::Pass);
+            .to(NotPythonStmt::Pass)
+            .boxed();
 
         // break;
         let break_ = just(NotPythonLangToken::KwBreak)
             .then_ignore(semi_line_end.clone())
-            .to(NotPythonStmt::Break);
+            .to(NotPythonStmt::Break)
+            .boxed();
 
         // continue;
         let continue_ = just(NotPythonLangToken::KwContinue)
             .then_ignore(semi_line_end.clone())
-            .to(NotPythonStmt::Continue);
+            .to(NotPythonStmt::Continue)
+            .boxed();
 
         // return <expr>;
         let return_ = just(NotPythonLangToken::KwReturn)
             .ignore_then(expression.clone().or_not())
             .then_ignore(semi_line_end.clone())
-            .map(NotPythonStmt::Return);
+            .map(NotPythonStmt::Return)
+            .boxed();
 
         // name := expr;
         let decl = select! { NotPythonLangToken::Identifier(s) => s }
             .then_ignore(just(NotPythonLangToken::ColonEqual))
             .then(expression.clone())
             .then_ignore(semi_line_end.clone())
-            .map(|(name, expr)| NotPythonStmt::Decl(name, expr));
+            .map(|(name, expr)| NotPythonStmt::Decl(name, expr))
+            .boxed();
 
         // name = expr;
         let assign = select! { NotPythonLangToken::Identifier(s) => s }
             .then_ignore(just(NotPythonLangToken::Equal))
             .then(expression.clone())
             .then_ignore(semi_line_end.clone())
-            .map(|(name, expr)| NotPythonStmt::Assign(name, expr));
+            .map(|(name, expr)| NotPythonStmt::Assign(name, expr))
+            .boxed();
 
         // name(args...);
         let call_stmt = select! { NotPythonLangToken::Identifier(s) => s }
@@ -291,7 +305,8 @@ where
                     ),
             )
             .then_ignore(semi_line_end)
-            .map(|(name, args)| NotPythonStmt::Call(name, args));
+            .map(|(name, args)| NotPythonStmt::Call(name, args))
+            .boxed();
 
         // A block is a bare sequence of statements. Each statement carries its own
         // terminator, so no extra separator is needed. The block ends when the next
@@ -300,22 +315,26 @@ where
             .clone()
             .repeated()
             .collect::<Vec<_>>()
-            .map(NotPythonStmt::Block);
+            .map(NotPythonStmt::Block)
+            .boxed();
 
         // `:\n` header terminator shared by if/elif/else/loop/def.
         let colon_newline = just(NotPythonLangToken::Colon)
             .then(just(NotPythonLangToken::Newline))
-            .ignored();
+            .ignored()
+            .boxed();
 
         // if expr:\n block [elif expr:\n block]* [else:\n block] end\n
         let elif_branch = just(NotPythonLangToken::KwElif)
             .ignore_then(expression.clone())
             .then_ignore(colon_newline.clone())
-            .then(block.clone());
+            .then(block.clone())
+            .boxed();
 
         let else_branch = just(NotPythonLangToken::KwElse)
             .ignore_then(colon_newline.clone())
-            .ignore_then(block.clone());
+            .ignore_then(block.clone())
+            .boxed();
 
         let if_stmt = just(NotPythonLangToken::KwIf)
             .ignore_then(expression.clone())
@@ -340,7 +359,8 @@ where
                     then: Box::new(then_block),
                     else_,
                 }
-            });
+            })
+            .boxed();
 
         // loop:\n block end\n
         let loop_stmt = just(NotPythonLangToken::KwLoop)
@@ -348,7 +368,8 @@ where
             .ignore_then(block.clone())
             .then_ignore(just(NotPythonLangToken::KwEnd))
             .then_ignore(line_end.clone())
-            .map(|body| NotPythonStmt::Loop(Box::new(body)));
+            .map(|body| NotPythonStmt::Loop(Box::new(body)))
+            .boxed();
 
         // def name(params):\n block end\n
         let func_params = select! { NotPythonLangToken::Identifier(s) => s }
@@ -358,7 +379,8 @@ where
             .delimited_by(
                 just(NotPythonLangToken::LParen),
                 just(NotPythonLangToken::RParen),
-            );
+            )
+            .boxed();
 
         let func_stmt = just(NotPythonLangToken::KwDef)
             .ignore_then(select! { NotPythonLangToken::Identifier(s) => s })
@@ -371,12 +393,14 @@ where
                 name,
                 params,
                 body: Box::new(body),
-            });
+            })
+            .boxed();
 
         choice((
             pass, break_, continue_, return_, if_stmt, loop_stmt, func_stmt, decl, assign,
             call_stmt,
         ))
+        .boxed()
     });
 
     // Top-level: each statement carries its own terminator, so no padding needed.
@@ -384,6 +408,7 @@ where
         .repeated()
         .collect::<Vec<_>>()
         .map(NotPythonStmt::Block)
+        .boxed()
 }
 
 fn parse<'a>(src: &'a str) -> Result<NotPythonStmt, Vec<Rich<'a, NotPythonLangToken>>> {

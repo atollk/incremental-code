@@ -538,12 +538,12 @@ mod tests {
     use crate::language::parser::parse_program;
 
     fn compiled(src: &str) -> CompiledProgram {
-        compile(&parse_program(src))
+        compile(&parse_program(src).unwrap())
     }
 
     fn compiled_err(src: &str) -> anyhow::Error {
         // We need direct access to the Result for error tests.
-        let program = parse_program(src);
+        let program = parse_program(src).unwrap();
         let mut state = ProgramExecutionState {
             control_flow: ProgramExecutionControlFlow::Normal,
             call_stack: vec![ProgramExecutionCallState::default()],
