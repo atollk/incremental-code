@@ -5,36 +5,7 @@ use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::widgets::blinking_cursor::BlinkingCursor;
 use ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::Widget};
 
-/// Trait for commands that run inside the terminal widget.
-///
-/// While a command is running, it receives all input events and a time delta
-/// each frame. Commands can render animated output (spinners, progress bars)
-/// while running, and their final output stays on screen after they finish.
-pub trait RunningCommand<Meta = ()> {
-    /// Returns true once the command has produced its final output and is done.
-    fn is_done(&self) -> bool;
-
-    /// Called each frame while this command is active.
-    ///
-    /// `events` contains all input events for the frame; `time_delta` is the
-    /// elapsed time since the previous call, for time-based animation.
-    fn update(&mut self, events: &[Event], time_delta: Duration);
-
-    /// Render the command's current output into `area`.
-    ///
-    /// Called both while running (for live output) and after completion (so
-    /// the final output stays visible in the history area).
-    fn render(&self, area: Rect, buf: &mut Buffer);
-
-    /// Number of terminal rows this command's output currently occupies.
-    ///
-    /// May change between frames (e.g. output growing line by line, or a
-    /// spinner that expands). The widget re-reads this value every frame.
-    fn height(&self, columns: u16) -> u16;
-
-    /// Gets the metadata of this command.
-    fn get_metadata(&self) -> Meta;
-}
+use super::commands::{EchoedCommand, RunningCommand};
 
 /// A terminal widget with a prompt for typing commands, a running-command area,
 /// and a scrolling history of completed command outputs.
@@ -69,47 +40,6 @@ pub struct TerminalWidget<Meta> {
     pub cursor: BlinkingCursor,
 }
 
-/// Wraps a [`RunningCommand`] and prepends a prompt-echo line (`> cmd`) so
-/// history entries look like a real terminal: the typed command followed by its output.
-struct EchoedCommand<Meta> {
-    echo: String,
-    inner: Box<dyn RunningCommand<Meta>>,
-}
-
-impl<Meta> RunningCommand<Meta> for EchoedCommand<Meta> {
-    fn is_done(&self) -> bool {
-        self.inner.is_done()
-    }
-
-    fn update(&mut self, events: &[Event], time_delta: Duration) {
-        self.inner.update(events, time_delta);
-    }
-
-    fn render(&self, area: Rect, buf: &mut Buffer) {
-        // First row: the echoed prompt line.
-        buf.set_string(area.x, area.y, &self.echo, Style::default());
-        // Remaining rows: the inner command's output.
-        if area.height > 1 {
-            self.inner.render(
-                Rect {
-                    y: area.y + 1,
-                    height: area.height - 1,
-                    ..area
-                },
-                buf,
-            );
-        }
-    }
-
-    fn height(&self, columns: u16) -> u16 {
-        1 + self.inner.height(columns)
-    }
-
-    fn get_metadata(&self) -> Meta {
-        self.inner.get_metadata()
-    }
-}
-
 impl<Meta: 'static> TerminalWidget<Meta> {
     /// Create a new terminal widget.
     pub fn new() -> Self {
@@ -130,10 +60,7 @@ impl<Meta: 'static> TerminalWidget<Meta> {
     /// string from [`update`](Self::update), so history entries show `> cmd` followed
     /// by the command's output, just like a real terminal.
     pub fn set_running(&mut self, cmd_text: &str, cmd: Box<dyn RunningCommand<Meta>>) {
-        self.running = Some(Box::new(EchoedCommand {
-            echo: format!("> {}", cmd_text),
-            inner: cmd,
-        }));
+        self.running = Some(Box::new(EchoedCommand::new(format!("> {cmd_text}"), cmd)));
     }
 
     fn handle_event(&mut self, event: &Event) -> Option<String> {

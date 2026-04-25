@@ -16,6 +16,12 @@ pub enum SceneSwitch {
     SwitchTo(Box<dyn Scene>),
 }
 
+impl Default for SceneSwitch {
+    fn default() -> Self {
+        Self::NoSwitch
+    }
+}
+
 pub struct SceneGame {
     active_scene: Box<dyn Scene>,
     last_frame: web_time::Instant,

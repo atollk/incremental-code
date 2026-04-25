@@ -149,7 +149,6 @@ where
             )
             .map(NotPythonExpr::Dict)
             .boxed();
-        let list_or_dict = list.or(dict);
         let call = select! { NotPythonLangToken::Identifier(s) => s }
             .then(
                 expr.clone()
@@ -174,7 +173,7 @@ where
                 NotPythonExpr::Index(Box::new(NotPythonExpr::Identifier(name)), Box::new(idx))
             })
             .boxed();
-        let base = call.or(index).or(list_or_dict).or(atom);
+        let base = choice((call, index, list, dict, atom));
 
         {
             let arith_op = {
