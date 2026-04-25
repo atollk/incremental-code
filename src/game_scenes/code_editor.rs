@@ -2,12 +2,11 @@ use crate::backend::events::Event;
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
 use crate::game_state::with_game_state;
+use crate::language::{not_python_default_theme, not_python_language};
 use crate::widgets::code_editor::editor::Editor;
 use crate::widgets::code_editor::input::{EditorCommand, apply_key_event, apply_mouse_event};
-use crate::widgets::code_editor::python_logos;
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
 use ratatui_core::terminal::Frame;
-use std::collections::HashMap;
 use web_time::Duration;
 
 pub struct CodeEditorScene {
@@ -25,8 +24,8 @@ impl Default for CodeEditorScene {
 impl CodeEditorScene {
     pub fn new() -> Self {
         let code = with_game_state(|state| state.program_code.clone());
-        let lang = Box::new(python_logos::python_language(HashMap::new()));
-        let editor = Editor::new(lang, &code);
+        let lang = not_python_language(not_python_default_theme());
+        let editor = Editor::new(Box::new(lang), &code);
         CodeEditorScene {
             editor,
             original_code: code,

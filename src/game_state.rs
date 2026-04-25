@@ -1,4 +1,4 @@
-use crate::language::compile::CompiledProgram;
+use crate::language::CompiledProgram;
 use serde::{Deserialize, Serialize};
 use std::sync::{LazyLock, Mutex};
 

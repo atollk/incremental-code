@@ -10,7 +10,7 @@ use std::ops::Range;
 pub struct LogosCodeLanguage<'a, Token: logos::Logos<'a>> {
     indent: &'a str,
     comment_prefix: &'a str,
-    theme: HashMap<Token, Style>,
+    theme: HashMap<std::mem::Discriminant<Token>, Style>,
     token: PhantomData<Token>,
 }
 
@@ -18,7 +18,11 @@ impl<'a, Token> LogosCodeLanguage<'a, Token>
 where
     Token: logos::Logos<'a, Extras: Default, Source = str>,
 {
-    pub fn new(indent: &'a str, comment_prefix: &'a str, theme: HashMap<Token, Style>) -> Self {
+    pub fn new(
+        indent: &'a str,
+        comment_prefix: &'a str,
+        theme: HashMap<std::mem::Discriminant<Token>, Style>,
+    ) -> Self {
         LogosCodeLanguage {
             indent,
             comment_prefix,
@@ -48,7 +52,7 @@ where
         tokens
             .into_iter()
             .filter_map(|(token, span)| {
-                let style = self.theme.get(&token);
+                let style = self.theme.get(&std::mem::discriminant(&token));
                 style.map(|style| (span, *style))
             })
             .collect()

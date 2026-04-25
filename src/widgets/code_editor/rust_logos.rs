@@ -4,7 +4,7 @@ use ratatui_core::style::Style;
 use std::collections::HashMap;
 
 pub fn rust_language<'a>(
-    theme: HashMap<RustLangToken, Style>,
+    theme: HashMap<std::mem::Discriminant<RustLangToken>, Style>,
 ) -> LogosCodeLanguage<'a, RustLangToken> {
     LogosCodeLanguage::new("  ", "//", theme)
 }

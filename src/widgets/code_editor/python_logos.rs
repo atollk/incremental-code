@@ -4,7 +4,7 @@ use ratatui_core::style::Style;
 use std::collections::HashMap;
 
 pub fn python_language<'a>(
-    theme: HashMap<PythonLangToken, Style>,
+    theme: HashMap<std::mem::Discriminant<PythonLangToken>, Style>,
 ) -> LogosCodeLanguage<'a, PythonLangToken> {
     LogosCodeLanguage::new("  ", "#", theme)
 }

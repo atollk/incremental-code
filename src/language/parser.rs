@@ -409,10 +409,11 @@ pub struct NotPythonProgram {
     pub(super) statement: NotPythonStmt,
 }
 
-pub fn parse_program(src: &str) -> NotPythonProgram {
-    NotPythonProgram {
-        statement: parse(src).unwrap(),
-    }
+pub fn parse_program<'a>(
+    src: &'a str,
+) -> anyhow::Result<NotPythonProgram, Vec<Rich<'a, NotPythonLangToken>>> {
+    let x = parse(src).map(|ast| NotPythonProgram { statement: ast });
+    x.into()
 }
 
 #[cfg(test)]

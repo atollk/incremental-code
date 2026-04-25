@@ -96,7 +96,7 @@ impl Default for CodeEditorDemo {
     }
 }
 
-fn prism_theme() -> HashMap<PythonLangToken, Style> {
+fn prism_theme() -> HashMap<std::mem::Discriminant<PythonLangToken>, Style> {
     let colors = [
         // Identifiers
         (PythonLangToken::Identifier, "#82aaff"),
@@ -194,7 +194,10 @@ fn prism_theme() -> HashMap<PythonLangToken, Style> {
         .into_iter()
         .map(|(token, hex)| {
             let (r, g, b) = code_editor::utils::rgb(hex);
-            (token, Style::default().fg(Color::Rgb(r, g, b)))
+            (
+                std::mem::discriminant(&token),
+                Style::default().fg(Color::Rgb(r, g, b)),
+            )
         })
         .collect()
 }
