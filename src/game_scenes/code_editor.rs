@@ -2,9 +2,11 @@ use crate::backend::events::Event;
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
 use crate::game_state::with_game_state;
-use crate::language::{not_python_default_theme, not_python_language};
 use crate::widgets::code_editor::editor::Editor;
 use crate::widgets::code_editor::input::{EditorCommand, apply_key_event, apply_mouse_event};
+use crate::widgets::code_editor::not_python_logos::{
+    not_python_default_theme, not_python_language,
+};
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
 use ratatui_core::terminal::Frame;
 use web_time::Duration;

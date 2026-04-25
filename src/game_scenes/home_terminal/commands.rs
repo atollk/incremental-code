@@ -2,10 +2,9 @@ use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::code_editor::CodeEditorScene;
 use crate::game_state::with_game_state;
-use crate::language::{NotPythonProgram, compile, parse_program};
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
 use anyhow::anyhow;
-use chumsky::error::Rich;
+use language::{compile, parse_program};
 use ratatui::widgets::Paragraph;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
@@ -171,7 +170,7 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
             if self.result.is_some() {
                 self.result = with_game_state(|game_state| {
                     // TODO: run this while actually waiting, not just at the end
-                    let parsed: anyhow::Result<NotPythonProgram> = todo!(); //parse_program(&game_state.program_code);
+                    let parsed = parse_program(&game_state.program_code);
                     let (compiled_program, result) = match parsed {
                         Ok(parsed) => (Some(compile(&parsed)), Some(Ok(()))),
                         Err(err) => {

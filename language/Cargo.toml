@@ -1,0 +1,15 @@
+[package]
+name = "language"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chumsky = "0.12.0"
+logos = "0.16.1"
+anyhow = "1.0.102"
+serde = { version = "1.0.228", features = ["derive"] }
+
+[lints.clippy]
+new_without_default = "allow"
+style = "allow"
+complexity = "allow"

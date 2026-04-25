@@ -1,4 +1,4 @@
-use crate::language::parser::{NotPythonExpr, NotPythonExprOp, NotPythonProgram, NotPythonStmt};
+use crate::parser::{NotPythonExpr, NotPythonExprOp, NotPythonProgram, NotPythonStmt};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
@@ -535,7 +535,7 @@ fn eval_expr<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::language::parser::parse_program;
+    use crate::parser::parse_program;
 
     fn compiled(src: &str) -> CompiledProgram {
         compile(&parse_program(src).unwrap())

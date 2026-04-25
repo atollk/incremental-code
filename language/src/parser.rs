@@ -1,4 +1,4 @@
-use crate::language::lexer::NotPythonLangToken;
+use crate::lexer::NotPythonLangToken;
 use chumsky::{
     input::{Stream, ValueInput},
     prelude::*,
@@ -436,8 +436,9 @@ pub struct NotPythonProgram {
 pub fn parse_program<'a>(
     src: &'a str,
 ) -> anyhow::Result<NotPythonProgram, Vec<Rich<'a, NotPythonLangToken>>> {
-    let x = parse(src).map(|ast| NotPythonProgram { statement: ast });
-    x.into()
+    parse(src)
+        .map(|ast| NotPythonProgram { statement: ast })
+        .into()
 }
 
 #[cfg(test)]

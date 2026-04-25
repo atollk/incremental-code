@@ -3,7 +3,6 @@ mod basic_terminal_app;
 pub mod demos;
 pub mod game_scenes;
 pub mod game_state;
-pub mod language;
 pub mod widgets;
 
 use crate::basic_terminal_app::BasicTerminalApp;

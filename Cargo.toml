@@ -1,9 +1,13 @@
+[workspace]
+members = ["language"]
+
 [package]
 name = "incremental-code"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+language = { path = "language" }
 # general dependencies
 ratatui = { version = "0.30.0", default-features = false, features = ["unstable-rendered-line-info"] }
 ratatui-core = { version = "0.1.0" }
