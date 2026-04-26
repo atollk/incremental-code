@@ -19,7 +19,7 @@ pub struct GameState {
 impl GameState {
     pub fn new() -> Self {
         GameState {
-            program_code: "asdf".to_string(),
+            program_code: "def foo():\n  return 1;\nend\n\nfoo();".to_string(),
             compiled_program: None,
         }
     }

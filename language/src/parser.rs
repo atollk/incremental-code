@@ -3,7 +3,6 @@ use chumsky::{
     input::{Stream, ValueInput},
     prelude::*,
 };
-use log::debug;
 use logos::Logos;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -240,10 +239,7 @@ where
         // Each simple statement ends with `;\n` (or `;<EOI>`).
         // Each block statement ends with `end\n` (or `end<EOI>`).
         // Block headers (if/elif/else/loop/def) end with `:\n`.
-        let line_end = just(NotPythonLangToken::Newline)
-            .ignored()
-            .or(end())
-            .boxed();
+        let line_end = just(NotPythonLangToken::Newline).ignored().or(end());
 
         let semi_line_end = just(NotPythonLangToken::Semi)
             .then(line_end.clone())
@@ -388,7 +384,7 @@ where
             .then_ignore(colon_newline)
             .then(block)
             .then_ignore(just(NotPythonLangToken::KwEnd))
-            .then_ignore(line_end)
+            .then_ignore(line_end.clone())
             .map(|((name, params), body)| NotPythonStmt::Function {
                 name,
                 params,
@@ -400,6 +396,7 @@ where
             pass, break_, continue_, return_, if_stmt, loop_stmt, func_stmt, decl, assign,
             call_stmt,
         ))
+        .then_ignore(line_end.or_not())
         .boxed()
     });
 
@@ -648,6 +645,23 @@ mod tests {
                 params: vec!["x".into(), "y".into()],
                 body: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Pass])),
             }]
+        );
+    }
+
+    #[test]
+    fn func_def_with_return_then_call() {
+        assert_eq!(
+            stmts("def foo():\n  return 1;\nend\n\nfoo();\n"),
+            vec![
+                NotPythonStmt::Function {
+                    name: "foo".into(),
+                    params: vec![],
+                    body: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Return(Some(
+                        NotPythonExpr::Int(1)
+                    ))])),
+                },
+                NotPythonStmt::Call("foo".into(), vec![]),
+            ]
         );
     }
 

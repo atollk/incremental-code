@@ -218,7 +218,7 @@ impl Code {
 
         results
             .into_iter()
-            .map(|(range, value)| (range.start, range.end, value))
+            .map(|(range, value)| (range.start + start, range.end + start, value))
             .collect()
     }
 
