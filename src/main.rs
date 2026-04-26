@@ -8,8 +8,14 @@ pub mod widgets;
 use crate::basic_terminal_app::BasicTerminalApp;
 use crate::game_scenes::base::SceneGame;
 use crate::game_scenes::home_terminal::HomeTerminalScene;
+use log::LevelFilter;
+use simple_logger::SimpleLogger;
 
 pub fn main() {
+    SimpleLogger::new()
+        .with_level(LevelFilter::Debug)
+        .init()
+        .unwrap();
     // let app = BasicTerminalApp::new(demos::CodeEditorDemo::default());
     // let app = BasicTerminalApp::<demos::CounterDemo>::new();
     // let app = BasicTerminalApp::<BeamtermDemo>::new();

@@ -122,10 +122,17 @@ fn compile_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
             Box::new(ChainCmd::new(
                 Box::new(CompileCmd::new()),
                 Box::new(|compile_cmd| {
-                    let paragraph = if let Err(e) = compile_cmd.result.as_ref().unwrap() {
+                    let result = compile_cmd
+                        .result
+                        .as_ref()
+                        .expect("compile command to finish");
+                    let paragraph: Paragraph<'static> = if let Err(e) = result {
                         Paragraph::new(e.to_string())
                     } else {
-                        Paragraph::new("Compilation successful.")
+                        let text = with_game_state(|game_state| {
+                            format!("Compilation successful., {:?}", game_state.compiled_program)
+                        });
+                        Paragraph::new(text)
                     };
                     Box::new(ParagraphCmd::new(paragraph))
                 }),
@@ -153,7 +160,7 @@ impl CompileCmd {
         throbber_state.get_mut().calc_step(0); // randomize animation start
         CompileCmd {
             running_duration: Duration::from_millis(0),
-            compile_duration: Duration::from_secs(5),
+            compile_duration: Duration::from_millis(500),
             throbber_state,
             result: None,
         }
@@ -162,20 +169,20 @@ impl CompileCmd {
 
 impl RunningCommand<SceneSwitch> for CompileCmd {
     fn is_done(&self) -> bool {
-        self.compile_duration <= self.running_duration
+        self.result.is_some()
     }
 
     fn update(&mut self, _events: &[Event], time_delta: Duration) {
         if self.compile_duration <= self.running_duration {
-            if self.result.is_some() {
+            if self.result.is_none() {
                 self.result = with_game_state(|game_state| {
                     // TODO: run this while actually waiting, not just at the end
                     let parsed = parse_program(&game_state.program_code);
                     let (compiled_program, result) = match parsed {
                         Ok(parsed) => (Some(compile(&parsed)), Some(Ok(()))),
-                        Err(err) => {
-                            let err = anyhow!("todo error");
-                            (None, Some(Err(err)))
+                        Err(richs) => {
+                            let errs = richs.into_iter().map(|rich| Err(anyhow!("{rich}")));
+                            (None, Some(errs.collect()))
                         }
                     };
                     game_state.compiled_program = compiled_program;

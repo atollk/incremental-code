@@ -1,4 +1,5 @@
 use crate::widgets::code_editor::code::CodeLanguage;
+use log::debug;
 use logos::Logos;
 use ratatui_core::style::Style;
 use std::collections::HashMap;
@@ -34,7 +35,7 @@ where
 
 impl<'a, Token> CodeLanguage for LogosCodeLanguage<'a, Token>
 where
-    Token: for<'s> logos::Logos<'s, Extras: Default, Source = str> + Eq + Hash,
+    Token: for<'s> logos::Logos<'s, Extras: Default, Source = str> + Eq + Hash + std::fmt::Debug,
 {
     fn get_indent(&self) -> &'a str {
         self.indent
@@ -49,6 +50,7 @@ where
             .spanned()
             .filter_map(|(token, span)| token.map(|token| (token, span)).ok())
             .collect();
+        debug!("{:?}", tokens);
         tokens
             .into_iter()
             .filter_map(|(token, span)| {

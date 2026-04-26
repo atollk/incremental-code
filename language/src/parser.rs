@@ -3,6 +3,7 @@ use chumsky::{
     input::{Stream, ValueInput},
     prelude::*,
 };
+use log::debug;
 use logos::Logos;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -411,7 +412,7 @@ where
 }
 
 fn parse<'a>(src: &'a str) -> Result<NotPythonStmt, Vec<Rich<'a, NotPythonLangToken>>> {
-    let token_iter = NotPythonLangToken::lexer(src)
+    let tokens: Vec<_> = NotPythonLangToken::lexer(src)
         .spanned()
         // Convert logos errors into tokens. We want parsing to be recoverable and not fail at the lexing stage, so
         // we have a dedicated `Token::Error` variant that represents a token error that was previously encountered
@@ -420,9 +421,10 @@ fn parse<'a>(src: &'a str) -> Result<NotPythonStmt, Vec<Rich<'a, NotPythonLangTo
             // to work with
             Ok(tok) => (tok, span.into()),
             Err(()) => (NotPythonLangToken::LexError, span.into()),
-        });
+        })
+        .collect();
     // Turn the token iterator into a stream that chumsky can use for things like backtracking
-    let token_stream = Stream::from_iter(token_iter)
+    let token_stream = Stream::from_iter(tokens)
         // Tell chumsky to split the (Token, SimpleSpan) stream into its parts so that it can handle the spans for us
         // This involves giving chumsky an 'end of input' span: we just use a zero-width span at the end of the string
         .map((0..src.len()).into(), |(t, s): (_, _)| (t, s));

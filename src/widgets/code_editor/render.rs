@@ -1,5 +1,6 @@
+use crate::widgets::blinking_cursor::BlinkingCursor;
 use crate::widgets::code_editor::code::{
-    RopeGraphemes, grapheme_width_and_bytes_len, grapheme_width_and_chars_len,
+    Code, RopeGraphemes, grapheme_width_and_bytes_len, grapheme_width_and_chars_len,
 };
 use crate::widgets::code_editor::editor::Editor;
 use ratatui_core::buffer::Buffer;
@@ -30,12 +31,51 @@ impl Widget for &Editor {
         let line_number_digits = max_line_number.to_string().len().max(5);
         let line_number_width = line_number_digits + 2;
 
-        let mut draw_y = area.top();
+        let draw_y = area.top();
 
         let line_number_style = Style::default().fg(Color::DarkGray);
         let default_text_style = Style::default().fg(Color::White);
 
-        // draw line numbers and text
+        self.draw_lines(
+            area,
+            buf,
+            code,
+            total_lines,
+            line_number_digits,
+            line_number_width,
+            draw_y,
+            line_number_style,
+            default_text_style,
+        );
+
+        if code.is_highlight() {
+            self.draw_highlighting(area, buf, code, total_lines, total_chars, line_number_width);
+        }
+
+        self.draw_selection(area, buf, code, line_number_width);
+
+        self.draw_marks(area, buf, code, total_chars, line_number_width);
+
+        // draw cursor
+        if let Some((x, y)) = self.get_visible_cursor(&area) {
+            BlinkingCursor::new(x, y).render(area, buf);
+        }
+    }
+}
+
+impl Editor {
+    fn draw_lines(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        code: &Code,
+        total_lines: usize,
+        line_number_digits: usize,
+        line_number_width: usize,
+        mut draw_y: u16,
+        line_number_style: Style,
+        default_text_style: Style,
+    ) {
         for line_idx in self.offset_y..total_lines {
             if draw_y >= area.bottom() {
                 break;
@@ -65,74 +105,82 @@ impl Widget for &Editor {
 
             draw_y += 1;
         }
+    }
 
-        // draw syntax highlighting
-        if code.is_highlight() {
-            // Render syntax highlighting for the visible portion of the text buffer.
-            // For each visible line within the viewport, limit the highlighting to the
-            // visible columns to avoid expensive processing of long lines outside the view.
-            // This improves performance by only querying Tree-sitter for the visible slice,
-            // then applying styles per character based on byte ranges returned by the syntax query.
+    fn draw_highlighting(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        code: &Code,
+        total_lines: usize,
+        total_chars: usize,
+        line_number_width: usize,
+    ) {
+        // Render syntax highlighting for the visible portion of the text buffer.
+        // For each visible line within the viewport, limit the highlighting to the
+        // visible columns to avoid expensive processing of long lines outside the view.
+        // This improves performance by only querying Tree-sitter for the visible slice,
+        // then applying styles per character based on byte ranges returned by the syntax query.
 
-            for screen_y in 0..(area.height as usize) {
-                let line_idx = self.offset_y + screen_y;
-                if line_idx >= total_lines {
+        for screen_y in 0..(area.height as usize) {
+            let line_idx = self.offset_y + screen_y;
+            if line_idx >= total_lines {
+                break;
+            }
+
+            let line_len = code.line_len(line_idx);
+            let max_x = (area.width as usize).saturating_sub(line_number_width);
+
+            let line_start_char = code.line_to_char(line_idx);
+            let start_char = line_start_char + self.offset_x;
+            let visible_len = line_len.saturating_sub(self.offset_x);
+            let end = max_x.min(visible_len);
+            let end_char = start_char + end;
+
+            if start_char > total_chars || end_char > total_chars {
+                continue; // last line offset case
+            }
+
+            let chars = code.char_slice(start_char, end_char);
+
+            let start_byte = code.char_to_byte(start_char);
+            let end_byte = code.char_to_byte(end_char);
+
+            let highlights = self.highlight_interval(start_byte, end_byte);
+
+            let mut x = 0;
+            let mut byte_idx_in_rope = start_byte;
+
+            for g in RopeGraphemes::new(&chars) {
+                let (g_width, g_bytes) = grapheme_width_and_bytes_len(g);
+
+                if x >= max_x {
                     break;
                 }
 
-                let line_len = code.line_len(line_idx);
-                let max_x = (area.width as usize).saturating_sub(line_number_width);
+                let start_x = area.left() + line_number_width as u16 + x as u16;
+                let draw_y = area.top() + screen_y as u16;
 
-                let line_start_char = code.line_to_char(line_idx);
-                let start_char = line_start_char + self.offset_x;
-                let visible_len = line_len.saturating_sub(self.offset_x);
-                let end = max_x.min(visible_len);
-                let end_char = start_char + end;
-
-                if start_char > total_chars || end_char > total_chars {
-                    continue; // last line offset case 
-                }
-
-                let chars = code.char_slice(start_char, end_char);
-
-                let start_byte = code.char_to_byte(start_char);
-                let end_byte = code.char_to_byte(end_char);
-
-                let highlights = self.highlight_interval(start_byte, end_byte);
-
-                let mut x = 0;
-                let mut byte_idx_in_rope = start_byte;
-
-                for g in RopeGraphemes::new(&chars) {
-                    let (g_width, g_bytes) = grapheme_width_and_bytes_len(g);
-
-                    if x >= max_x {
+                for dx in 0..g_width {
+                    if x + dx >= max_x {
                         break;
                     }
-
-                    let start_x = area.left() + line_number_width as u16 + x as u16;
-                    let draw_y = area.top() + screen_y as u16;
-
-                    for dx in 0..g_width {
-                        if x + dx >= max_x {
+                    let draw_x = start_x + dx as u16;
+                    for &(start, end, s) in &highlights {
+                        if start <= byte_idx_in_rope && byte_idx_in_rope < end {
+                            buf[(draw_x, draw_y)].set_style(s);
                             break;
                         }
-                        let draw_x = start_x + dx as u16;
-                        for &(start, end, s) in &highlights {
-                            if start <= byte_idx_in_rope && byte_idx_in_rope < end {
-                                buf[(draw_x, draw_y)].set_style(s);
-                                break;
-                            }
-                        }
                     }
-
-                    x = x.saturating_add(g_width);
-                    byte_idx_in_rope += g_bytes;
                 }
+
+                x = x.saturating_add(g_width);
+                byte_idx_in_rope += g_bytes;
             }
         }
+    }
 
-        // draw selection
+    fn draw_selection(&self, area: Rect, buf: &mut Buffer, code: &Code, line_number_width: usize) {
         if let Some(selection) = self.selection
             && !selection.is_empty()
         {
@@ -192,8 +240,16 @@ impl Widget for &Editor {
                 }
             }
         }
+    }
 
-        // draw marks
+    fn draw_marks(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        code: &Code,
+        total_chars: usize,
+        line_number_width: usize,
+    ) {
         if let Some(ref marks) = self.marks {
             for &(start, end, color) in marks {
                 if start >= end || end > total_chars {
