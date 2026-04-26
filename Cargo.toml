@@ -25,6 +25,8 @@ serde = { version = "1.0.228", features = ["derive"] }
 itertools = "0.14.0"
 rand = { version = "0.10.1", features = [] }
 getrandom = { version = "*", features = ["wasm_js"] }
+ratatui-widgets = "0.3.0"
+ouroboros = "0.18.5"
 
 # code editor
 ropey = "^1.6"

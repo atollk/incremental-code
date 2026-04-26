@@ -1,118 +1,18 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_scenes::code_editor::CodeEditorScene;
 use crate::game_state::with_game_state;
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
 use anyhow::anyhow;
 use language::{compile, parse_program};
-use ratatui::widgets::Paragraph;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
-use ratatui_core::text::{Line, Text};
+use ratatui_core::text::Text;
 use ratatui_core::widgets::StatefulWidget;
+use ratatui_widgets::paragraph::Paragraph;
 use std::cell::RefCell;
 use std::time::Duration;
 
-pub struct Command {
-    pub(crate) name: &'static str,
-    help_description: &'static str,
-    pub(crate) runner: fn() -> Box<dyn RunningCommand<SceneSwitch>>,
-}
-
-pub fn command_list() -> Vec<Command> {
-    vec![
-        Command {
-            name: "help",
-            help_description: "Displays this help text",
-            runner: help_cmd,
-        },
-        Command {
-            name: "exit",
-            help_description: "Exits the game",
-            runner: exit_cmd,
-        },
-        Command {
-            name: "code",
-            help_description: "Opens the code editor to write or modify your program",
-            runner: code_cmd,
-        },
-        Command {
-            name: "compile",
-            help_description: "Compiles the program code to make it executable",
-            runner: compile_cmd,
-        },
-    ]
-}
-
-pub fn unknown_cmd(cmd: String) -> Box<dyn RunningCommand<SceneSwitch>> {
-    let text = format!("Unknown command '{cmd}'. For a list of available commands, try 'help'.");
-    let text = Text::raw(text);
-    Box::new(ParagraphCmd::new(Paragraph::new(text)))
-}
-
-fn help_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    let available_commands = command_list();
-    let lines = std::iter::once("List of available commands:".to_string())
-        .chain(
-            available_commands
-                .iter()
-                .map(|c| format!("  {}\t - {}", c.name, c.help_description)),
-        )
-        .map(Line::from)
-        .collect::<Vec<_>>();
-    let text = Text::from(lines);
-    Box::new(ParagraphCmd::new(Paragraph::new(text)))
-}
-
-fn exit_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    Box::new(ExitCmd {})
-}
-
-struct ExitCmd {}
-
-impl RunningCommand<SceneSwitch> for ExitCmd {
-    fn is_done(&self) -> bool {
-        true
-    }
-
-    fn update(&mut self, _events: &[Event], _time_delta: Duration) {}
-
-    fn render(&self, _area: Rect, _buf: &mut Buffer) {}
-
-    fn height(&self, _columns: u16) -> u16 {
-        0
-    }
-
-    fn get_metadata(&self) -> SceneSwitch {
-        SceneSwitch::ExitGame
-    }
-}
-
-fn code_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    Box::new(CodeCmd {})
-}
-
-struct CodeCmd {}
-
-impl RunningCommand<SceneSwitch> for CodeCmd {
-    fn is_done(&self) -> bool {
-        true
-    }
-
-    fn update(&mut self, _events: &[Event], _time_delta: Duration) {}
-
-    fn render(&self, _area: Rect, _buf: &mut Buffer) {}
-
-    fn height(&self, _columns: u16) -> u16 {
-        0
-    }
-
-    fn get_metadata(&self) -> SceneSwitch {
-        SceneSwitch::SwitchTo(Box::new(CodeEditorScene::new()))
-    }
-}
-
-fn compile_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
+pub(super) fn compile_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
     with_game_state(|game_state| -> Box<dyn RunningCommand<SceneSwitch>> {
         if game_state.program_code.is_empty() {
             let text = "There is no program to compile. Use 'code' to open the code editor and write a program before compiling.";
