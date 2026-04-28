@@ -10,7 +10,9 @@ mod compile_command;
 mod exit_command;
 mod help_command;
 mod unknown_command;
+mod upgrades_command;
 
+use crate::game_scenes::home_terminal::commands::upgrades_command::upgrades_cmd;
 pub use unknown_command::unknown_cmd;
 
 pub struct Command {
@@ -40,6 +42,11 @@ pub fn command_list() -> Vec<Command> {
             name: "compile",
             help_description: "Compiles the program code to make it executable",
             runner: compile_cmd,
+        },
+        Command {
+            name: "upgrades",
+            help_description: "Opens the upgrade tree",
+            runner: upgrades_cmd,
         },
     ]
 }

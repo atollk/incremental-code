@@ -18,6 +18,7 @@ pub use self::tree_item::TreeItem;
 pub use self::tree_state::TreeState;
 
 mod flatten;
+mod input;
 mod tree_item;
 mod tree_state;
 
@@ -102,7 +103,7 @@ where
             highlight_style: Style::new(),
             highlight_symbol: "",
             node_closed_symbol: "\u{25b6} ", // Arrow to right
-            node_open_symbol: "\u{25bc} ",   // Arrow down
+            node_open_symbol: "\u{21B3} ",   // Arrow down
             node_no_children_symbol: "  ",
         })
     }

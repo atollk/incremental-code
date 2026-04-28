@@ -11,18 +11,31 @@ pub struct UpgradesScene<'a> {
 
 #[self_referencing]
 struct TreeWidget<'a> {
-    tree_items: Vec<TreeItem<'a, &'a str>>,
+    tree_items: Vec<TreeItem<'a, u64>>,
     #[borrows(tree_items)]
     #[covariant]
-    tree: Tree<'this, &'a str>,
-    tree_state: TreeState<&'a str>,
+    tree: Tree<'this, u64>,
+    tree_state: TreeState<u64>,
+}
+
+impl<'a> UpgradesScene<'a> {
+    fn build_tree_items() -> Vec<TreeItem<'a, u64>> {
+        vec![
+            TreeItem::new(
+                1,
+                "foo text",
+                vec![TreeItem::new(2, "x text", vec![]).unwrap()],
+            )
+            .unwrap(),
+            TreeItem::new(3, "bar text", vec![]).unwrap(),
+        ]
+    }
 }
 
 impl<'a> Default for UpgradesScene<'a> {
     fn default() -> Self {
-        let tree_items = vec![TreeItem::new("foo", "foo text", vec![]).unwrap()];
         let tree_widget = TreeWidget::new(
-            tree_items,
+            Self::build_tree_items(),
             |tree_items| Tree::new(tree_items).unwrap(),
             TreeState::default(),
         );
@@ -32,6 +45,11 @@ impl<'a> Default for UpgradesScene<'a> {
 
 impl<'a> Scene for UpgradesScene<'a> {
     fn frame(&mut self, events: &[Event], frame: &mut Frame, time_delta: Duration) -> SceneSwitch {
+        self.tree_widget.with_tree_state_mut(|tree_state| {
+            for event in events {
+                tree_state.process_input_event(event);
+            }
+        });
         self.tree_widget.with_mut(|tree| {
             frame.render_stateful_widget(&*tree.tree, frame.area(), tree.tree_state)
         });
