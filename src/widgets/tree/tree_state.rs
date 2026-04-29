@@ -19,7 +19,7 @@ use super::tree_item::TreeItem;
 /// let mut state = TreeState::<Identifier>::default();
 /// ```
 #[must_use]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TreeState<Identifier> {
     pub(super) offset: usize,
     pub(super) opened: HashSet<Vec<Identifier>>,

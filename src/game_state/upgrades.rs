@@ -1,8 +1,10 @@
 use crate::game_state::Resources;
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 
 pub trait UpgradeCollection {
     fn upgrades(&self) -> impl Iterator<Item = &dyn Upgrade>;
+    fn upgrades_mut(&mut self) -> impl Iterator<Item = &mut dyn Upgrade>;
 }
 
 pub trait Upgrade {
@@ -12,6 +14,28 @@ pub trait Upgrade {
     fn next_level_cost(&self) -> Option<Resources>;
     fn current_value_text(&self) -> String;
     fn next_value_text(&self) -> Option<String>;
+
+    fn level_up(&mut self);
+    fn level_down(&mut self);
+
+    fn format_level_str(&self, empty_box: char, full_box: char) -> String {
+        format!(
+            "{}{}",
+            std::iter::repeat(full_box)
+                .take(self.current_level() as usize)
+                .collect::<String>(),
+            std::iter::repeat(empty_box)
+                .take((self.max_level() - self.current_level()) as usize)
+                .collect::<String>(),
+        )
+    }
+
+    fn format_cost_str(&self) -> String {
+        match self.next_level_cost() {
+            Some(r) => r.to_string(),
+            None => "maxed".to_string(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -33,7 +57,7 @@ macro_rules! impl_upgrade {
         $val:ty,
         [ $( ($value:expr, $cost:expr) ),+ $(,)? ]
     ) => {
-        #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Default, Clone, std::hash::Hash, serde::Serialize, serde::Deserialize)]
         struct $struct (u8);
 
         impl $struct {
@@ -103,6 +127,14 @@ macro_rules! impl_upgrade {
                     __i += 1;
                 )+
                 None
+            }
+
+            fn level_up(&mut self) {
+                self.0 = std::cmp::min(self.0 + 1, self.max_level());
+            }
+
+            fn level_down(&mut self) {
+                self.0 = self.0.saturating_sub(1);
             }
         }
     };
@@ -203,6 +235,19 @@ pub mod level1 {
                 &self.code_line_width,
                 &self.code_line_count,
                 &self.loop_statements,
+            ];
+            x.into_iter()
+        }
+
+        fn upgrades_mut(&mut self) -> impl Iterator<Item = &mut dyn Upgrade> {
+            let x: [&mut dyn Upgrade; _] = [
+                &mut self.compile_time,
+                &mut self.run_time,
+                &mut self.speed_up_per_instruction,
+                &mut self.bronze_per_instruction,
+                &mut self.code_line_width,
+                &mut self.code_line_count,
+                &mut self.loop_statements,
             ];
             x.into_iter()
         }
