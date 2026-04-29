@@ -135,6 +135,18 @@ where
         self.children.push(child);
         Ok(())
     }
+
+    #[must_use]
+    pub(crate) fn find_child(&self, identifier_path: &[Identifier]) -> Option<&Self> {
+        if let [head, tail @ ..] = identifier_path {
+            self.children
+                .iter()
+                .find(|&child| child.identifier == *head)
+                .and_then(|child| child.find_child(tail))
+        } else {
+            Some(self)
+        }
+    }
 }
 
 impl TreeItem<'static, &'static str> {
