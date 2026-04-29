@@ -1,9 +1,22 @@
 use crate::game_state::Resources;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+pub trait UpgradeCollection {
+    fn upgrades(&self) -> impl Iterator<Item = &dyn Upgrade>;
+}
+
+pub trait Upgrade {
+    fn name(&self) -> &'static str;
+    fn current_level(&self) -> u8;
+    fn max_level(&self) -> u8;
+    fn next_level_cost(&self) -> Option<Resources>;
+    fn current_value_text(&self) -> String;
+    fn next_value_text(&self) -> Option<String>;
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Upgrades {
-    level1: level1::Upgrades,
+    pub level1: level1::Upgrades,
 }
 
 impl Default for Upgrades {
@@ -20,7 +33,7 @@ macro_rules! impl_upgrade {
         $val:ty,
         [ $( ($value:expr, $cost:expr) ),+ $(,)? ]
     ) => {
-        #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
         struct $struct (u8);
 
         impl $struct {
@@ -39,6 +52,10 @@ macro_rules! impl_upgrade {
         }
 
         impl Upgrade for $struct {
+            fn name(&self) -> &'static str {
+                stringify!($struct)
+            }
+
             fn current_level(&self) -> u8 {
                 self.0
             }
@@ -92,19 +109,7 @@ macro_rules! impl_upgrade {
     (@unit $_:expr) => { () };
 }
 
-trait UpgradeCollection {
-    fn upgrades(&self) -> impl Iterator<Item = &dyn Upgrade>;
-}
-
-trait Upgrade {
-    fn current_level(&self) -> u8;
-    fn max_level(&self) -> u8;
-    fn next_level_cost(&self) -> Option<Resources>;
-    fn current_value_text(&self) -> String;
-    fn next_value_text(&self) -> Option<String>;
-}
-
-mod level1 {
+pub mod level1 {
     use crate::game_state::Resources;
     use crate::game_state::upgrades::{Upgrade, UpgradeCollection};
     use serde::{Deserialize, Serialize};
@@ -177,8 +182,8 @@ mod level1 {
         ]
     );
 
-    #[derive(Debug, Default, Serialize, Deserialize)]
-    pub(super) struct Upgrades {
+    #[derive(Debug, Default, Serialize, Deserialize, Clone)]
+    pub struct Upgrades {
         compile_time: CompileTime,
         run_time: RunTime,
         speed_up_per_instruction: SpeedUpPerInstruction,

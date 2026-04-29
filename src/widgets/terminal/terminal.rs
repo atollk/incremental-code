@@ -28,7 +28,7 @@ pub struct TerminalWidget<Meta> {
     /// The currently running command, if any. Input is blocked while this is set.
     pub running: Option<Box<dyn RunningCommand<Meta>>>,
     /// Text currently being typed in the prompt.
-    input: String,
+    pub input: String,
     /// Byte offset of the cursor within `input`.
     input_cursor: usize,
     /// Previously submitted command strings, for up/down arrow navigation.

@@ -1,4 +1,5 @@
 use crate::backend::events::Event;
+use crate::backend::input::KeyCode;
 use crate::game_scenes::base::Scene;
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::home_terminal::commands::{command_list, unknown_cmd};
@@ -36,12 +37,42 @@ impl HomeTerminalScene {
 
 impl Scene for HomeTerminalScene {
     fn frame(&mut self, events: &[Event], frame: &mut Frame, time_delta: Duration) -> SceneSwitch {
+        // Execute command
         let cmd = self.terminal_widget.update(events, time_delta);
         if let Some(cmd) = cmd {
             self.terminal_widget
                 .set_running(&cmd, self.handle_terminal_command(&cmd));
         }
+
+        // Autocomplete
+        for event in events {
+            if let Event::KeyEvent(key) = event
+                && key.code == KeyCode::Tab
+            {
+                if self.terminal_widget.input.is_empty() {
+                    continue;
+                }
+                let completion_candidates = command_list()
+                    .iter()
+                    .map(|cmd| cmd.name)
+                    .filter(|cmd| cmd.starts_with(&self.terminal_widget.input))
+                    .collect_vec();
+                match completion_candidates.len() {
+                    0 => {}
+                    1 => {
+                        self.terminal_widget.input = completion_candidates[0].to_owned();
+                    }
+                    _ => {
+                        todo!()
+                    }
+                }
+            }
+        }
+
+        // Draw widget
         frame.render_widget(&self.terminal_widget, frame.area());
+
+        // Switch scene
         if let Some(cmd) = &self.terminal_widget.running {
             cmd.get_metadata()
         } else {
