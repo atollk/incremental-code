@@ -1116,6 +1116,7 @@ dependencies = [
  "beamterm-renderer 1.0.0",
  "bitflags 2.11.1",
  "crossterm",
+ "derive_more",
  "getrandom 0.4.2",
  "glow",
  "glutin",

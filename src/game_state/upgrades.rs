@@ -32,7 +32,7 @@ pub trait Upgrade {
 
     fn format_cost_str(&self) -> String {
         match self.next_level_cost() {
-            Some(r) => r.to_string(),
+            Some(r) => r.fmt_oneline().to_string(),
             None => "maxed".to_string(),
         }
     }
@@ -85,7 +85,7 @@ macro_rules! impl_upgrade {
             }
 
             fn max_level(&self) -> u8 {
-                [ $( impl_upgrade!(@unit $value) ),+ ].len() as u8
+                [ $( impl_upgrade!(@unit $value) ),+ ].len().saturating_sub(1) as u8
             }
 
             #[allow(unused_assignments)]

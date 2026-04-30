@@ -11,6 +11,7 @@ log = "0.4.29"
 
 [dependencies]
 language = { path = "language" }
+
 # general dependencies
 ratatui = { version = "0.30.0", default-features = false, features = ["unstable-rendered-line-info"] }
 ratatui-core = { version = "0.1.0" }
@@ -27,6 +28,7 @@ getrandom = { version = "*", features = ["wasm_js"] }
 ratatui-widgets = "0.3.0"
 ouroboros = "0.18.5"
 bitflags = "2.11.1"
+derive_more = { version = "2.1.1", features = ["default", "add", "add_assign"] }
 
 # code editor
 ropey = "^1.6"

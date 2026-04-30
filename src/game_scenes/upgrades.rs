@@ -1,7 +1,8 @@
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind, MouseEventKind};
 use crate::game_scenes::base::{Scene, SceneSwitch};
-use crate::game_state::{Upgrade, UpgradeCollection, Upgrades, with_game_state};
+use crate::game_state::{Resources, Upgrade, UpgradeCollection, Upgrades, with_game_state};
+use crate::widgets::hud::hud_layout;
 use crate::widgets::tree::{Tree, TreeItem, TreeState};
 use itertools::Itertools;
 use ouroboros::self_referencing;
@@ -17,6 +18,7 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 pub struct UpgradesScene<'a> {
     tree_widget: TreeWidget<'a>,
     upgrades_working_copy: Upgrades,
+    resources_backup: (Resources, Resources),
 }
 
 #[self_referencing]
@@ -26,6 +28,33 @@ struct TreeWidget<'a> {
     #[covariant]
     tree: Tree<'this, u64>,
     tree_state: TreeState<u64>,
+}
+
+impl<'a> Default for UpgradesScene<'a> {
+    fn default() -> Self {
+        let (upgrades, current_resources, carryover_resources) = with_game_state(|game_state| {
+            (
+                game_state.upgrades.clone(),
+                game_state.current_resources.clone(),
+                game_state.carryover_resources.clone(),
+            )
+        });
+        let mut tree_widget = TreeWidget::new(
+            Self::build_tree_items(&upgrades),
+            |tree_items| {
+                Tree::new(tree_items)
+                    .unwrap()
+                    .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
+            },
+            TreeState::default(),
+        );
+        tree_widget.with_tree_state_mut(|state| state.select(vec![1]));
+        UpgradesScene {
+            tree_widget,
+            upgrades_working_copy: upgrades,
+            resources_backup: (current_resources, carryover_resources),
+        }
+    }
 }
 
 fn find_item_in_tree<'a, 'b>(
@@ -48,12 +77,14 @@ fn render_upgrade(upgrade: &dyn Upgrade, name_width: usize, level_width: usize) 
     let level_str = upgrade.format_level_str(EMPTY_BOX, FULL_BOX);
     let cost_str = upgrade.format_cost_str();
     Line::from_iter(vec![
-        Span::raw(format!("{:<name_width$}  ", upgrade.name())),
+        Span::raw(format!("{:<name_width$}", upgrade.name())),
+        Span::raw("     "),
         Span::raw(format!(
             "{}{}",
             level_str,
             " ".repeat((level_width * FULL_BOX.width().unwrap()).saturating_sub(level_str.width()))
         )),
+        Span::raw("     "),
         Span::styled(cost_str, Style::default().fg(Color::LightRed)),
     ])
 }
@@ -112,22 +143,49 @@ impl<'a> UpgradesScene<'a> {
             .upgrades()
             .find_position(|&u| hash_upgrade(u) == identifier_path[1])
             .expect("find the identifier from the hash");
+        let upgrade = upgrade_level.upgrades_mut().nth(pos).unwrap();
 
         // Perform the leveling
-        let upgrade = upgrade_level.upgrades_mut().nth(pos).unwrap();
-        if level_up {
-            upgrade.level_up();
+        let refresh_required = if level_up {
+            if let Some(cost) = upgrade.next_level_cost() {
+                if with_game_state(|game_state| cost <= game_state.total_resources()) {
+                    // can afford -> take resources and level up
+                    with_game_state(|game_state| game_state.take_resources(&cost)).unwrap();
+                    upgrade.level_up();
+                    true
+                } else {
+                    // cannot afford -> do nothing
+                    false
+                }
+            } else {
+                // can't level up
+                false
+            }
         } else {
-            upgrade.level_down();
-        }
+            if upgrade.current_level() == 0 {
+                // can't level down
+                false
+            } else {
+                // level down and return resources
+                upgrade.level_down();
+                let cost = upgrade
+                    .next_level_cost()
+                    .expect("After leveling down, a cost to level up should be defined.");
+                // TODO: shortcut - we don't remember where resources came from, so we just return them as carryover
+                with_game_state(|game_state| game_state.give_carryover_resources(&cost));
+                true
+            }
+        };
 
         // Refresh visuals
-        let old_tree_state = self
-            .tree_widget
-            .with_tree_state(|tree_state| tree_state.clone());
-        self.tree_widget = Self::create_tree_widget(&self.upgrades_working_copy);
-        self.tree_widget
-            .with_tree_state_mut(|new_tree_state| *new_tree_state = old_tree_state);
+        if refresh_required {
+            let old_tree_state = self
+                .tree_widget
+                .with_tree_state(|tree_state| tree_state.clone());
+            self.tree_widget = Self::create_tree_widget(&self.upgrades_working_copy);
+            self.tree_widget
+                .with_tree_state_mut(|new_tree_state| *new_tree_state = old_tree_state);
+        }
     }
 
     fn process_input_event(&mut self, event: &Event) {
@@ -210,33 +268,14 @@ impl<'a> UpgradesScene<'a> {
     }
 }
 
-impl<'a> Default for UpgradesScene<'a> {
-    fn default() -> Self {
-        let upgrades = with_game_state(|game_state| game_state.upgrades.clone());
-        let mut tree_widget = TreeWidget::new(
-            Self::build_tree_items(&upgrades),
-            |tree_items| {
-                Tree::new(tree_items)
-                    .unwrap()
-                    .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-            },
-            TreeState::default(),
-        );
-        tree_widget.with_tree_state_mut(|state| state.select(vec![1]));
-        UpgradesScene {
-            tree_widget,
-            upgrades_working_copy: upgrades,
-        }
-    }
-}
-
 impl<'a> Scene for UpgradesScene<'a> {
     fn frame(&mut self, events: &[Event], frame: &mut Frame, time_delta: Duration) -> SceneSwitch {
         for event in events {
             self.process_input_event(event);
         }
+        let content_area = hud_layout(frame);
         self.tree_widget.with_mut(|tree| {
-            frame.render_stateful_widget(&*tree.tree, frame.area(), tree.tree_state)
+            frame.render_stateful_widget(&*tree.tree, content_area, tree.tree_state)
         });
         SceneSwitch::NoSwitch
     }

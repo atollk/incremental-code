@@ -3,6 +3,7 @@ use crate::backend::input::KeyCode;
 use crate::game_scenes::base::Scene;
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::home_terminal::commands::{command_list, unknown_cmd};
+use crate::widgets::hud::hud_layout;
 use crate::widgets::terminal::{RunningCommand, TerminalWidget};
 use itertools::Itertools;
 use ratatui_core::terminal::Frame;
@@ -70,7 +71,8 @@ impl Scene for HomeTerminalScene {
         }
 
         // Draw widget
-        frame.render_widget(&self.terminal_widget, frame.area());
+        let content_area = hud_layout(frame);
+        frame.render_widget(&self.terminal_widget, content_area);
 
         // Switch scene
         if let Some(cmd) = &self.terminal_widget.running {
