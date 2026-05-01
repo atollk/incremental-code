@@ -123,7 +123,6 @@ impl PartialOrd for Resources {
 const BRONZE_SYMBOL: char = '🟤';
 const SILVER_SYMBOL: char = '⚪';
 const GOLD_SYMBOL: char = '🟡';
-const DIAMOND_SYMBOL: char = '💎';
 
 struct ResourcesFmtOneline<'a> {
     parent: &'a Resources,
