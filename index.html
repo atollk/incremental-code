@@ -120,7 +120,7 @@
 <body>
     <!-- The WASM code will resize the canvas dynamically -->
     <!-- the id is hardcoded in main.rs . so, make sure both match. -->
-    <canvas id="the_canvas_id"></canvas>
+    <canvas id="the_canvas_id" tabindex="0"></canvas>
 
     <!-- the loading spinner will be removed in main.rs -->
     <div class="centered" id="loading_text">
@@ -140,6 +140,19 @@
                 navigator.serviceWorker.register('sw.js');
             });
         }
+    </script>
+
+    <script>
+        // Auto-focus the canvas so keyboard events are captured without requiring a click.
+        window.addEventListener('load', function () {
+            const canvas = document.getElementById('the_canvas_id');
+            if (canvas) { canvas.focus(); }
+        });
+
+        // Prevent keys from doing stuff outside the game.
+        document.addEventListener('keydown', function (e) {
+            e.preventDefault();
+        }, { capture: true });
     </script>
 </body>
 

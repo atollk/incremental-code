@@ -1,0 +1,27 @@
+when:
+  event: [push, pull_request]
+
+steps:
+  fmt:
+    image: rust:nightly
+    environment:
+      CARGO_TERM_COLOR: always
+    commands:
+      - rustup component add rustfmt
+      - cargo fmt --all -- --check
+
+  clippy:
+    image: rust:nightly
+    environment:
+      CARGO_TERM_COLOR: always
+    commands:
+      - rustup component add clippy
+      - cargo clippy --features tui -- -D warnings
+
+  build-and-test:
+    image: rust:nightly
+    environment:
+      CARGO_TERM_COLOR: always
+    commands:
+      - cargo build --features tui
+      - cargo test --features tui

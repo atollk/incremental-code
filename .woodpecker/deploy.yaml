@@ -1,0 +1,31 @@
+# Builds the wasm/ratzilla target with trunk and publishes to Codeberg Pages
+# via git-pages-cli (https://codeberg.org/git-pages/git-pages-cli).
+#
+# Requires a "git_pages_token" secret in Woodpecker: a Codeberg access token
+# with read:user and read+write:repository permissions.
+# Settings > Applications > Access tokens
+
+when:
+  branch: main
+  event: push
+
+steps:
+  build:
+    image: rust:nightly
+    environment:
+      CARGO_TERM_COLOR: always
+    commands:
+      - rustup target add wasm32-unknown-unknown
+      - wget -qO- https://github.com/trunk-rs/trunk/releases/download/v0.21.14/trunk-x86_64-unknown-linux-gnu.tar.gz | tar xz -C /usr/local/bin
+      - trunk build --release --features ratzilla --public-url "/${CI_REPO_NAME}/"
+
+  publish:
+    image: alpine:latest
+    environment:
+      GIT_PAGES_TOKEN:
+        from_secret: git_pages_token
+    commands:
+      - apk add --no-cache curl
+      - curl -sL https://codeberg.org/git-pages/git-pages-cli/releases/download/latest/git-pages-cli.linux-amd64 -o /usr/local/bin/git-pages-cli
+      - chmod +x /usr/local/bin/git-pages-cli
+      - git-pages-cli https://${CI_REPO_OWNER}.codeberg.page/${CI_REPO_NAME}/ --token $GIT_PAGES_TOKEN --upload-dir dist/
