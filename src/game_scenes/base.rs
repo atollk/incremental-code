@@ -10,6 +10,7 @@ pub trait Scene {
     ) -> SceneSwitch;
 }
 
+// TODO: replace by std::ops::ControlFlow
 pub enum SceneSwitch {
     NoSwitch,
     ExitGame,

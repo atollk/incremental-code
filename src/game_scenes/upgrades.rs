@@ -1,7 +1,9 @@
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind, MouseEventKind};
 use crate::game_scenes::base::{Scene, SceneSwitch};
+use crate::game_scenes::home_terminal::HomeTerminalScene;
 use crate::game_state::{Resources, Upgrade, UpgradeCollection, Upgrades, with_game_state};
+use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
 use crate::widgets::hud::hud_layout;
 use crate::widgets::tree::{Tree, TreeItem, TreeState};
 use itertools::Itertools;
@@ -11,12 +13,12 @@ use ratatui_core::style::{Color, Modifier, Style};
 use ratatui_core::terminal::Frame;
 use ratatui_core::text::{Line, Span};
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::process::id;
 use std::time::Duration;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub struct UpgradesScene<'a> {
     tree_widget: TreeWidget<'a>,
+    confirm_dialog: Option<ConfirmDialog>,
     upgrades_working_copy: Upgrades,
     resources_backup: (Resources, Resources),
 }
@@ -39,18 +41,11 @@ impl<'a> Default for UpgradesScene<'a> {
                 game_state.carryover_resources.clone(),
             )
         });
-        let mut tree_widget = TreeWidget::new(
-            Self::build_tree_items(&upgrades),
-            |tree_items| {
-                Tree::new(tree_items)
-                    .unwrap()
-                    .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-            },
-            TreeState::default(),
-        );
+        let mut tree_widget = Self::create_tree_widget(&upgrades);
         tree_widget.with_tree_state_mut(|state| state.select(vec![1]));
         UpgradesScene {
             tree_widget,
+            confirm_dialog: None,
             upgrades_working_copy: upgrades,
             resources_backup: (current_resources, carryover_resources),
         }
@@ -85,7 +80,21 @@ fn render_upgrade(upgrade: &dyn Upgrade, name_width: usize, level_width: usize) 
             " ".repeat((level_width * FULL_BOX.width().unwrap()).saturating_sub(level_str.width()))
         )),
         Span::raw("     "),
-        Span::styled(cost_str, Style::default().fg(Color::LightRed)),
+        Span::raw("todo(value)"),
+        Span::raw("     "),
+        Span::styled(cost_str, {
+            let cost = upgrade.next_level_cost();
+            match cost {
+                None => Style::default().fg(Color::Gray),
+                Some(cost) => {
+                    if cost <= with_game_state(|game_state| game_state.total_resources()) {
+                        Style::default().fg(Color::White)
+                    } else {
+                        Style::default().fg(Color::LightRed)
+                    }
+                }
+            }
+        }),
     ])
 }
 
@@ -188,7 +197,8 @@ impl<'a> UpgradesScene<'a> {
         }
     }
 
-    fn process_input_event(&mut self, event: &Event) {
+    #[must_use]
+    fn process_input_event(&mut self, event: &Event) -> SceneSwitch {
         match event {
             Event::KeyEvent(key) if key.kind == KeyEventKind::Press => match key.code {
                 KeyCode::Enter | KeyCode::Char(' ') => {
@@ -238,8 +248,18 @@ impl<'a> UpgradesScene<'a> {
                     self.tree_widget.with_tree_state_mut(|ts| ts.key_up());
                 }
                 KeyCode::Esc => {
-                    self.tree_widget
-                        .with_tree_state_mut(|ts| ts.select(Vec::new()));
+                    if with_game_state(|game_state| {
+                        self.upgrades_working_copy == game_state.upgrades
+                    }) {
+                        // no changes -> just switch back
+                        return SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()));
+                    } else {
+                        // upgrades leveled -> open confirm dialog
+                        self.confirm_dialog = Some(ConfirmDialog::new(
+                            "",
+                            "Purchase selected upgrades? [Y]es  [N]o  [Esc] Cancel",
+                        ));
+                    }
                 }
                 KeyCode::PageDown => {
                     self.tree_widget.with_tree_state_mut(|ts| ts.scroll_down(3));
@@ -265,11 +285,53 @@ impl<'a> UpgradesScene<'a> {
             },
             _ => {}
         }
+        SceneSwitch::NoSwitch
     }
 }
 
 impl<'a> Scene for UpgradesScene<'a> {
-    fn frame(&mut self, events: &[Event], frame: &mut Frame, time_delta: Duration) -> SceneSwitch {
+    fn frame(&mut self, events: &[Event], frame: &mut Frame, _time_delta: Duration) -> SceneSwitch {
+        // ConfirmingExit mode: dialog is active
+        if self.confirm_dialog.is_some() {
+            for event in events {
+                self.confirm_dialog.as_mut().unwrap().handle_event(event);
+            }
+            let result = self.confirm_dialog.as_ref().unwrap().result();
+            let dialog_scene_switch = match result {
+                Some(ConfirmResult::Yes) => {
+                    with_game_state(|game_state| {
+                        game_state.upgrades = self.upgrades_working_copy.clone()
+                    });
+                    SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
+                }
+                Some(ConfirmResult::No) => {
+                    with_game_state(|game_state| {
+                        game_state.current_resources = self.resources_backup.0;
+                        game_state.carryover_resources = self.resources_backup.1;
+                    });
+                    SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
+                }
+                Some(ConfirmResult::Cancel) => {
+                    self.confirm_dialog = None;
+                    SceneSwitch::NoSwitch
+                }
+                None => SceneSwitch::NoSwitch,
+            };
+
+            let content_area = hud_layout(frame);
+            self.tree_widget.with_mut(|tree| {
+                frame.render_stateful_widget(&*tree.tree, content_area, tree.tree_state)
+            });
+
+            if let Some(dialog) = &self.confirm_dialog {
+                frame.render_widget(dialog, frame.area());
+            }
+            if matches!(dialog_scene_switch, SceneSwitch::NoSwitch) {
+                return dialog_scene_switch;
+            }
+        }
+
+        // Upgrade screen
         for event in events {
             self.process_input_event(event);
         }

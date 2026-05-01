@@ -45,15 +45,13 @@ impl CodeEditorScene {
 
 impl Scene for CodeEditorScene {
     fn frame(&mut self, events: &[Event], frame: &mut Frame, _time_delta: Duration) -> SceneSwitch {
-        let area = frame.area();
-
         // ConfirmingExit mode: dialog is active
         if self.confirm_dialog.is_some() {
             for event in events {
                 self.confirm_dialog.as_mut().unwrap().handle_event(event);
             }
             let result = self.confirm_dialog.as_ref().unwrap().result();
-            let switch = match result {
+            let dialog_scene_switch = match result {
                 Some(ConfirmResult::Yes) => {
                     self.save_code();
                     SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
@@ -65,13 +63,15 @@ impl Scene for CodeEditorScene {
                     self.confirm_dialog = None;
                     SceneSwitch::NoSwitch
                 }
-                None => SceneSwitch::NoSwitch,
+                None1 => SceneSwitch::NoSwitch,
             };
-            frame.render_widget(&self.editor, area);
+            frame.render_widget(&self.editor, frame.area());
             if let Some(dialog) = &self.confirm_dialog {
-                frame.render_widget(dialog, area);
+                frame.render_widget(dialog, frame.area());
             }
-            return switch;
+            if matches!(dialog_scene_switch, SceneSwitch::NoSwitch) {
+                return dialog_scene_switch;
+            }
         }
 
         // Editing mode
@@ -98,13 +98,12 @@ impl Scene for CodeEditorScene {
                     Some(EditorCommand::Handled) | None => {}
                 },
                 Event::MouseEvent(mouse) => {
-                    apply_mouse_event(&mut self.editor, mouse, &area);
+                    apply_mouse_event(&mut self.editor, mouse, &frame.area());
                 }
             }
         }
-
-        self.editor.focus(&area);
-        frame.render_widget(&self.editor, area);
+        self.editor.focus(&frame.area());
+        frame.render_widget(&self.editor, frame.area());
         switch
     }
 }

@@ -38,7 +38,7 @@ pub trait Upgrade {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Upgrades {
     pub level1: level1::Upgrades,
 }
@@ -57,7 +57,7 @@ macro_rules! impl_upgrade {
         $val:ty,
         [ $( ($value:expr, $cost:expr) ),+ $(,)? ]
     ) => {
-        #[derive(Debug, Default, Clone, std::hash::Hash, serde::Serialize, serde::Deserialize)]
+        #[derive(Debug, Default, Clone, PartialEq, std::hash::Hash, serde::Serialize, serde::Deserialize)]
         struct $struct (u8);
 
         impl $struct {
@@ -214,7 +214,7 @@ pub mod level1 {
         ]
     );
 
-    #[derive(Debug, Default, Serialize, Deserialize, Clone)]
+    #[derive(Debug, Default, PartialEq, Serialize, Deserialize, Clone)]
     pub struct Upgrades {
         compile_time: CompileTime,
         run_time: RunTime,
