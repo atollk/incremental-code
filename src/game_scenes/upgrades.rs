@@ -71,8 +71,8 @@ fn render_upgrade(upgrade: &dyn Upgrade, name_width: usize, level_width: usize) 
     const FULL_BOX: char = '⬛';
     let level_str = upgrade.format_level_str(EMPTY_BOX, FULL_BOX);
     let cost_str = upgrade.format_cost_str();
-    let _current_value_str = upgrade.current_value_text();
-    let _next_value_str = upgrade.next_value_text();
+    let current_value_str = upgrade.current_value_text();
+    let next_value_str = upgrade.next_value_text().unwrap_or("".to_string());
     Line::from_iter(vec![
         Span::raw(format!("{:<name_width$}", upgrade.name())),
         Span::raw("     "),
@@ -82,7 +82,7 @@ fn render_upgrade(upgrade: &dyn Upgrade, name_width: usize, level_width: usize) 
             " ".repeat((level_width * FULL_BOX.width().unwrap()).saturating_sub(level_str.width()))
         )),
         Span::raw("     "),
-        Span::raw("todo(value)"),
+        Span::raw(format!("{} -> {}", current_value_str, next_value_str)),
         Span::raw("     "),
         Span::styled(cost_str, {
             let cost = upgrade.next_level_cost();
