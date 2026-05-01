@@ -59,21 +59,6 @@ macro_rules! impl_upgrade {
         #[derive(Debug, Default, Clone, PartialEq, std::hash::Hash, serde::Serialize, serde::Deserialize)]
         struct $struct (u8);
 
-        impl $struct {
-            #[allow(unused_assignments)]
-            fn current_value_text(&self) -> $val {
-                let mut __i: u8 = 0;
-                $(
-                    if self.0 == __i { return $value; }
-                    __i += 1;
-                )+
-                panic!(
-                    concat!(stringify!($struct), ": level {} out of bounds"),
-                    self.0
-                )
-            }
-        }
-
         impl Upgrade for $struct {
             fn name(&self) -> &'static str {
                 stringify!($struct)
