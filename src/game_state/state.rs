@@ -1,9 +1,8 @@
 use crate::game_state::Resources;
 use crate::game_state::upgrades::Upgrades;
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use language::CompiledProgram;
 use serde::{Deserialize, Serialize};
-use std::ops::Add;
 use std::sync::{LazyLock, Mutex};
 
 pub fn with_game_state<T>(f: impl Fn(&mut GameState) -> T) -> T {

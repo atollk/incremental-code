@@ -306,8 +306,8 @@ impl<'a> Scene for UpgradesScene<'a> {
                 }
                 Some(ConfirmResult::No) => {
                     with_game_state(|game_state| {
-                        game_state.current_resources = self.resources_backup.0;
-                        game_state.carryover_resources = self.resources_backup.1;
+                        game_state.current_resources = self.resources_backup.0.clone();
+                        game_state.carryover_resources = self.resources_backup.1.clone();
                     });
                     SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
                 }
@@ -326,14 +326,12 @@ impl<'a> Scene for UpgradesScene<'a> {
             if let Some(dialog) = &self.confirm_dialog {
                 frame.render_widget(dialog, frame.area());
             }
-            if matches!(dialog_scene_switch, SceneSwitch::NoSwitch) {
-                return dialog_scene_switch;
-            }
+            dialog_scene_switch?;
         }
 
         // Upgrade screen
         for event in events {
-            self.process_input_event(event);
+            self.process_input_event(event)?;
         }
         let content_area = hud_layout(frame);
         self.tree_widget.with_mut(|tree| {

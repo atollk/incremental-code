@@ -63,15 +63,13 @@ impl Scene for CodeEditorScene {
                     self.confirm_dialog = None;
                     SceneSwitch::NoSwitch
                 }
-                None1 => SceneSwitch::NoSwitch,
+                None => SceneSwitch::NoSwitch,
             };
             frame.render_widget(&self.editor, frame.area());
             if let Some(dialog) = &self.confirm_dialog {
                 frame.render_widget(dialog, frame.area());
             }
-            if matches!(dialog_scene_switch, SceneSwitch::NoSwitch) {
-                return dialog_scene_switch;
-            }
+            dialog_scene_switch?;
         }
 
         // Editing mode

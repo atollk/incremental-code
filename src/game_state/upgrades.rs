@@ -1,6 +1,5 @@
 use crate::game_state::Resources;
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
 
 pub trait UpgradeCollection {
     fn upgrades(&self) -> impl Iterator<Item = &dyn Upgrade>;

@@ -1,5 +1,7 @@
 use crate::backend::events::Event;
 use crate::basic_terminal_app::App;
+use itertools::FoldWhile::Continue;
+use std::ops::{ControlFlow, FromResidual, Residual, Try};
 
 pub trait Scene {
     fn frame(
@@ -10,11 +12,37 @@ pub trait Scene {
     ) -> SceneSwitch;
 }
 
-// TODO: replace by std::ops::ControlFlow
 pub enum SceneSwitch {
     NoSwitch,
     ExitGame,
     SwitchTo(Box<dyn Scene>),
+}
+
+impl Residual<()> for SceneSwitch {
+    type TryType = SceneSwitch;
+}
+
+impl FromResidual for SceneSwitch {
+    fn from_residual(residual: <Self as Try>::Residual) -> Self {
+        residual
+    }
+}
+
+impl Try for SceneSwitch {
+    type Output = ();
+    type Residual = SceneSwitch;
+
+    fn from_output(_output: Self::Output) -> Self {
+        SceneSwitch::NoSwitch
+    }
+
+    fn branch(self) -> ControlFlow<Self::Residual, Self::Output> {
+        if let SceneSwitch::NoSwitch = self {
+            ControlFlow::Continue(())
+        } else {
+            ControlFlow::Break(self)
+        }
+    }
 }
 
 impl Default for SceneSwitch {

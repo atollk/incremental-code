@@ -1,11 +1,8 @@
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
-use crate::game_scenes::base::{Scene, SceneSwitch};
-use crate::game_scenes::home_terminal::HomeTerminalScene;
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::{Constraint, Layout, Rect};
-use ratatui_core::terminal::Frame;
 use ratatui_core::widgets::Widget;
 
 #[derive(Copy, Clone)]

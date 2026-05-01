@@ -1,10 +1,10 @@
-[workspace]
-members = ["language"]
-
 [package]
 name = "incremental-code"
 version = "0.1.0"
 edition = "2024"
+
+[workspace]
+members = ["language"]
 
 [workspace.dependencies]
 log = "0.4.29"
