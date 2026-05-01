@@ -67,9 +67,9 @@ pub struct Tree<'a, Identifier> {
     highlight_symbol: &'a str,
 
     /// Symbol displayed in front of a closed node (As in the children are currently not visible)
-    node_closed_symbol: &'a str,
+    pub node_closed_symbol: &'a str,
     /// Symbol displayed in front of an open node. (As in the children are currently visible)
-    node_open_symbol: &'a str,
+    pub node_open_symbol: &'a str,
     /// Symbol displayed in front of a node without children.
     node_no_children_symbol: &'a str,
 }
@@ -350,13 +350,19 @@ mod render_tests {
 
     #[must_use]
     #[track_caller]
-    fn render(width: u16, height: u16, state: &mut TreeState<&'static str>) -> Buffer {
+    fn render(
+        width: u16,
+        height: u16,
+        state: &mut TreeState<&'static str>,
+    ) -> (Buffer, String, String) {
         let items = TreeItem::example();
         let tree = Tree::new(&items).unwrap();
+        let open_sym = tree.node_open_symbol.to_string();
+        let closed_sym = tree.node_closed_symbol.to_string();
         let area = Rect::new(0, 0, width, height);
         let mut buffer = Buffer::empty(area);
-        StatefulWidget::render(tree, area, &mut buffer, state);
-        buffer
+        StatefulWidget::render(&tree, area, &mut buffer, state);
+        (buffer, open_sym, closed_sym)
     }
 
     #[test]
@@ -369,13 +375,12 @@ mod render_tests {
 
     #[test]
     fn nothing_open() {
-        let buffer = render(10, 4, &mut TreeState::default());
-        #[rustfmt::skip]
-        let expected = Buffer::with_lines([
-            "  Alfa    ",
-            "▶ Bravo   ",
-            "  Hotel   ",
-            "          ",
+        let (buffer, _, closed) = render(10, 4, &mut TreeState::default());
+        let expected = Buffer::with_lines(vec![
+            "  Alfa    ".to_string(),
+            format!("{closed}Bravo   "),
+            "  Hotel   ".to_string(),
+            "          ".to_string(),
         ]);
         assert_eq!(buffer, expected);
     }
@@ -384,15 +389,15 @@ mod render_tests {
     fn depth_one() {
         let mut state = TreeState::default();
         state.open(vec!["b"]);
-        let buffer = render(13, 7, &mut state);
-        let expected = Buffer::with_lines([
-            "  Alfa       ",
-            "▼ Bravo      ",
-            "    Charlie  ",
-            "  ▶ Delta    ",
-            "    Golf     ",
-            "  Hotel      ",
-            "             ",
+        let (buffer, open, closed) = render(13, 7, &mut state);
+        let expected = Buffer::with_lines(vec![
+            "  Alfa       ".to_string(),
+            format!("{open}Bravo      "),
+            "    Charlie  ".to_string(),
+            format!("  {closed}Delta    "),
+            "    Golf     ".to_string(),
+            "  Hotel      ".to_string(),
+            "             ".to_string(),
         ]);
         assert_eq!(buffer, expected);
     }
@@ -402,17 +407,17 @@ mod render_tests {
         let mut state = TreeState::default();
         state.open(vec!["b"]);
         state.open(vec!["b", "d"]);
-        let buffer = render(15, 9, &mut state);
-        let expected = Buffer::with_lines([
-            "  Alfa         ",
-            "▼ Bravo        ",
-            "    Charlie    ",
-            "  ▼ Delta      ",
-            "      Echo     ",
-            "      Foxtrot  ",
-            "    Golf       ",
-            "  Hotel        ",
-            "               ",
+        let (buffer, open, _) = render(15, 9, &mut state);
+        let expected = Buffer::with_lines(vec![
+            "  Alfa         ".to_string(),
+            format!("{open}Bravo        "),
+            "    Charlie    ".to_string(),
+            format!("  {open}Delta      "),
+            "      Echo     ".to_string(),
+            "      Foxtrot  ".to_string(),
+            "    Golf       ".to_string(),
+            "  Hotel        ".to_string(),
+            "               ".to_string(),
         ]);
         assert_eq!(buffer, expected);
     }

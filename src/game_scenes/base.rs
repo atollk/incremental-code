@@ -1,6 +1,5 @@
 use crate::backend::events::Event;
 use crate::basic_terminal_app::App;
-use itertools::FoldWhile::Continue;
 use std::ops::{ControlFlow, FromResidual, Residual, Try};
 
 pub trait Scene {
