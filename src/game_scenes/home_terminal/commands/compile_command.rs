@@ -1,9 +1,9 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_state::{GameState, with_game_state};
+use crate::game_state::{CompiledProgram, GameState, with_game_state};
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
 use anyhow::anyhow;
-use language::{compile, parse_program};
+use language::{compile_with_meta, parse_program};
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::text::Text;
@@ -66,25 +66,23 @@ impl CompileCmd {
         }
     }
 
-    fn compile_result(game_state: &mut GameState) -> Option<anyhow::Result<()>> {
+    fn compile_result(game_state: &mut GameState) -> anyhow::Result<()> {
         let parsed = parse_program(&game_state.program_code);
-        let (compiled_program, result) = match parsed {
+        match parsed {
             Ok(parsed) => {
-                let linear_factor = game_state
-                    .upgrades
-                    .speed_up_per_instruction_linear
-                    .current_value();
-                let instr_count_to_exec_time = move |n| (n * linear_factor as u128) as f64;
-                let compiled = compile(&parsed, Box::new(instr_count_to_exec_time));
-                (Some(compiled), Some(Ok(())))
+                let mut compiled = CompiledProgram::new();
+                let run_result = compile_with_meta(&parsed, &mut compiled);
+                game_state.compiled_program = Some(match run_result {
+                    Ok(()) => Ok(compiled),
+                    Err(e) => Err(e.to_string()),
+                });
+                Ok(())
             }
             Err(richs) => {
                 let errs = richs.into_iter().map(|rich| Err(anyhow!("{rich}")));
-                (None, Some(errs.collect()))
+                errs.collect()
             }
-        };
-        game_state.compiled_program = compiled_program;
-        result
+        }
     }
 }
 
@@ -97,7 +95,9 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
         if self.compile_duration <= self.running_duration {
             if self.result.is_none() {
                 // TODO: run this while actually waiting, not just at the end
-                self.result = with_game_state(|game_state| Self::compile_result(game_state));
+                self.result = Some(with_game_state(|game_state| {
+                    Self::compile_result(game_state)
+                }));
             }
         } else {
             // Animate loading

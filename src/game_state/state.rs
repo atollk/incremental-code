@@ -1,20 +1,22 @@
-use crate::game_state::Resources;
 use crate::game_state::upgrades::Upgrades;
+use crate::game_state::{CompiledProgram, Resources};
 use anyhow::bail;
-use language::CompiledProgram;
+use parking_lot::ReentrantMutex;
 use serde::{Deserialize, Serialize};
-use std::sync::{LazyLock, Mutex};
+use std::cell::RefCell;
+use std::ops::{Deref, DerefMut};
+use std::sync::LazyLock;
 
 /// Lock the global game state and run `f` with a mutable reference to it.
 ///
 /// This is the single entry point for reading or mutating [`GameState`].
-pub fn with_game_state<T>(f: impl Fn(&mut GameState) -> T) -> T {
-    let mut lock = GLOBAL_GAME_STATE.lock().unwrap();
-    f(&mut lock)
+pub fn with_game_state<T>(f: impl FnOnce(&mut GameState) -> T) -> T {
+    let lock = GLOBAL_GAME_STATE.lock();
+    f(lock.deref().borrow_mut().deref_mut())
 }
 
-static GLOBAL_GAME_STATE: LazyLock<Mutex<GameState>> =
-    LazyLock::new(|| Mutex::new(GameState::default()));
+static GLOBAL_GAME_STATE: LazyLock<ReentrantMutex<RefCell<GameState>>> =
+    LazyLock::new(|| ReentrantMutex::new(RefCell::new(GameState::default())));
 
 /// Persistent game state stored in a global singleton.
 ///
@@ -23,7 +25,7 @@ static GLOBAL_GAME_STATE: LazyLock<Mutex<GameState>> =
 pub struct GameState {
     // Program
     pub program_code: String,
-    pub compiled_program: Option<CompiledProgram>,
+    pub compiled_program: Option<Result<CompiledProgram, String>>,
     // Resources
     pub current_resources: Resources,
     pub carryover_resources: Resources,
@@ -46,7 +48,7 @@ impl Default for GameState {
 impl GameState {
     /// Returns the sum of current and carryover resources.
     pub fn total_resources(&self) -> Resources {
-        &self.current_resources + &self.carryover_resources
+        self.current_resources.clone() + self.carryover_resources.clone()
     }
 
     /// Deduct `resources` from the available pool.
@@ -84,7 +86,7 @@ impl GameState {
     }
 
     /// Add `resources` to the carryover pool (e.g. earnings from a compiled program run).
-    pub fn give_carryover_resources(&mut self, resources: &Resources) {
-        self.carryover_resources = &self.carryover_resources + resources;
+    pub fn give_carryover_resources(&mut self, resources: Resources) {
+        self.carryover_resources += resources;
     }
 }

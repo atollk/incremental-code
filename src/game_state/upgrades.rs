@@ -6,7 +6,7 @@ pub trait Upgrade {
     /// Human-readable name of this upgrade.
     fn name(&self) -> &'static str;
     /// The unlock tier this upgrade belongs to.
-    fn group_level(&self) -> u8;
+    fn group(&self) -> u8;
     /// The player's current level for this upgrade (0-based).
     fn current_level(&self) -> u8;
     /// The highest level this upgrade can reach.
@@ -52,7 +52,7 @@ pub trait Upgrade {
 pub struct Upgrades {
     // Level 1
     pub compile_time: CompileTime,
-    pub speed_up_per_instruction_linear: SpeedUpPerInstructionLinear,
+    pub speed_up_per_instruction_constant: SpeedUpPerInstructionConstant,
     pub bronze_per_instruction_linear: BronzePerInstructionLinear,
     pub code_line_width_1: CodeLineWidth1,
     pub code_line_count_1: CodeLineCount1,
@@ -64,7 +64,7 @@ impl Upgrades {
     pub fn upgrades(&self) -> [&dyn Upgrade; 6] {
         [
             &self.compile_time,
-            &self.speed_up_per_instruction_linear,
+            &self.speed_up_per_instruction_constant,
             &self.bronze_per_instruction_linear,
             &self.code_line_width_1,
             &self.code_line_count_1,
@@ -75,7 +75,7 @@ impl Upgrades {
     fn upgrades_mut(&mut self) -> [&mut dyn Upgrade; 6] {
         [
             &mut self.compile_time,
-            &mut self.speed_up_per_instruction_linear,
+            &mut self.speed_up_per_instruction_constant,
             &mut self.bronze_per_instruction_linear,
             &mut self.code_line_width_1,
             &mut self.code_line_count_1,
@@ -126,7 +126,7 @@ macro_rules! impl_upgrade {
                 stringify!($struct)
             }
 
-            fn group_level(&self) -> u8 {
+            fn group(&self) -> u8 {
                 $group_level
             }
 
@@ -191,15 +191,15 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    SpeedUpPerInstructionLinear,
-    type=u8,
+    SpeedUpPerInstructionConstant,
+    type=u32,
     level=1,
     [
         (1, Resources::from_bronze(10.)),
         (2, Resources::from_bronze(100.)),
-        (3, Resources::from_bronze(2e3)),
-        (4, Resources::from_bronze(30e3)),
-        (5, Resources::zero()),
+        (8, Resources::from_bronze(2e3)),
+        (64, Resources::from_bronze(30e3)),
+        (1024, Resources::zero()),
     ]
 );
 

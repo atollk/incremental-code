@@ -9,9 +9,11 @@ mod code_command;
 mod compile_command;
 mod exit_command;
 mod help_command;
+mod run_command;
 mod unknown_command;
 mod upgrades_command;
 
+use crate::game_scenes::home_terminal::commands::run_command::run_cmd;
 use crate::game_scenes::home_terminal::commands::upgrades_command::upgrades_cmd;
 pub use unknown_command::unknown_cmd;
 
@@ -44,6 +46,11 @@ pub fn command_list() -> Vec<Command> {
             name: "compile",
             help_description: "Compiles the program code to make it executable",
             runner: compile_cmd,
+        },
+        Command {
+            name: "run",
+            help_description: "Runs the program code after compiling",
+            runner: run_cmd,
         },
         Command {
             name: "upgrades",

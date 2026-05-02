@@ -188,7 +188,7 @@ impl<'a> UpgradesScene<'a> {
                     .next_level_cost()
                     .expect("After leveling down, a cost to level up should be defined.");
                 // TODO: shortcut - we don't remember where resources came from, so we just return them as carryover
-                with_game_state(|game_state| game_state.give_carryover_resources(&cost));
+                with_game_state(move |game_state| game_state.give_carryover_resources(cost));
                 true
             }
         };

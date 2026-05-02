@@ -1,18 +1,18 @@
+use derive_more::{Add, AddAssign, Sub, SubAssign};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::ops::Add;
 
 #[derive(
     Default,
     PartialEq,
     PartialOrd,
     Debug,
-    derive_more::derive::Add,
-    derive_more::derive::Sub,
-    derive_more::derive::AddAssign,
-    derive_more::derive::SubAssign,
+    Add,
+    Sub,
+    AddAssign,
+    SubAssign,
     Serialize,
     Deserialize,
     Clone,
@@ -42,7 +42,7 @@ impl Display for Currency {
     }
 }
 
-#[derive(Default, PartialEq, Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, PartialEq, Debug, Serialize, Deserialize, Clone, Add, AddAssign)]
 /// A bundle of three resource denominations: bronze, silver, and gold.
 pub struct Resources {
     pub bronze: Currency,
@@ -96,17 +96,6 @@ impl Resources {
             bronze: self.bronze.saturating_sub(other.bronze),
             silver: self.silver.saturating_sub(other.silver),
             gold: self.gold.saturating_sub(other.gold),
-        }
-    }
-}
-
-impl Add for &Resources {
-    type Output = Resources;
-    fn add(self, rhs: &Resources) -> Resources {
-        Resources {
-            bronze: self.bronze + rhs.bronze,
-            silver: self.silver + rhs.silver,
-            gold: self.gold + rhs.gold,
         }
     }
 }

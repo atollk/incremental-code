@@ -1,30 +1,34 @@
 use crate::parser::{NotPythonExpr, NotPythonExprOp, NotPythonProgram, NotPythonStmt};
 use anyhow::{anyhow, bail};
-use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
-use std::ops::{Add, Deref};
+use std::ops::Deref;
 
-trait CompilingMetadata {
+pub trait CompilingMetadata {
     fn log_zero_instruction(&mut self) -> anyhow::Result<()>;
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()>;
 }
 
 impl CompilingMetadata for () {
-    fn log_zero_instruction(&mut self) {}
-    fn log_atomic_instruction(&mut self) {}
+    fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 /// Validates and executes a parsed [`NotPythonProgram`], returning an error if execution fails.
 pub fn compile(program: &NotPythonProgram) -> anyhow::Result<()> {
-    compile_with_meta(program, &())
+    compile_with_meta(program, &mut ())
 }
 
 /// Like [`compile`], but calls back into `meta` at each zero-cost and atomic instruction
 /// so callers can measure or profile execution.
 pub fn compile_with_meta(
     program: &NotPythonProgram,
-    meta: &mut dyn CompilingMetadata,
+    meta: &mut impl CompilingMetadata,
 ) -> anyhow::Result<()> {
     let mut state = ProgramExecutionState {
         control_flow: ProgramExecutionControlFlow::Normal,
@@ -118,7 +122,7 @@ impl<'a> ProgramExecutionState<'a> {
 fn compile_stmt<'a>(
     stmt: &'a NotPythonStmt,
     state: &mut ProgramExecutionState<'a>,
-    meta: &'a mut dyn CompilingMetadata,
+    meta: &mut impl CompilingMetadata,
 ) -> anyhow::Result<()> {
     if matches!(state.control_flow, ProgramExecutionControlFlow::Return(_)) {
         meta.log_zero_instruction()?;
@@ -142,19 +146,19 @@ fn compile_stmt<'a>(
         NotPythonStmt::Return(expr) => {
             state.control_flow = ProgramExecutionControlFlow::Return(
                 expr.as_ref()
-                    .map(|e| eval_expr(e, state))
+                    .map(|e| eval_expr(e, state, meta))
                     .unwrap_or(Ok(ProgramValue::None))?,
             );
             meta.log_atomic_instruction()?;
         }
         NotPythonStmt::Decl(name, expr) => {
-            let expr = eval_expr(expr, state)?;
+            let expr = eval_expr(expr, state, meta)?;
             state.decl_variable(name, expr);
             meta.log_atomic_instruction()?;
         }
         NotPythonStmt::Assign(name, expr) => {
             state.get_variable(name)?;
-            let expr = eval_expr(expr, state)?;
+            let expr = eval_expr(expr, state, meta)?;
             state.assign_variable(name, expr)?;
             meta.log_atomic_instruction()?;
         }
@@ -162,7 +166,7 @@ fn compile_stmt<'a>(
             condition,
             then,
             else_,
-        } => match eval_expr(condition, state)? {
+        } => match eval_expr(condition, state, meta)? {
             ProgramValue::Hashable(HashableProgramValue::Bool(b)) => {
                 if b {
                     compile_stmt(then, state, meta)?;
@@ -213,7 +217,7 @@ fn compile_stmt<'a>(
             };
             let arg_values: Vec<ProgramValue> = args
                 .iter()
-                .map(|a| eval_expr(a, state))
+                .map(|a| eval_expr(a, state, meta))
                 .collect::<anyhow::Result<_>>()?;
             if params.len() != arg_values.len() {
                 return Err(anyhow!(
@@ -232,7 +236,7 @@ fn compile_stmt<'a>(
             state.call_stack.push(frame);
 
             // Run function & return
-            let result = compile_stmt(body, state, meta);
+            compile_stmt(body, state, meta)?;
             state.call_stack.pop();
             if let ProgramExecutionControlFlow::Return(_) = state.control_flow {
                 state.control_flow = ProgramExecutionControlFlow::Normal;
@@ -384,6 +388,7 @@ fn eval_binary_op(
 fn eval_expr<'a>(
     expr: &'a NotPythonExpr,
     state: &mut ProgramExecutionState<'a>,
+    meta: &mut impl CompilingMetadata,
 ) -> anyhow::Result<ProgramValue> {
     match expr {
         NotPythonExpr::Int(i) => Ok(ProgramValue::Hashable(HashableProgramValue::Int(*i))),
@@ -396,14 +401,14 @@ fn eval_expr<'a>(
         NotPythonExpr::Identifier(name) => state.get_variable(name).cloned(),
         NotPythonExpr::List(l) => Ok(ProgramValue::List(
             l.iter()
-                .map(|ex| eval_expr(ex, state))
+                .map(|ex| eval_expr(ex, state, meta))
                 .collect::<anyhow::Result<_>>()?,
         )),
         NotPythonExpr::Dict(d) => {
             let mut map = HashMap::new();
             for (k, v) in d {
-                let key = eval_expr(k, state)?;
-                let val = eval_expr(v, state)?;
+                let key = eval_expr(k, state, meta)?;
+                let val = eval_expr(v, state, meta)?;
                 match key {
                     ProgramValue::Hashable(h) => {
                         map.insert(h, val);
@@ -427,11 +432,14 @@ fn eval_expr<'a>(
             | NotPythonExprOp::Less(lhs, rhs)
             | NotPythonExprOp::GreaterEqual(lhs, rhs)
             | NotPythonExprOp::LessEqual(lhs, rhs)
-            | NotPythonExprOp::In(lhs, rhs) => {
-                eval_binary_op(eval_expr(lhs, state)?, eval_expr(rhs, state)?, o, state)
-            }
+            | NotPythonExprOp::In(lhs, rhs) => eval_binary_op(
+                eval_expr(lhs, state, meta)?,
+                eval_expr(rhs, state, meta)?,
+                o,
+                state,
+            ),
             NotPythonExprOp::Neg(val) | NotPythonExprOp::Not(val) => {
-                eval_unary_op(eval_expr(val, state)?, o, state)
+                eval_unary_op(eval_expr(val, state, meta)?, o, state)
             }
         },
         NotPythonExpr::Call(name_expr, args) => {
@@ -448,7 +456,7 @@ fn eval_expr<'a>(
             };
             let arg_values: Vec<ProgramValue> = args
                 .iter()
-                .map(|a| eval_expr(a, state))
+                .map(|a| eval_expr(a, state, meta))
                 .collect::<anyhow::Result<_>>()?;
             if params.len() != arg_values.len() {
                 return Err(anyhow!(
@@ -467,7 +475,7 @@ fn eval_expr<'a>(
             state.call_stack.push(frame);
 
             // Run function & return
-            compile_stmt(body, state)?;
+            compile_stmt(body, state, meta)?;
             state.call_stack.pop();
             let return_value = match std::mem::replace(
                 &mut state.control_flow,
@@ -479,8 +487,8 @@ fn eval_expr<'a>(
             Ok(return_value)
         }
         NotPythonExpr::Index(lhs, rhs) => {
-            let lhs = eval_expr(lhs, state)?;
-            let rhs = eval_expr(rhs, state)?;
+            let lhs = eval_expr(lhs, state, meta)?;
+            let rhs = eval_expr(rhs, state, meta)?;
             match lhs {
                 ProgramValue::List(l) => match rhs {
                     ProgramValue::Hashable(HashableProgramValue::Int(i)) => l
@@ -512,20 +520,29 @@ mod tests {
     use super::*;
     use crate::parser::parse_program;
 
-    fn compiled(src: &str) -> CompiledProgram {
-        compile(&parse_program(src).unwrap())
+    impl CompilingMetadata for u32 {
+        fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
+            *self += 1;
+            Ok(())
+        }
+    }
+
+    fn compiled(src: &str) -> u32 {
+        let mut count: u32 = 0;
+        compile_with_meta(&parse_program(src).unwrap(), &mut count).unwrap();
+        count
     }
 
     fn compiled_err(src: &str) -> anyhow::Error {
-        // We need direct access to the Result for error tests.
         let program = parse_program(src).unwrap();
         let mut state = ProgramExecutionState {
             control_flow: ProgramExecutionControlFlow::Normal,
             call_stack: vec![ProgramExecutionCallState::default()],
-            instruction_speedup_count: 1,
-            instr_count_to_exec_time: Box::new(|n| 1.0),
         };
-        compile_stmt(&program.statement, &mut state).unwrap_err()
+        compile_stmt(&program.statement, &mut state, &mut ()).unwrap_err()
     }
 
     // -------------------------------------------------------------------------
@@ -534,28 +551,22 @@ mod tests {
 
     #[test]
     fn single_pass_counts_one() {
-        assert_eq!(compiled("pass;").instruction_count, 1);
+        assert_eq!(compiled("pass;"), 1);
     }
 
     #[test]
     fn two_stmts_count_two() {
-        assert_eq!(compiled("pass;\npass;\n").instruction_count, 2);
+        assert_eq!(compiled("pass;\npass;\n"), 2);
     }
 
     #[test]
     fn execution_time_positive() {
-        assert!(compiled("pass;").execution_time > 0.0);
+        assert!(compiled("pass;") > 0);
     }
 
     #[test]
     fn later_stmts_have_lower_time() {
-        // execution_time is 1/speedup; speedup grows each call, so each
-        // successive statement contributes less time than the previous one.
-        let p1 = compiled("pass;");
-        let p2 = compiled("pass;\npass;\n");
-        // Total time for two passes must be less than 2× the time of one pass,
-        // because the second pass runs at a higher speedup factor.
-        assert!(p2.execution_time < 2.0 * p1.execution_time);
+        assert!(compiled("pass;\npass;\n") > compiled("pass;"));
     }
 
     // -------------------------------------------------------------------------
@@ -564,8 +575,7 @@ mod tests {
 
     #[test]
     fn decl_and_assign() {
-        let c = compiled("x := 42;\nx = 1;\n");
-        assert_eq!(c.instruction_count, 2);
+        assert_eq!(compiled("x := 42;\nx = 1;\n"), 2);
     }
 
     #[test]
@@ -580,21 +590,17 @@ mod tests {
 
     #[test]
     fn arithmetic_in_decl() {
-        // Just check it compiles without panic; the value is 7.
-        let c = compiled("x := 1 + 2 * 3;\n");
-        assert_eq!(c.instruction_count, 1);
+        assert_eq!(compiled("x := 1 + 2 * 3;\n"), 1);
     }
 
     #[test]
     fn negation_in_decl() {
-        let c = compiled("x := -5;\n");
-        assert_eq!(c.instruction_count, 1);
+        assert_eq!(compiled("x := -5;\n"), 1);
     }
 
     #[test]
     fn string_concat() {
-        let c = compiled("x := \"hello\" + \" world\";\n");
-        assert_eq!(c.instruction_count, 1);
+        assert_eq!(compiled("x := \"hello\" + \" world\";\n"), 1);
     }
 
     // -------------------------------------------------------------------------
@@ -603,23 +609,17 @@ mod tests {
 
     #[test]
     fn if_true_branch_executes() {
-        // then branch: pass (1 stmt) → 1 + 1 = 2 instructions (if + pass)
-        let c = compiled("if True:\npass;\nend\n");
-        assert_eq!(c.instruction_count, 2);
+        assert_eq!(compiled("if True:\npass;\nend\n"), 2);
     }
 
     #[test]
     fn if_false_branch_skipped() {
-        // condition is False, no else → only the if stmt itself counts
-        let c = compiled("if False:\npass;\nend\n");
-        assert_eq!(c.instruction_count, 1);
+        assert_eq!(compiled("if False:\npass;\nend\n"), 1);
     }
 
     #[test]
     fn if_else_false_takes_else() {
-        // else branch has break (1 stmt) → 1 (if) + 1 (break) = 2
-        let c = compiled("if False:\npass;\nelse:\nbreak;\nend\n");
-        assert_eq!(c.instruction_count, 2);
+        assert_eq!(compiled("if False:\npass;\nelse:\nbreak;\nend\n"), 2);
     }
 
     #[test]
@@ -634,27 +634,20 @@ mod tests {
 
     #[test]
     fn loop_immediate_break() {
-        // Loop runs once (break on first iteration): atom(loop) + break = 2
-        let c = compiled("loop:\nbreak;\nend\n");
-        assert_eq!(c.instruction_count, 2);
+        assert_eq!(compiled("loop:\nbreak;\nend\n"), 2);
     }
 
     #[test]
     fn loop_body_executes_multiple_times() {
-        // x counts down from 3; loop runs 3 times then breaks.
         let src = "x := 3;\nloop:\nif x == 1:\nbreak;\nend\nx = x + -1;\nend\n";
-        let c = compiled(src);
-        // More instructions than if there were no loop.
-        assert!(c.instruction_count > 3);
+        assert!(compiled(src) > 3);
     }
 
     #[test]
     fn loop_adds_more_instructions_than_sequential() {
-        // A loop that runs twice should produce more instructions than two
-        // inline pass statements.
         let looped = compiled("loop:\npass;\npass;\nbreak;\nend\n");
         let sequential = compiled("pass;\npass;\n");
-        assert!(looped.instruction_count > sequential.instruction_count);
+        assert!(looped > sequential);
     }
 
     // -------------------------------------------------------------------------
@@ -663,21 +656,18 @@ mod tests {
 
     #[test]
     fn function_def_counts_one() {
-        let c = compiled("def foo():\npass;\nend\n");
-        assert_eq!(c.instruction_count, 1);
+        assert_eq!(compiled("def foo():\npass;\nend\n"), 1);
     }
 
     #[test]
     fn function_call_executes_body() {
         // def (1) + call stmt (1 overhead + body pass 1) = 3
-        let c = compiled("def foo():\npass;\nend\nfoo();\n");
-        assert_eq!(c.instruction_count, 3);
+        assert_eq!(compiled("def foo():\npass;\nend\nfoo();\n"), 3);
     }
 
     #[test]
     fn function_with_params() {
-        let c = compiled("def add(x, y):\npass;\nend\nadd(1, 2);\n");
-        assert_eq!(c.instruction_count, 3);
+        assert_eq!(compiled("def add(x, y):\npass;\nend\nadd(1, 2);\n"), 3);
     }
 
     #[test]
@@ -698,26 +688,22 @@ mod tests {
 
     #[test]
     fn list_literal_in_decl() {
-        let c = compiled("x := [1, 2, 3];\n");
-        assert_eq!(c.instruction_count, 1);
+        assert_eq!(compiled("x := [1, 2, 3];\n"), 1);
     }
 
     #[test]
     fn list_index() {
-        let c = compiled("x := [10, 20, 30];\ny := x[1];\n");
-        assert_eq!(c.instruction_count, 2);
+        assert_eq!(compiled("x := [10, 20, 30];\ny := x[1];\n"), 2);
     }
 
     #[test]
     fn dict_literal_in_decl() {
-        let c = compiled("x := {1: \"one\", 2: \"two\"};\n");
-        assert_eq!(c.instruction_count, 1);
+        assert_eq!(compiled("x := {1: \"one\", 2: \"two\"};\n"), 1);
     }
 
     #[test]
     fn dict_index() {
-        let c = compiled("x := {1: \"one\"};\ny := x[1];\n");
-        assert_eq!(c.instruction_count, 2);
+        assert_eq!(compiled("x := {1: \"one\"};\ny := x[1];\n"), 2);
     }
 
     #[test]
