@@ -19,7 +19,7 @@ pub static BACKEND_INSTANCE: LazyLock<RwLock<CrosstermBackendSuite>> =
 pub struct CrosstermBackendSuite {}
 
 impl BackendSuite<BackendType, StorageType> for CrosstermBackendSuite {
-    fn run(&self, mut app: &mut dyn TerminalApp<BackendType>) -> anyhow::Result<()> {
+    fn run(&self, app: &mut dyn TerminalApp<BackendType>) -> anyhow::Result<()> {
         let backend = BackendType::new(stdout());
         enable_raw_mode()?;
         execute!(stdout(), EnterAlternateScreen)?;
