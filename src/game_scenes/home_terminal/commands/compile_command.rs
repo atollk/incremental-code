@@ -10,6 +10,7 @@ use ratatui_core::text::Text;
 use ratatui_core::widgets::StatefulWidget;
 use ratatui_widgets::paragraph::Paragraph;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::time::Duration;
 
 pub(super) fn compile_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
@@ -71,7 +72,8 @@ impl CompileCmd {
         match parsed {
             Ok(parsed) => {
                 let mut compiled = CompiledProgram::new();
-                let run_result = compile_with_meta(&parsed, &mut compiled);
+                let predefined_function = HashMap::new();
+                let run_result = compile_with_meta(&parsed, predefined_function, &mut compiled);
                 game_state.compiled_program = Some(match run_result {
                     Ok(()) => Ok(compiled),
                     Err(e) => Err(e.to_string()),

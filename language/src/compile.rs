@@ -20,32 +20,37 @@ impl CompilingMetadata for () {
 }
 
 /// Validates and executes a parsed [`NotPythonProgram`], returning an error if execution fails.
-pub fn compile(program: &NotPythonProgram) -> anyhow::Result<()> {
-    compile_with_meta(program, &mut ())
+pub fn compile(
+    program: &NotPythonProgram,
+    predefined_functions: HashMap<&str, &PredefinedFunction>,
+) -> anyhow::Result<()> {
+    compile_with_meta(program, predefined_functions, &mut ())
 }
 
 /// Like [`compile`], but calls back into `meta` at each zero-cost and atomic instruction
 /// so callers can measure or profile execution.
 pub fn compile_with_meta(
     program: &NotPythonProgram,
+    predefined_functions: HashMap<&str, &PredefinedFunction>,
     meta: &mut impl CompilingMetadata,
 ) -> anyhow::Result<()> {
     let mut state = ProgramExecutionState {
         control_flow: ProgramExecutionControlFlow::Normal,
         call_stack: vec![ProgramExecutionCallState::default()],
+        predefined_functions,
     };
     compile_stmt(&program.statement, &mut state, meta)
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
-enum HashableProgramValue {
+pub enum HashableProgramValue {
     Int(i64),
     String(String),
     Bool(bool),
 }
 
 #[derive(PartialEq, Clone, Debug)]
-enum ProgramValue {
+pub enum ProgramValue {
     Hashable(HashableProgramValue),
     Float(f64),
     None,
@@ -68,69 +73,55 @@ struct ProgramExecutionCallState<'a> {
     loop_nesting: usize,
 }
 
+type PredefinedFunction = dyn Fn(Vec<ProgramValue>) -> anyhow::Result<ProgramValue>;
+
 enum Callable<'a> {
-    PredefinedFunction {
-        body: Box<dyn Fn(Vec<ProgramValue>) -> anyhow::Result<ProgramValue>>,
-        params: Vec<String>,
-    },
+    PredefinedFunction(&'a PredefinedFunction),
     UserFunction(&'a NotPythonStmt),
 }
 
 impl<'a> Callable<'a> {
     fn call(
-        &self,
+        self,
         name: &str,
         args: &[NotPythonExpr],
         state: &mut ProgramExecutionState<'a>,
         meta: &mut impl CompilingMetadata,
     ) -> anyhow::Result<ProgramValue> {
-        let predefined_function_body = if let Callable::PredefinedFunction { params, body } = self {
-            Some(|args| body(args))
-        } else {
-            None
-        };
-        let user_function_body =
-            if let Callable::UserFunction(NotPythonStmt::Function { params, body, .. }) = self {
-                let f = |args: Vec<ProgramValue>| -> anyhow::Result<ProgramValue> {
-                    let mut frame = ProgramExecutionCallState::default();
-                    for (param, val) in params.into_iter().zip(args) {
-                        frame.variables.insert(param.as_str(), val);
-                    }
-                    state.call_stack.push(frame);
-
-                    // Run function & return
-                    compile_stmt(body, state, meta)?;
-                    state.call_stack.pop();
-                    let return_value = match std::mem::replace(
-                        &mut state.control_flow,
-                        ProgramExecutionControlFlow::Normal,
-                    ) {
-                        ProgramExecutionControlFlow::Return(v) => v,
-                        _ => ProgramValue::None,
-                    };
-                    Ok(return_value)
-                };
-                Some(f)
-            } else {
-                None
-            };
-        let body_function = match (predefined_function_body, user_function_body) {
-            (Some(_), Some(_)) => unreachable!(),
-            (Some(f), None) => &f as &(dyn FnMut(&[ProgramValue]) -> anyhow::Result<ProgramValue>),
-            (None, Some(f)) => &f,
-            (None, None) => bail!("'{}' is not a function", name),
-        };
         let arg_values: Vec<ProgramValue> = args
             .iter()
             .map(|a| eval_expr(a, state, meta))
             .collect::<anyhow::Result<_>>()?;
-        body_function(&arg_values)
+        match self {
+            Callable::PredefinedFunction(body) => body(arg_values),
+            Callable::UserFunction(NotPythonStmt::Function { params, body, .. }) => {
+                let mut frame = ProgramExecutionCallState::default();
+                for (param, val) in params.iter().zip(arg_values) {
+                    frame.variables.insert(param.as_str(), val);
+                }
+                state.call_stack.push(frame);
+
+                // Run function & return
+                compile_stmt(body, state, meta)?;
+                state.call_stack.pop();
+                let return_value = match std::mem::replace(
+                    &mut state.control_flow,
+                    ProgramExecutionControlFlow::Normal,
+                ) {
+                    ProgramExecutionControlFlow::Return(v) => v,
+                    _ => ProgramValue::None,
+                };
+                Ok(return_value)
+            }
+            _ => bail!("'{}' is not a function", name),
+        }
     }
 }
 
 struct ProgramExecutionState<'a> {
     control_flow: ProgramExecutionControlFlow,
     call_stack: Vec<ProgramExecutionCallState<'a>>,
+    predefined_functions: HashMap<&'a str, &'a PredefinedFunction>,
 }
 
 impl<'a> ProgramExecutionState<'a> {
@@ -169,7 +160,7 @@ impl<'a> ProgramExecutionState<'a> {
             .insert(name, stmt);
     }
 
-    fn get_function(&self, name: &str) -> anyhow::Result<Callable> {
+    fn get_function(&self, name: &str) -> anyhow::Result<Callable<'a>> {
         for call_state in self.call_stack.iter().rev() {
             if let Some(&stmt) = call_state.functions.get(name) {
                 return Ok(Callable::UserFunction(stmt));
@@ -415,7 +406,7 @@ fn eval_binary_op(
 }
 
 fn eval_expr<'a>(
-    expr: &'a NotPythonExpr,
+    expr: &NotPythonExpr,
     state: &mut ProgramExecutionState<'a>,
     meta: &mut impl CompilingMetadata,
 ) -> anyhow::Result<ProgramValue> {
@@ -525,7 +516,7 @@ mod tests {
 
     fn compiled(src: &str) -> u32 {
         let mut count: u32 = 0;
-        compile_with_meta(&parse_program(src).unwrap(), &mut count).unwrap();
+        compile_with_meta(&parse_program(src).unwrap(), HashMap::new(), &mut count).unwrap();
         count
     }
 
@@ -534,6 +525,7 @@ mod tests {
         let mut state = ProgramExecutionState {
             control_flow: ProgramExecutionControlFlow::Normal,
             call_stack: vec![ProgramExecutionCallState::default()],
+            predefined_functions: HashMap::new(),
         };
         compile_stmt(&program.statement, &mut state, &mut ()).unwrap_err()
     }
