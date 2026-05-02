@@ -23,7 +23,7 @@ pub static BACKEND_INSTANCE: LazyLock<RwLock<RatzillaBackendSuite>> =
 pub struct RatzillaBackendSuite {}
 
 impl BackendSuite<BackendType, StorageType> for RatzillaBackendSuite {
-    fn run(&self, mut terminal_app: &mut dyn TerminalApp<BackendType>) -> anyhow::Result<()> {
+    fn run(&self, terminal_app: &mut dyn TerminalApp<BackendType>) -> anyhow::Result<()> {
         let mut backend = WebGl2Backend::new().map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
         let events: Rc<RefCell<Vec<Event>>> = Rc::new(RefCell::new(Vec::new()));

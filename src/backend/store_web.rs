@@ -17,7 +17,7 @@ impl StorageBackend for StoreWeb {
         storage
             .set_item(&format!("save_{key}"), &json)
             .map_err(|e| anyhow!(format!("{e:?}")))?;
-        log::info!("saved to {path}.json");
+        log::info!("saved to local storage with key: {key}");
         Ok(())
     }
 

@@ -5,7 +5,7 @@ use std::path;
 const APP_NAME: &'static str = "incremental-code";
 
 pub struct StoreNative {
-    directory: std::path::PathBuf,
+    directory: path::PathBuf,
 }
 
 impl Default for StoreNative {

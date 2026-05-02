@@ -209,10 +209,10 @@ impl_upgrade!(
     level=1,
     [
         (1, Resources::from_bronze(10.)),
-        (2, Resources::from_bronze(100.)),
-        (3, Resources::from_bronze(2e3)),
-        (4, Resources::from_bronze(30e3)),
-        (5, Resources::zero()),
+        (5, Resources::from_bronze(100.)),
+        (25, Resources::from_bronze(2e3)),
+        (125, Resources::from_bronze(30e3)),
+        (625, Resources::zero()),
     ]
 );
 impl_upgrade!(
