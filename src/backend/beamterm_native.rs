@@ -14,11 +14,12 @@ use glutin::{
     surface::{Surface, SwapInterval, WindowSurface},
 };
 use glutin_winit::DisplayBuilder;
+use log::LevelFilter;
 use ratbeam::BeamtermBackend;
 use raw_window_handle::HasWindowHandle;
 use std::num::NonZeroU32;
 use std::rc::Rc;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex, RwLock};
 use winit::event::KeyEvent;
 use winit::{
     application::ApplicationHandler,
@@ -31,10 +32,11 @@ use winit::{
     window::{Window, WindowAttributes},
 };
 
-pub static BACKEND_INSTANCE: LazyLock<Mutex<BeamtermCoreBackendSuite>> =
-    LazyLock::new(|| Mutex::new(BeamtermCoreBackendSuite {}));
+pub static BACKEND_INSTANCE: LazyLock<RwLock<BeamtermCoreBackendSuite>> =
+    LazyLock::new(|| RwLock::new(BeamtermCoreBackendSuite {}));
 
 pub type BackendType = BeamtermBackend;
+pub type StorageType = StoreNative;
 
 pub struct BeamtermCoreBackendSuite {}
 
@@ -48,8 +50,8 @@ impl BeamtermCoreBackendSuite {
     }
 }
 
-impl BackendSuite<BackendType> for BeamtermCoreBackendSuite {
-    fn run(&mut self, terminal_app: impl TerminalApp<BackendType>) -> anyhow::Result<()> {
+impl BackendSuite<BackendType, StorageType> for BeamtermCoreBackendSuite {
+    fn run(&self, terminal_app: &mut dyn TerminalApp<BackendType>) -> anyhow::Result<()> {
         let event_loop = EventLoop::new().expect("failed to create event loop");
         let mut app = BeamtermCoreApplicationHandler {
             terminal_app,
@@ -60,13 +62,16 @@ impl BackendSuite<BackendType> for BeamtermCoreBackendSuite {
         Ok(())
     }
 
-    fn storage_backend(&self) -> impl StorageBackend {
-        StoreNative::default()
+    fn init_logging(&self) -> anyhow::Result<()> {
+        simple_logger::SimpleLogger::new()
+            .with_level(LevelFilter::Debug)
+            .init()
+            .map_err(|e| anyhow::anyhow!(e))
     }
 }
 
-struct BeamtermCoreApplicationHandler<A: TerminalApp<BackendType>> {
-    terminal_app: A,
+struct BeamtermCoreApplicationHandler<'a> {
+    terminal_app: &'a mut dyn TerminalApp<BackendType>,
     window_state: Option<WindowState>,
     events: Vec<Event>,
 }
@@ -95,7 +100,7 @@ impl WindowState {
     }
 }
 
-impl<A: TerminalApp<BackendType>> ApplicationHandler for BeamtermCoreApplicationHandler<A> {
+impl<'a> ApplicationHandler for BeamtermCoreApplicationHandler<'a> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_state = BeamtermCoreBackendSuite::get_window_state(event_loop);
         self.window_state = Some(window_state);

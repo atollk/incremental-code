@@ -1,5 +1,4 @@
 use crate::backend;
-use crate::backend::backend::BackendSuite;
 use crate::backend::backend::TerminalApp;
 use crate::backend::events::Event;
 
@@ -27,8 +26,8 @@ impl<A: App + 'static> BasicTerminalApp<A> {
     }
 
     /// Hand the app to the global backend and block until the app requests an exit.
-    pub(crate) fn run(self) -> anyhow::Result<()> {
-        backend::BACKEND_INSTANCE.lock().unwrap().run(self)
+    pub(crate) fn run(&mut self) -> anyhow::Result<()> {
+        backend::with_backend(|backend| backend.run(self))
     }
 }
 

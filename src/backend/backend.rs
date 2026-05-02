@@ -2,12 +2,17 @@ use crate::backend::events::Event;
 use serde::{Deserialize, Serialize};
 
 /// A backend implementation that can own and drive a [`TerminalApp`] event loop.
-pub trait BackendSuite<B: ratatui::backend::Backend> {
+pub trait BackendSuite<B: ratatui::backend::Backend, S: StorageBackend + Default> {
     /// Start the event loop and run `app` until it requests an exit.
-    fn run(&mut self, app: impl TerminalApp<B> + 'static) -> anyhow::Result<()>;
+    fn run(&self, app: &mut dyn TerminalApp<B>) -> anyhow::Result<()>;
+
+    /// Enable logging.
+    fn init_logging(&self) -> anyhow::Result<()>;
 
     /// StorageBackend to work with persisting data.
-    fn storage_backend(&self) -> impl StorageBackend;
+    fn storage_backend(&self) -> S {
+        S::default()
+    }
 }
 
 /// A backend to store data between runs.

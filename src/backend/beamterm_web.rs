@@ -1,6 +1,8 @@
+use crate::backend::backend;
 use crate::backend::backend::{BackendSuite, StorageBackend, TerminalApp};
 use crate::backend::events::{Event, IntoEvent};
 use crate::backend::store_web::StoreWeb;
+use log::LevelFilter;
 use ratzilla::event::{
     KeyCode as RzKeyCode, MouseButton as RzMouseButton, MouseEventKind as RzMouseEventKind,
 };
@@ -8,21 +10,20 @@ use ratzilla::web_sys::wasm_bindgen::JsCast;
 use ratzilla::web_sys::wasm_bindgen::closure::Closure;
 use ratzilla::{WebEventHandler, WebGl2Backend};
 use std::cell::RefCell;
+use std::ops::Deref;
 use std::rc::Rc;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex, RwLock};
 
 pub type BackendType = WebGl2Backend;
+pub type StorageType = StoreWeb;
 
-pub static BACKEND_INSTANCE: LazyLock<Mutex<RatzillaBackendSuite>> =
-    LazyLock::new(|| Mutex::new(RatzillaBackendSuite {}));
+pub static BACKEND_INSTANCE: LazyLock<RwLock<RatzillaBackendSuite>> =
+    LazyLock::new(|| RwLock::new(RatzillaBackendSuite {}));
 
 pub struct RatzillaBackendSuite {}
 
-impl BackendSuite<BackendType> for RatzillaBackendSuite {
-    fn run(
-        &mut self,
-        mut terminal_app: impl TerminalApp<BackendType> + 'static,
-    ) -> anyhow::Result<()> {
+impl BackendSuite<BackendType, StorageType> for RatzillaBackendSuite {
+    fn run(&self, mut terminal_app: &mut dyn TerminalApp<BackendType>) -> anyhow::Result<()> {
         let mut backend = WebGl2Backend::new().map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
         let events: Rc<RefCell<Vec<Event>>> = Rc::new(RefCell::new(Vec::new()));
@@ -70,7 +71,7 @@ impl BackendSuite<BackendType> for RatzillaBackendSuite {
             }
         }) as Box<dyn FnMut()>));
 
-        ratzilla::web_sys::window()
+        web_sys::window()
             .unwrap()
             .request_animation_frame(g.borrow().as_ref().unwrap().as_ref().unchecked_ref())
             .unwrap();
@@ -78,8 +79,8 @@ impl BackendSuite<BackendType> for RatzillaBackendSuite {
         Ok(())
     }
 
-    fn storage_backend(&self) -> impl StorageBackend {
-        StoreWeb::default()
+    fn init_logging(&self) -> anyhow::Result<()> {
+        console_log::init_with_level(log::Level::Debug).map_err(|e| anyhow::anyhow!(e))
     }
 }
 

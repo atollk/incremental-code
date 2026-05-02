@@ -3,21 +3,23 @@ use crate::backend::events::{Event, IntoEvent};
 use crate::backend::store_native::StoreNative;
 use crossterm::execute;
 use crossterm::terminal::{EnterAlternateScreen, enable_raw_mode};
+use log::LevelFilter;
 use ratatui::backend::CrosstermBackend;
 use std::io::{Stdout, stdout};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{LazyLock, Mutex, RwLock};
 use std::time::Duration;
 
 pub type BackendType = CrosstermBackend<Stdout>;
+pub type StorageType = StoreNative;
 
-pub static BACKEND_INSTANCE: LazyLock<Mutex<CrosstermBackendSuite>> =
-    LazyLock::new(|| Mutex::new(CrosstermBackendSuite {}));
+pub static BACKEND_INSTANCE: LazyLock<RwLock<CrosstermBackendSuite>> =
+    LazyLock::new(|| RwLock::new(CrosstermBackendSuite {}));
 
 #[derive(Default)]
 pub struct CrosstermBackendSuite {}
 
-impl BackendSuite<BackendType> for CrosstermBackendSuite {
-    fn run(&mut self, mut app: impl TerminalApp<BackendType> + 'static) -> anyhow::Result<()> {
+impl BackendSuite<BackendType, StorageType> for CrosstermBackendSuite {
+    fn run(&self, mut app: &mut dyn TerminalApp<BackendType>) -> anyhow::Result<()> {
         let backend = BackendType::new(stdout());
         enable_raw_mode()?;
         execute!(stdout(), EnterAlternateScreen)?;
@@ -38,8 +40,11 @@ impl BackendSuite<BackendType> for CrosstermBackendSuite {
         Ok(())
     }
 
-    fn storage_backend(&self) -> impl StorageBackend {
-        StoreNative::default()
+    fn init_logging(&self) -> anyhow::Result<()> {
+        simple_logger::SimpleLogger::new()
+            .with_level(LevelFilter::Debug)
+            .init()
+            .map_err(|e| anyhow::anyhow!(e))
     }
 }
 

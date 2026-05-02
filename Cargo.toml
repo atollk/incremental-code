@@ -28,6 +28,7 @@ glow = { version = "0.17.0", optional = true }
 ratzilla = { git = "https://github.com/atollk/ratzilla", rev = "373a39b17d0fbf5d1d72f77fd28450c102ada33e", optional = true }
 beamterm-renderer = { version = "^1.0", optional = true }
 web-sys = { version = "0.3.97", features = ["Storage", "Window"], optional = true }
+console_log = { version = "1.0", optional = true }
 
 # general dependencies
 ratatui = { version = "0.30.0", default-features = false, features = ["unstable-rendered-line-info"] }
@@ -75,6 +76,7 @@ ratzilla = [
     "dep:beamterm-renderer",
     "dep:ratzilla",
     "dep:web-sys",
+    "dep:console_log",
     "tachyonfx/wasm",
 ]
 
