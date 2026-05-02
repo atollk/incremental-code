@@ -7,17 +7,21 @@ use std::ops::Range;
 use unicode_segmentation::{GraphemeCursor, GraphemeIncomplete};
 use unicode_width::UnicodeWidthStr;
 
+/// The kind of atomic change applied to a [`Code`] buffer.
 #[derive(Clone)]
 pub enum EditKind {
     Insert { offset: usize, text: String },
     Remove { offset: usize, text: String },
 }
 
+/// A single atomic edit (insert or remove) with its position encoded in the [`EditKind`].
 #[derive(Clone)]
 pub struct Edit {
     pub kind: EditKind,
 }
 
+/// A group of [`Edit`]s that are undone/redone together, plus the editor state
+/// snapshots taken before and after the batch.
 #[derive(Clone)]
 pub struct EditBatch {
     pub edits: Vec<Edit>,
@@ -32,6 +36,7 @@ impl Default for EditBatch {
 }
 
 impl EditBatch {
+    /// Creates an empty `EditBatch`.
     pub fn new() -> Self {
         Self {
             edits: Vec::new(),
@@ -41,18 +46,29 @@ impl EditBatch {
     }
 }
 
+/// A snapshot of editor position state saved alongside an [`EditBatch`].
 #[derive(Clone, Copy)]
 pub struct EditState {
     pub offset: usize,
     pub selection: Option<Selection>,
 }
 
+/// Language-specific behaviour plugged into the [`Code`] buffer.
 pub trait CodeLanguage {
+    /// The string used for one indentation level (e.g. `"    "` or `"\t"`).
     fn get_indent(&self) -> &str;
+
+    /// The prefix that starts a single-line comment (e.g. `"#"` or `"//"`).
     fn get_comment_prefix(&self) -> &str;
+
+    /// Returns a list of byte-range → style mappings for syntax highlighting of `text`.
     fn highlight(&self, text: &str) -> Vec<(Range<usize>, Style)>;
 }
 
+/// The text buffer for the code editor.
+///
+/// Wraps a [`ropey::Rope`] with language-aware helpers (indentation, comments,
+/// syntax highlighting) and a built-in undo/redo history.
 pub struct Code {
     content: Rope,
     language: Box<dyn CodeLanguage>,
@@ -63,6 +79,7 @@ pub struct Code {
 }
 
 impl Code {
+    /// Creates a new `Code` buffer with the given initial text and language plugin.
     pub fn new(text: &str, language: Box<dyn CodeLanguage>) -> Self {
         Self {
             content: Rope::from_str(text),
@@ -74,6 +91,7 @@ impl Code {
         }
     }
 
+    /// Converts a char offset into a `(row, col)` pair.
     pub fn point(&self, offset: usize) -> (usize, usize) {
         let row = self.content.char_to_line(offset);
         let line_start = self.content.line_to_char(row);
@@ -81,38 +99,47 @@ impl Code {
         (row, col)
     }
 
+    /// Converts a `(row, col)` pair into a char offset.
     pub fn offset(&self, row: usize, col: usize) -> usize {
         let line_start = self.content.line_to_char(row);
         line_start + col
     }
 
+    /// Returns the entire buffer contents as an owned `String`.
     pub fn get_content(&self) -> String {
         self.content.to_string()
     }
 
+    /// Returns the char range `[start, end)` as an owned `String`.
     pub fn slice(&self, start: usize, end: usize) -> String {
         self.content.slice(start..end).to_string()
     }
 
+    /// Returns the total number of chars in the buffer.
     pub fn len(&self) -> usize {
         self.content.len_chars()
     }
 
+    /// Returns the number of lines in the buffer.
     pub fn len_lines(&self) -> usize {
         self.content.len_lines()
     }
 
+    /// Returns the total number of Unicode scalar values in the buffer.
     pub fn len_chars(&self) -> usize {
         self.content.len_chars()
     }
 
+    /// Returns the char offset of the first character on `line_idx`.
     pub fn line_to_char(&self, line_idx: usize) -> usize {
         self.content.line_to_char(line_idx)
     }
+    /// Converts a char index to the corresponding byte index.
     pub fn char_to_byte(&self, char_idx: usize) -> usize {
         self.content.char_to_byte(char_idx)
     }
 
+    /// Returns the number of chars on line `idx`, excluding the trailing newline.
     pub fn line_len(&self, idx: usize) -> usize {
         let line = self.content.line(idx);
         let len = line.len_chars();
@@ -123,42 +150,52 @@ impl Code {
         }
     }
 
+    /// Returns a rope slice for line `line_idx` (including its newline, if any).
     pub fn line(&self, line_idx: usize) -> RopeSlice<'_> {
         self.content.line(line_idx)
     }
 
+    /// Returns the line index that contains `char_idx`.
     pub fn char_to_line(&self, char_idx: usize) -> usize {
         self.content.char_to_line(char_idx)
     }
 
+    /// Returns a rope slice over the char range `[start, end)`.
     pub fn char_slice(&self, start: usize, end: usize) -> RopeSlice<'_> {
         self.content.slice(start..end)
     }
 
+    /// Returns a rope slice over the byte range `[start, end)`.
     pub fn byte_slice(&self, start: usize, end: usize) -> RopeSlice<'_> {
         self.content.byte_slice(start..end)
     }
 
+    /// Returns the line index that contains `byte_idx`.
     pub fn byte_to_line(&self, byte_idx: usize) -> usize {
         self.content.byte_to_line(byte_idx)
     }
 
+    /// Converts a byte index to the corresponding char index.
     pub fn byte_to_char(&self, byte_idx: usize) -> usize {
         self.content.byte_to_char(byte_idx)
     }
 
+    /// Starts a new edit transaction, discarding any previously uncommitted edits.
     pub fn tx(&mut self) {
         self.current_batch = EditBatch::new();
     }
 
+    /// Records the editor state (cursor and selection) that existed *before* the current transaction.
     pub fn set_state_before(&mut self, offset: usize, selection: Option<Selection>) {
         self.current_batch.state_before = Some(EditState { offset, selection });
     }
 
+    /// Records the editor state (cursor and selection) that will exist *after* the current transaction.
     pub fn set_state_after(&mut self, offset: usize, selection: Option<Selection>) {
         self.current_batch.state_after = Some(EditState { offset, selection });
     }
 
+    /// Commits the current transaction to the undo history if it contains any edits.
     pub fn commit(&mut self) {
         if !self.current_batch.edits.is_empty() {
             self.notify_changes(&self.current_batch.edits);
@@ -167,6 +204,7 @@ impl Code {
         }
     }
 
+    /// Inserts `text` at the given char offset and records the edit in the current transaction.
     pub fn insert(&mut self, from: usize, text: &str) {
         self.content.insert(from, text);
 
@@ -180,6 +218,7 @@ impl Code {
         }
     }
 
+    /// Removes chars in the range `[from, to)` and records the edit in the current transaction.
     pub fn remove(&mut self, from: usize, to: usize) {
         let removed_text = self.content.slice(from..to).to_string();
 
@@ -195,6 +234,7 @@ impl Code {
         }
     }
 
+    /// Returns `true` if syntax highlighting is enabled for this buffer.
     pub fn is_highlight(&self) -> bool {
         true
     }
@@ -222,6 +262,9 @@ impl Code {
             .collect()
     }
 
+    /// Undoes the most recent committed transaction, returning the reversed batch.
+    ///
+    /// Returns `None` if there is nothing to undo.
     pub fn undo(&mut self) -> Option<EditBatch> {
         let batch = self.history.undo()?;
         self.applying_history = false;
@@ -241,6 +284,9 @@ impl Code {
         Some(batch)
     }
 
+    /// Re-applies the most recently undone transaction, returning the re-applied batch.
+    ///
+    /// Returns `None` if there is nothing to redo.
     pub fn redo(&mut self) -> Option<EditBatch> {
         let batch = self.history.redo()?;
         self.applying_history = false;
@@ -260,6 +306,10 @@ impl Code {
         Some(batch)
     }
 
+    /// Returns `(start, end)` char offsets of the word that contains `pos`.
+    ///
+    /// Word characters are alphanumeric or `_`. If `pos` is outside the buffer the
+    /// result is `(pos, pos)`.
     pub fn word_boundaries(&self, pos: usize) -> (usize, usize) {
         let len = self.content.len_chars();
         if pos >= len {
@@ -289,6 +339,9 @@ impl Code {
         (start, end)
     }
 
+    /// Returns `(start, end)` char offsets of the line that contains `pos`.
+    ///
+    /// The `end` offset includes the trailing newline, if present.
     pub fn line_boundaries(&self, pos: usize) -> (usize, usize) {
         let total_chars = self.content.len_chars();
         if pos >= total_chars {
@@ -541,6 +594,7 @@ impl<'a> Iterator for RopeGraphemes<'a> {
     }
 }
 
+/// Returns the display width (in terminal columns) and char count of a grapheme cluster.
 pub fn grapheme_width_and_chars_len(g: RopeSlice) -> (usize, usize) {
     if let Some(g_str) = g.as_str() {
         (UnicodeWidthStr::width(g_str), g_str.chars().count())
@@ -551,6 +605,7 @@ pub fn grapheme_width_and_chars_len(g: RopeSlice) -> (usize, usize) {
     }
 }
 
+/// Returns the display width (in terminal columns) and byte length of a grapheme cluster.
 pub fn grapheme_width_and_bytes_len(g: RopeSlice) -> (usize, usize) {
     if let Some(g_str) = g.as_str() {
         (UnicodeWidthStr::width(g_str), g_str.len())
@@ -561,6 +616,7 @@ pub fn grapheme_width_and_bytes_len(g: RopeSlice) -> (usize, usize) {
     }
 }
 
+/// Returns the display width (in terminal columns) of a grapheme cluster.
 pub fn grapheme_width(g: RopeSlice) -> usize {
     if let Some(s) = g.as_str() {
         UnicodeWidthStr::width(s)

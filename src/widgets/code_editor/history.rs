@@ -1,6 +1,7 @@
 use crate::widgets::code_editor::code::EditBatch;
 use std::collections::VecDeque;
 
+/// Bounded undo/redo stack for the code editor.
 pub struct History {
     index: usize,
     max_items: usize,
@@ -8,6 +9,7 @@ pub struct History {
 }
 
 impl History {
+    /// Creates an empty `History` that retains at most `max_items` batches.
     pub fn new(max_items: usize) -> Self {
         Self {
             index: 0,
@@ -16,6 +18,10 @@ impl History {
         }
     }
 
+    /// Pushes a new `batch` onto the history stack.
+    ///
+    /// Any previously undone batches beyond the current position are discarded.
+    /// If the stack is full, the oldest entry is dropped.
     pub fn push(&mut self, batch: EditBatch) {
         while self.edits.len() > self.index {
             self.edits.pop_back();
@@ -30,6 +36,9 @@ impl History {
         self.index += 1;
     }
 
+    /// Steps one position back in history and returns the batch to reverse.
+    ///
+    /// Returns `None` if already at the beginning.
     pub fn undo(&mut self) -> Option<EditBatch> {
         if self.index == 0 {
             None
@@ -39,6 +48,9 @@ impl History {
         }
     }
 
+    /// Steps one position forward in history and returns the batch to re-apply.
+    ///
+    /// Returns `None` if already at the most recent position.
     pub fn redo(&mut self) -> Option<EditBatch> {
         if self.index >= self.edits.len() {
             None

@@ -3,16 +3,22 @@ use crate::backend::backend::BackendSuite;
 use crate::backend::backend::TerminalApp;
 use crate::backend::events::Event;
 
+/// High-level application trait driven by [`BasicTerminalApp`].
 pub trait App {
+    /// Called once per frame with all events collected since the last frame.
+    ///
+    /// Returns `true` to request a clean exit of the application loop.
     fn frame(&mut self, events: &[Event], frame: &mut ratatui::Frame) -> anyhow::Result<bool>;
 }
 
+/// Wraps an [`App`] and wires it to the platform-specific [`BackendSuite`](crate::backend::backend::BackendSuite).
 pub struct BasicTerminalApp<A: App> {
     terminal: Option<ratatui::Terminal<backend::BackendType>>,
     app: A,
 }
 
 impl<A: App + 'static> BasicTerminalApp<A> {
+    /// Wraps `app` in a `BasicTerminalApp` ready to be passed to the backend.
     pub(crate) fn new(app: A) -> Self {
         BasicTerminalApp {
             terminal: None,
@@ -20,6 +26,7 @@ impl<A: App + 'static> BasicTerminalApp<A> {
         }
     }
 
+    /// Hand the app to the global backend and block until the app requests an exit.
     pub(crate) fn run(self) -> anyhow::Result<()> {
         backend::BACKEND_INSTANCE.lock().unwrap().run(self)
     }

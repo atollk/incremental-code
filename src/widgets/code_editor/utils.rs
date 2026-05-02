@@ -1,3 +1,6 @@
+/// Counts the number of complete `indent_unit` repetitions at the start of `line`.
+///
+/// Stops counting once the column position reaches `max_col` (if provided).
 pub fn count_indent_units(
     line: ropey::RopeSlice<'_>,
     indent_unit: &str,
@@ -30,6 +33,7 @@ pub fn count_indent_units(
     count
 }
 
+/// Parses a CSS-style hex colour string (e.g. `"#1a2b3c"` or `"1a2b3c"`) into `(r, g, b)`.
 pub fn rgb(hex: &str) -> (u8, u8, u8) {
     let hex = hex.trim_start_matches('#');
     let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);

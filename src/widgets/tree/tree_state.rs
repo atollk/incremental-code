@@ -54,22 +54,26 @@ impl<Identifier> TreeState<Identifier>
 where
     Identifier: Clone + PartialEq + Eq + core::hash::Hash,
 {
+    /// Returns the current scroll offset (number of items scrolled past at the top).
     #[must_use]
     pub const fn get_offset(&self) -> usize {
         self.offset
     }
 
+    /// Returns all currently opened node identifiers as a `Vec`.
     #[must_use]
     #[deprecated = "Use self.opened()"]
     pub fn get_all_opened(&self) -> Vec<Vec<Identifier>> {
         self.opened.iter().cloned().collect()
     }
 
+    /// Returns the set of all currently opened node identifier paths.
     #[must_use]
     pub const fn opened(&self) -> &HashSet<Vec<Identifier>> {
         &self.opened
     }
 
+    /// Returns the identifier path of the currently selected node.
     #[must_use]
     pub fn selected(&self) -> &[Identifier] {
         &self.selected

@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Whether a mouse button press is a single, double, or triple click.
 pub enum ClickKind {
     Single,
     Double,
@@ -8,6 +9,7 @@ pub enum ClickKind {
 }
 
 #[derive(Debug, Clone, Copy)]
+/// Tracks successive mouse clicks to detect double- and triple-clicks.
 pub struct ClickTracker {
     pub last: Option<(Instant, usize)>,
     pub prev: Option<(Instant, usize)>,
@@ -15,6 +17,7 @@ pub struct ClickTracker {
 }
 
 impl ClickTracker {
+    /// Creates a new `ClickTracker` where two clicks within `max_dt` of each other count as a double-click.
     pub fn new(max_dt: Duration) -> Self {
         Self {
             last: None,
@@ -23,6 +26,7 @@ impl ClickTracker {
         }
     }
 
+    /// Records a click at `cursor` and returns whether it is a single, double, or triple click.
     pub fn register(&mut self, cursor: usize) -> ClickKind {
         let now = Instant::now();
         let dbl = self

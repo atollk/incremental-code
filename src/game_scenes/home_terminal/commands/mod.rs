@@ -15,12 +15,14 @@ mod upgrades_command;
 use crate::game_scenes::home_terminal::commands::upgrades_command::upgrades_cmd;
 pub use unknown_command::unknown_cmd;
 
+/// A terminal command entry: its name, help text, and a factory that creates a runner for it.
 pub struct Command {
     pub(crate) name: &'static str,
     help_description: &'static str,
     pub(crate) runner: fn() -> Box<dyn RunningCommand<SceneSwitch>>,
 }
 
+/// Returns the full list of available terminal commands.
 pub fn command_list() -> Vec<Command> {
     vec![
         Command {

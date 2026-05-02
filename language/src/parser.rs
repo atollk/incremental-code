@@ -428,10 +428,14 @@ fn parse<'a>(src: &'a str) -> Result<NotPythonStmt, Vec<Rich<'a, NotPythonLangTo
     parser().parse(token_stream).into_result()
 }
 
+/// The root AST node produced by [`parse_program`].
 pub struct NotPythonProgram {
     pub(super) statement: NotPythonStmt,
 }
 
+/// Parses NotPython source `src` into a [`NotPythonProgram`].
+///
+/// Returns an `Err` containing one or more rich parse errors on failure.
 pub fn parse_program<'a>(
     src: &'a str,
 ) -> anyhow::Result<NotPythonProgram, Vec<Rich<'a, NotPythonLangToken>>> {

@@ -49,6 +49,11 @@ impl GameState {
         &self.current_resources + &self.carryover_resources
     }
 
+    /// Deduct `resources` from the available pool.
+    ///
+    /// Carryover resources are consumed first; any remainder is taken from
+    /// current resources. Returns an error (and reverts all changes) if the
+    /// total balance is insufficient.
     pub fn take_resources(&mut self, resources: &Resources) -> anyhow::Result<()> {
         // Backup resources in case of error.
         let carryover_resources_backup = self.carryover_resources.clone();
@@ -78,6 +83,7 @@ impl GameState {
         }
     }
 
+    /// Add `resources` to the carryover pool (e.g. earnings from a compiled program run).
     pub fn give_carryover_resources(&mut self, resources: &Resources) {
         self.carryover_resources = &self.carryover_resources + resources;
     }

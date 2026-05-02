@@ -44,6 +44,7 @@ pub struct EchoedCommand<Meta> {
 }
 
 impl<Meta> EchoedCommand<Meta> {
+    /// Creates an `EchoedCommand` that prepends `echo` as a prompt line above `inner`'s output.
     pub fn new(echo: String, inner: Box<dyn RunningCommand<Meta>>) -> EchoedCommand<Meta> {
         EchoedCommand { echo, inner }
     }
@@ -89,6 +90,7 @@ pub struct ParagraphCmd<'a> {
 }
 
 impl<'a> ParagraphCmd<'a> {
+    /// Creates a `ParagraphCmd` that renders `paragraph` as its static output.
     pub fn new(paragraph: Paragraph<'a>) -> ParagraphCmd<'a> {
         ParagraphCmd { paragraph }
     }
@@ -123,6 +125,11 @@ pub struct ChainCmd<C1, C2> {
 }
 
 impl<C1, C2> ChainCmd<C1, C2> {
+    /// Creates a `ChainCmd` that runs `first_command`, then uses `second_command_constructor` to
+    /// build the second command once the first is done.
+    ///
+    /// If `keep_rendering_first_command` is `true`, the first command's output remains visible
+    /// above the second command while the second runs.
     pub fn new(
         first_command: Box<C1>,
         second_command_constructor: Box<dyn Fn(&C1) -> Box<C2>>,

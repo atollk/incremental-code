@@ -3,12 +3,14 @@ use language::NotPythonLangToken;
 use ratatui_core::style::Style;
 use std::collections::HashMap;
 
+/// Creates a [`LogosCodeLanguage`] for NotPython, using `theme` for syntax highlighting colours.
 pub fn not_python_language<'a>(
     theme: HashMap<std::mem::Discriminant<NotPythonLangToken>, Style>,
 ) -> LogosCodeLanguage<'a, NotPythonLangToken> {
     LogosCodeLanguage::new("  ", "#", theme)
 }
 
+/// Returns the default colour theme for NotPython syntax highlighting.
 pub fn not_python_default_theme() -> HashMap<std::mem::Discriminant<NotPythonLangToken>, Style> {
     use crate::widgets::code_editor::utils::rgb;
     use ratatui_core::style::Color;

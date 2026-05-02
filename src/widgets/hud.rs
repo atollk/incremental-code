@@ -5,8 +5,10 @@ use ratatui_core::layout::{Constraint, Layout, Rect};
 use ratatui_core::terminal::Frame;
 use ratatui_core::widgets::Widget;
 
+/// Fixed width (in terminal columns) reserved for the HUD panel.
 pub const HUD_WIDTH: u16 = 22;
 
+/// Renders the HUD panel showing the player's current resource totals.
 pub struct HudWidget;
 
 impl Widget for HudWidget {
@@ -23,6 +25,9 @@ impl Widget for HudWidget {
     }
 }
 
+/// Renders the [`HudWidget`] on the left side of the frame and returns the remaining content area.
+///
+/// If the frame is narrower than [`HUD_WIDTH`], the full area is returned unchanged.
 pub fn hud_layout(frame: &mut Frame) -> Rect {
     let full_area = frame.area();
     if full_area.width <= HUD_WIDTH {

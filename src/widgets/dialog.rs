@@ -6,12 +6,17 @@ use ratatui_core::layout::{Constraint, Layout, Rect};
 use ratatui_core::widgets::Widget;
 
 #[derive(Copy, Clone)]
+/// The outcome returned by a [`ConfirmDialog`] after the player responds.
 pub enum ConfirmResult {
     Yes,
     No,
     Cancel,
 }
 
+/// A modal yes/no/cancel confirmation dialog.
+///
+/// Render it with `frame.render_widget(&dialog, area)` and call
+/// [`handle_event`](Self::handle_event) each frame to process keyboard input.
 pub struct ConfirmDialog {
     title: String,
     message: String,
@@ -19,6 +24,7 @@ pub struct ConfirmDialog {
 }
 
 impl ConfirmDialog {
+    /// Creates a new dialog with the given title and message text.
     pub fn new(title: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
             title: title.into(),
@@ -27,6 +33,7 @@ impl ConfirmDialog {
         }
     }
 
+    /// Processes an input event, updating the internal result if the player presses y/n/Esc.
     pub fn handle_event(&mut self, event: &Event) {
         if let Event::KeyEvent(key) = event {
             if key.kind == KeyEventKind::Release {
@@ -47,6 +54,7 @@ impl ConfirmDialog {
         }
     }
 
+    /// Returns the player's choice, or `None` if the dialog is still waiting for input.
     pub fn result(&self) -> Option<ConfirmResult> {
         self.result
     }

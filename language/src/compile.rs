@@ -15,10 +15,13 @@ impl CompilingMetadata for () {
     fn log_atomic_instruction(&mut self) {}
 }
 
+/// Validates and executes a parsed [`NotPythonProgram`], returning an error if execution fails.
 pub fn compile(program: &NotPythonProgram) -> anyhow::Result<()> {
     compile_with_meta(program, &())
 }
 
+/// Like [`compile`], but calls back into `meta` at each zero-cost and atomic instruction
+/// so callers can measure or profile execution.
 pub fn compile_with_meta(
     program: &NotPythonProgram,
     meta: &mut dyn CompilingMetadata,

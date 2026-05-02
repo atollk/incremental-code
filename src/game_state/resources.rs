@@ -18,9 +18,11 @@ use std::ops::Add;
     Clone,
     Copy,
 )]
+/// A single denomination of in-game currency backed by an `f64` amount.
 pub struct Currency(pub f64);
 
 impl Currency {
+    /// Subtracts `other` from `self`, clamping the result to zero if it would go negative.
     pub fn saturating_sub(&self, other: Self) -> Self {
         let delta = self.0 - other.0;
         Currency(if delta < 0.0 { 0.0 } else { delta })
@@ -41,6 +43,7 @@ impl Display for Currency {
 }
 
 #[derive(Default, PartialEq, Debug, Serialize, Deserialize, Clone)]
+/// A bundle of three resource denominations: bronze, silver, and gold.
 pub struct Resources {
     pub bronze: Currency,
     pub silver: Currency,
@@ -48,6 +51,7 @@ pub struct Resources {
 }
 
 impl Resources {
+    /// Creates a `Resources` with explicit amounts for each denomination.
     pub const fn new(bronze: f64, silver: f64, gold: f64) -> Self {
         Resources {
             bronze: Currency(bronze),
@@ -56,30 +60,37 @@ impl Resources {
         }
     }
 
+    /// Returns a `Resources` with all denominations set to zero.
     pub const fn zero() -> Self {
         Resources::new(0.0, 0.0, 0.0)
     }
 
+    /// Creates a `Resources` with only the bronze denomination set.
     pub const fn from_bronze(bronze: f64) -> Self {
         Resources::new(bronze, 0.0, 0.0)
     }
 
+    /// Creates a `Resources` with only the silver denomination set.
     pub const fn from_silver(silver: f64) -> Self {
         Resources::new(0.0, silver, 0.0)
     }
 
+    /// Creates a `Resources` with only the gold denomination set.
     pub const fn from_gold(gold: f64) -> Self {
         Resources::new(0.0, 0.0, gold)
     }
 
+    /// Returns a single-line display of all non-zero denominations.
     pub const fn fmt_oneline(&self) -> impl Display {
         ResourcesFmtOneline { parent: self }
     }
 
+    /// Returns a multi-line display with each non-zero denomination on its own line.
     pub const fn fmt_multiline(&self) -> impl Display {
         ResourcesFmtMultiline { parent: self }
     }
 
+    /// Subtracts `other` from `self` per denomination, clamping each to zero.
     pub fn saturating_sub(&self, other: &Self) -> Self {
         Self {
             bronze: self.bronze.saturating_sub(other.bronze),

@@ -1,18 +1,31 @@
 use crate::game_state::Resources;
 use serde::{Deserialize, Serialize};
 
+/// Common interface for all purchasable upgrades.
 pub trait Upgrade {
+    /// Human-readable name of this upgrade.
     fn name(&self) -> &'static str;
+    /// The unlock tier this upgrade belongs to.
     fn group_level(&self) -> u8;
+    /// The player's current level for this upgrade (0-based).
     fn current_level(&self) -> u8;
+    /// The highest level this upgrade can reach.
     fn max_level(&self) -> u8;
+    /// Cost to advance from the current level to the next, or `None` if already maxed.
     fn next_level_cost(&self) -> Option<Resources>;
+    /// Human-readable description of the current effect value.
     fn current_value_text(&self) -> String;
+    /// Human-readable description of the effect value at the next level, or `None` if maxed.
     fn next_value_text(&self) -> Option<String>;
 
+    /// Advance this upgrade by one level, capping at [`max_level`](Self::max_level).
     fn level_up(&mut self);
+    /// Reduce this upgrade by one level, clamping at zero.
     fn level_down(&mut self);
 
+    /// Renders the upgrade level as a string of box characters.
+    ///
+    /// `full_box` is used for purchased levels; `empty_box` for remaining slots.
     fn format_level_str(&self, empty_box: char, full_box: char) -> String {
         format!(
             "{}{}",
@@ -25,6 +38,7 @@ pub trait Upgrade {
         )
     }
 
+    /// Returns a display string for the next-level cost, or `"maxed"` if at max level.
     fn format_cost_str(&self) -> String {
         match self.next_level_cost() {
             Some(r) => r.fmt_oneline().to_string(),
@@ -34,6 +48,7 @@ pub trait Upgrade {
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq)]
+/// Container for all in-game upgrades, serialized as part of [`GameState`](crate::game_state::GameState).
 pub struct Upgrades {
     // Level 1
     pub compile_time: CompileTime,
@@ -45,6 +60,7 @@ pub struct Upgrades {
 }
 
 impl Upgrades {
+    /// Returns all upgrades as an array of trait-object references.
     pub fn upgrades(&self) -> [&dyn Upgrade; 6] {
         [
             &self.compile_time,
@@ -67,6 +83,7 @@ impl Upgrades {
         ] as [&mut dyn Upgrade; _]
     }
 
+    /// Returns a mutable reference to the upgrade at the given index.
     pub fn upgrade_at_mut(&mut self, index: usize) -> &mut dyn Upgrade {
         self.upgrades_mut()[index]
     }

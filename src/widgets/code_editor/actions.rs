@@ -2,7 +2,9 @@ use crate::widgets::code_editor::code::EditKind;
 use crate::widgets::code_editor::editor::Editor;
 use crate::widgets::code_editor::selection::Selection;
 
+/// An operation that can be applied to an [`Editor`].
 pub trait Action {
+    /// Applies the action to `editor`, mutating its state.
     fn apply(&mut self, editor: &mut Editor);
 }
 

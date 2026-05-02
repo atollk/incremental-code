@@ -2,7 +2,13 @@ use crate::backend::events::Event;
 use crate::basic_terminal_app::App;
 use std::ops::{ControlFlow, FromResidual, Residual, Try};
 
+/// A game scene that renders itself and handles input each frame.
 pub trait Scene {
+    /// Called once per frame with the accumulated events, the current ratatui frame, and the
+    /// time elapsed since the previous frame.
+    ///
+    /// Returns a [`SceneSwitch`] that controls whether the scene stays active, exits the game,
+    /// or hands off to a different scene.
     fn frame(
         &mut self,
         events: &[Event],
@@ -11,6 +17,7 @@ pub trait Scene {
     ) -> SceneSwitch;
 }
 
+/// Returned by [`Scene::frame`] to tell the scene manager what to do next.
 pub enum SceneSwitch {
     NoSwitch,
     ExitGame,
@@ -50,12 +57,14 @@ impl Default for SceneSwitch {
     }
 }
 
+/// Root [`App`](crate::basic_terminal_app::App) that owns the active scene and tracks frame timing.
 pub struct SceneGame {
     active_scene: Box<dyn Scene>,
     last_frame: web_time::Instant,
 }
 
 impl SceneGame {
+    /// Creates a `SceneGame` starting with the given initial scene.
     pub fn new(scene: Box<dyn Scene>) -> Self {
         SceneGame {
             active_scene: scene,
