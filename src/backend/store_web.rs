@@ -18,7 +18,7 @@ impl StorageBackend for StoreWeb {
             .map_err(|e| format!("{e:?}"))
     }
 
-    fn load<T: Deserialize>(&self, key: &str) -> Result<Option<T>, String> {
+    fn load<T: for<'a> Deserialize<'a>>(&self, key: &str) -> Result<Option<T>, String> {
         let storage = get_local_storage()?;
         match storage
             .get_item(&format!("save_{key}"))

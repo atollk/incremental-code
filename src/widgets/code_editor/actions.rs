@@ -207,6 +207,15 @@ impl Action for DefaultAction {
                 let mut cursor = editor.get_cursor();
                 let mut selection = editor.get_selection();
 
+                let effective_cursor = if let Some(sel) = &selection
+                    && !sel.is_empty()
+                {
+                    sel.sorted().0
+                } else {
+                    cursor
+                };
+                let text = editor.clamp_insertion_text(effective_cursor, selection, &text);
+
                 let code = editor.code_mut();
                 code.tx();
                 code.set_state_before(cursor, selection);
@@ -609,6 +618,19 @@ impl Action for DefaultAction {
 
                 let mut cursor = editor.get_cursor();
                 let mut selection = editor.get_selection();
+
+                let effective_cursor = if let Some(sel) = &selection
+                    && !sel.is_empty()
+                {
+                    sel.sorted().0
+                } else {
+                    cursor
+                };
+                let text = editor.clamp_insertion_text(effective_cursor, selection, &text);
+                if text.is_empty() {
+                    return;
+                }
+
                 let code = editor.code_mut();
 
                 code.tx();

@@ -49,6 +49,12 @@ pub struct Editor {
     /// User marks for intervals: (start, end, color)
     pub(crate) marks: Option<Vec<(usize, usize, Color)>>,
 
+    /// Maximum number of lines allowed (None = unlimited)
+    pub(crate) max_lines: Option<usize>,
+
+    /// Maximum number of characters per line allowed (None = unlimited)
+    pub(crate) max_line_width: Option<usize>,
+
     /// Syntax highlight cache by intervals to speed up rendering
     pub(crate) highlights_cache: RefCell<HightlightCache>,
 }
@@ -65,6 +71,8 @@ impl Editor {
             selection_snap: SelectionSnap::None,
             clipboard: String::new(),
             marks: None,
+            max_lines: None,
+            max_line_width: None,
             highlights_cache: RefCell::new(HashMap::new()),
         }
     }
@@ -350,6 +358,109 @@ impl Editor {
 
     pub fn get_marks(&self) -> Option<&Vec<(usize, usize, Color)>> {
         self.marks.as_ref()
+    }
+
+    pub fn with_max_lines(mut self, max: usize) -> Self {
+        self.max_lines = Some(max);
+        self
+    }
+
+    pub fn with_max_line_width(mut self, max: usize) -> Self {
+        self.max_line_width = Some(max);
+        self
+    }
+
+    pub fn set_max_lines(&mut self, max: Option<usize>) {
+        self.max_lines = max;
+    }
+
+    pub fn set_max_line_width(&mut self, max: Option<usize>) {
+        self.max_line_width = max;
+    }
+
+    /// Returns a (possibly truncated) copy of `text` that respects `max_lines`
+    /// and `max_line_width`.
+    ///
+    /// `effective_cursor` is the char offset where insertion will actually begin
+    /// (selection start when a selection is present, otherwise the cursor).
+    /// `selection` is used to count how many newlines the removal frees up,
+    /// adjusting the line budget accordingly.
+    pub(crate) fn clamp_insertion_text(
+        &self,
+        effective_cursor: usize,
+        selection: Option<Selection>,
+        text: &str,
+    ) -> String {
+        if self.max_lines.is_none() && self.max_line_width.is_none() {
+            return text.to_string();
+        }
+
+        // How many newlines may the inserted text contain?
+        let newlines_allowed: Option<usize> = self.max_lines.map(|max| {
+            let current_lines = self.code.len_lines();
+            let freed = if let Some(sel) = selection {
+                let (start, end) = sel.sorted();
+                if end > start {
+                    self.code
+                        .slice(start, end)
+                        .chars()
+                        .filter(|&c| c == '\n')
+                        .count()
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+            let lines_after_removal = current_lines.saturating_sub(freed);
+            max.saturating_sub(lines_after_removal)
+        });
+
+        // Column at which the first segment will be inserted.
+        let cursor_col = if self.max_line_width.is_some() {
+            self.code.point(effective_cursor).1
+        } else {
+            0
+        };
+
+        let mut result = String::with_capacity(text.len());
+        let mut newlines_used = 0usize;
+        let mut seg_start_col = cursor_col;
+
+        for (seg_idx, segment) in text.split('\n').enumerate() {
+            if seg_idx > 0 {
+                // About to emit a newline — check the budget first.
+                if let Some(allowed) = newlines_allowed {
+                    if newlines_used >= allowed {
+                        break; // budget exhausted; discard the rest
+                    }
+                }
+                result.push('\n');
+                newlines_used += 1;
+                seg_start_col = 0;
+            }
+
+            let truncated = if let Some(max_width) = self.max_line_width {
+                let remaining = max_width.saturating_sub(seg_start_col);
+                let char_count = segment.chars().count();
+                if char_count <= remaining {
+                    segment
+                } else {
+                    let byte_end = segment
+                        .char_indices()
+                        .nth(remaining)
+                        .map(|(b, _)| b)
+                        .unwrap_or(segment.len());
+                    &segment[..byte_end]
+                }
+            } else {
+                segment
+            };
+
+            result.push_str(truncated);
+        }
+
+        result
     }
 
     pub fn get_selection_text(&mut self) -> Option<String> {

@@ -1,6 +1,5 @@
 use crate::backend::backend::{BackendSuite, StorageBackend, TerminalApp};
 use crate::backend::events::{Event, IntoEvent};
-use crate::backend::store_native::StoreNative;
 use crate::backend::store_web::StoreWeb;
 use ratzilla::event::{
     KeyCode as RzKeyCode, MouseButton as RzMouseButton, MouseEventKind as RzMouseEventKind,

@@ -166,6 +166,9 @@ impl<'a> ProgramExecutionState<'a> {
                 return Ok(Callable::UserFunction(stmt));
             }
         }
+        if let Some(&f) = self.predefined_functions.get(name) {
+            return Ok(Callable::PredefinedFunction(f));
+        }
         Err(anyhow!("Function {} not found", name))
     }
 }
