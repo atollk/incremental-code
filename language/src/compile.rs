@@ -68,6 +68,66 @@ struct ProgramExecutionCallState<'a> {
     loop_nesting: usize,
 }
 
+enum Callable<'a> {
+    PredefinedFunction {
+        body: Box<dyn Fn(Vec<ProgramValue>) -> anyhow::Result<ProgramValue>>,
+        params: Vec<String>,
+    },
+    UserFunction(&'a NotPythonStmt),
+}
+
+impl<'a> Callable<'a> {
+    fn call(
+        &self,
+        name: &str,
+        args: &[NotPythonExpr],
+        state: &mut ProgramExecutionState<'a>,
+        meta: &mut impl CompilingMetadata,
+    ) -> anyhow::Result<ProgramValue> {
+        let predefined_function_body = if let Callable::PredefinedFunction { params, body } = self {
+            Some(|args| body(args))
+        } else {
+            None
+        };
+        let user_function_body =
+            if let Callable::UserFunction(NotPythonStmt::Function { params, body, .. }) = self {
+                let f = |args: Vec<ProgramValue>| -> anyhow::Result<ProgramValue> {
+                    let mut frame = ProgramExecutionCallState::default();
+                    for (param, val) in params.into_iter().zip(args) {
+                        frame.variables.insert(param.as_str(), val);
+                    }
+                    state.call_stack.push(frame);
+
+                    // Run function & return
+                    compile_stmt(body, state, meta)?;
+                    state.call_stack.pop();
+                    let return_value = match std::mem::replace(
+                        &mut state.control_flow,
+                        ProgramExecutionControlFlow::Normal,
+                    ) {
+                        ProgramExecutionControlFlow::Return(v) => v,
+                        _ => ProgramValue::None,
+                    };
+                    Ok(return_value)
+                };
+                Some(f)
+            } else {
+                None
+            };
+        let body_function = match (predefined_function_body, user_function_body) {
+            (Some(_), Some(_)) => unreachable!(),
+            (Some(f), None) => &f as &(dyn FnMut(&[ProgramValue]) -> anyhow::Result<ProgramValue>),
+            (None, Some(f)) => &f,
+            (None, None) => bail!("'{}' is not a function", name),
+        };
+        let arg_values: Vec<ProgramValue> = args
+            .iter()
+            .map(|a| eval_expr(a, state, meta))
+            .collect::<anyhow::Result<_>>()?;
+        body_function(&arg_values)
+    }
+}
+
 struct ProgramExecutionState<'a> {
     control_flow: ProgramExecutionControlFlow,
     call_stack: Vec<ProgramExecutionCallState<'a>>,
@@ -109,10 +169,10 @@ impl<'a> ProgramExecutionState<'a> {
             .insert(name, stmt);
     }
 
-    fn get_function(&self, name: &str) -> anyhow::Result<&'a NotPythonStmt> {
+    fn get_function(&self, name: &str) -> anyhow::Result<Callable> {
         for call_state in self.call_stack.iter().rev() {
             if let Some(&stmt) = call_state.functions.get(name) {
-                return Ok(stmt);
+                return Ok(Callable::UserFunction(stmt));
             }
         }
         Err(anyhow!("Function {} not found", name))
@@ -209,38 +269,7 @@ fn compile_stmt<'a>(
         }
         NotPythonStmt::Call(name, args) => {
             let func = state.get_function(name)?;
-
-            // Map argument values to parameter names
-            let (params, body) = match func {
-                NotPythonStmt::Function { params, body, .. } => (params.as_slice(), &**body),
-                _ => return Err(anyhow!("'{}' is not a function", name)),
-            };
-            let arg_values: Vec<ProgramValue> = args
-                .iter()
-                .map(|a| eval_expr(a, state, meta))
-                .collect::<anyhow::Result<_>>()?;
-            if params.len() != arg_values.len() {
-                return Err(anyhow!(
-                    "Function '{}' expects {} arguments but got {}",
-                    name,
-                    params.len(),
-                    arg_values.len()
-                ));
-            }
-
-            // Create new call stack frame
-            let mut frame = ProgramExecutionCallState::default();
-            for (param, val) in params.iter().zip(arg_values) {
-                frame.variables.insert(param.as_str(), val);
-            }
-            state.call_stack.push(frame);
-
-            // Run function & return
-            compile_stmt(body, state, meta)?;
-            state.call_stack.pop();
-            if let ProgramExecutionControlFlow::Return(_) = state.control_flow {
-                state.control_flow = ProgramExecutionControlFlow::Normal;
-            }
+            func.call(name, args, state, meta)?;
             meta.log_atomic_instruction()?;
         }
     };
@@ -448,43 +477,7 @@ fn eval_expr<'a>(
                 _ => return Err(anyhow!("Can only call named functions")),
             };
             let func = state.get_function(name)?;
-
-            // Map argument values to parameters
-            let (params, body) = match func {
-                NotPythonStmt::Function { params, body, .. } => (params.as_slice(), &**body),
-                _ => return Err(anyhow!("'{}' is not a function", name)),
-            };
-            let arg_values: Vec<ProgramValue> = args
-                .iter()
-                .map(|a| eval_expr(a, state, meta))
-                .collect::<anyhow::Result<_>>()?;
-            if params.len() != arg_values.len() {
-                return Err(anyhow!(
-                    "Function '{}' expects {} arguments but got {}",
-                    name,
-                    params.len(),
-                    arg_values.len()
-                ));
-            }
-
-            // Create new call stack frame
-            let mut frame = ProgramExecutionCallState::default();
-            for (param, val) in params.iter().zip(arg_values) {
-                frame.variables.insert(param.as_str(), val);
-            }
-            state.call_stack.push(frame);
-
-            // Run function & return
-            compile_stmt(body, state, meta)?;
-            state.call_stack.pop();
-            let return_value = match std::mem::replace(
-                &mut state.control_flow,
-                ProgramExecutionControlFlow::Normal,
-            ) {
-                ProgramExecutionControlFlow::Return(v) => v,
-                _ => ProgramValue::None,
-            };
-            Ok(return_value)
+            func.call(name, args, state, meta)
         }
         NotPythonExpr::Index(lhs, rhs) => {
             let lhs = eval_expr(lhs, state, meta)?;
