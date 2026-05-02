@@ -18,13 +18,13 @@ pub trait BackendSuite<B: ratatui::backend::Backend, S: StorageBackend + Default
 /// A backend to store data between runs.
 pub trait StorageBackend {
     /// Persist data.
-    fn save<T: Serialize>(&self, key: &str, data: &T) -> Result<(), String>;
+    fn save<T: Serialize>(&self, key: &str, data: &T) -> anyhow::Result<()>;
 
     /// Load persisted data.
-    fn load<T: for<'a> Deserialize<'a>>(&self, key: &str) -> Result<Option<T>, String>;
+    fn load<T: for<'a> Deserialize<'a>>(&self, key: &str) -> anyhow::Result<Option<T>>;
 
     /// Clear persisted data.
-    fn delete(&self, key: &str) -> Result<(), String>;
+    fn delete(&self, key: &str) -> anyhow::Result<()>;
 }
 
 /// An application that the backend drives frame by frame.
