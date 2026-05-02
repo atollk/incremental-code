@@ -2,7 +2,7 @@ use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind, MouseEventKind};
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
-use crate::game_state::{Resources, Upgrade, Upgrades, with_game_state};
+use crate::game_state::{Resources, Upgrade, Upgrades, with_game_state, with_game_state_mut};
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
 use crate::widgets::hud::hud_layout;
 use crate::widgets::tree::{Tree, TreeItem, TreeState};
@@ -166,7 +166,7 @@ impl<'a> UpgradesScene<'a> {
             if let Some(cost) = upgrade.next_level_cost() {
                 if with_game_state(|game_state| cost <= game_state.total_resources()) {
                     // can afford -> take resources and level up
-                    with_game_state(|game_state| game_state.take_resources(&cost)).unwrap();
+                    with_game_state_mut(|game_state| game_state.take_resources(&cost)).unwrap();
                     upgrade.level_up();
                     true
                 } else {
@@ -188,7 +188,7 @@ impl<'a> UpgradesScene<'a> {
                     .next_level_cost()
                     .expect("After leveling down, a cost to level up should be defined.");
                 // TODO: shortcut - we don't remember where resources came from, so we just return them as carryover
-                with_game_state(move |game_state| game_state.give_carryover_resources(cost));
+                with_game_state_mut(move |game_state| game_state.give_carryover_resources(cost));
                 true
             }
         };
@@ -306,13 +306,13 @@ impl<'a> Scene for UpgradesScene<'a> {
             let result = self.confirm_dialog.as_ref().unwrap().result();
             let dialog_scene_switch = match result {
                 Some(ConfirmResult::Yes) => {
-                    with_game_state(|game_state| {
+                    with_game_state_mut(|game_state| {
                         game_state.upgrades = self.upgrades_working_copy.clone()
                     });
                     SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
                 }
                 Some(ConfirmResult::No) => {
-                    with_game_state(|game_state| {
+                    with_game_state_mut(|game_state| {
                         game_state.current_resources = self.resources_backup.0.clone();
                         game_state.carryover_resources = self.resources_backup.1.clone();
                     });

@@ -1,5 +1,6 @@
-use crate::backend::backend::{BackendSuite, TerminalApp};
+use crate::backend::backend::{BackendSuite, StorageBackend, TerminalApp};
 use crate::backend::events::{Event, IntoEvent};
+use crate::backend::store_native::StoreNative;
 use beamterm_core::{
     Drawable, FontAtlasData, GlState, GlslVersion, RenderContext, StaticFontAtlas, TerminalGrid,
 };
@@ -57,6 +58,10 @@ impl BackendSuite<BackendType> for BeamtermCoreBackendSuite {
         };
         event_loop.run_app(&mut app)?;
         Ok(())
+    }
+
+    fn storage_backend(&self) -> impl StorageBackend {
+        StoreNative::default()
     }
 }
 

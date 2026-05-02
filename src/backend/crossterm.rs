@@ -1,5 +1,6 @@
-use crate::backend::backend::{BackendSuite, TerminalApp};
+use crate::backend::backend::{BackendSuite, StorageBackend, TerminalApp};
 use crate::backend::events::{Event, IntoEvent};
+use crate::backend::store_native::StoreNative;
 use crossterm::execute;
 use crossterm::terminal::{EnterAlternateScreen, enable_raw_mode};
 use ratatui::backend::CrosstermBackend;
@@ -35,6 +36,10 @@ impl BackendSuite<BackendType> for CrosstermBackendSuite {
             events.clear();
         }
         Ok(())
+    }
+
+    fn storage_backend(&self) -> impl StorageBackend {
+        StoreNative::default()
     }
 }
 

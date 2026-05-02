@@ -16,6 +16,8 @@ const _: () = {
 mod crossterm;
 #[cfg(feature = "tui")]
 pub use crossterm::{BACKEND_INSTANCE, BackendType};
+#[cfg(any(feature = "tui", feature = "opengl"))]
+mod store_native;
 
 #[cfg(feature = "opengl")]
 mod beamterm_native;
@@ -26,3 +28,5 @@ pub use beamterm_native::{BACKEND_INSTANCE, BackendType};
 mod beamterm_web;
 #[cfg(feature = "ratzilla")]
 pub use beamterm_web::{BACKEND_INSTANCE, BackendType};
+#[cfg(feature = "ratzilla")]
+mod store_web;

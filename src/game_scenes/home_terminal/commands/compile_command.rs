@@ -1,6 +1,6 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_state::{CompiledProgram, GameState, with_game_state};
+use crate::game_state::{CompiledProgram, GameState, with_game_state, with_game_state_mut};
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
 use anyhow::anyhow;
 use language::{compile_with_meta, parse_program};
@@ -97,7 +97,7 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
         if self.compile_duration <= self.running_duration {
             if self.result.is_none() {
                 // TODO: run this while actually waiting, not just at the end
-                self.result = Some(with_game_state(|game_state| {
+                self.result = Some(with_game_state_mut(|game_state| {
                     Self::compile_result(game_state)
                 }));
             }

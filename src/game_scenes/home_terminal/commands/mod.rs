@@ -7,12 +7,16 @@ use crate::widgets::terminal::RunningCommand;
 
 mod code_command;
 mod compile_command;
+mod docs_command;
 mod exit_command;
 mod help_command;
+mod reset_command;
 mod run_command;
 mod unknown_command;
 mod upgrades_command;
 
+use crate::game_scenes::home_terminal::commands::docs_command::docs_cmd;
+use crate::game_scenes::home_terminal::commands::reset_command::reset_cmd;
 use crate::game_scenes::home_terminal::commands::run_command::run_cmd;
 use crate::game_scenes::home_terminal::commands::upgrades_command::upgrades_cmd;
 pub use unknown_command::unknown_cmd;
@@ -33,9 +37,19 @@ pub fn command_list() -> Vec<Command> {
             runner: help_cmd,
         },
         Command {
+            name: "reset",
+            help_description: "Resets the game, removing any save data",
+            runner: reset_cmd,
+        },
+        Command {
             name: "exit",
             help_description: "Exits the game",
             runner: exit_cmd,
+        },
+        Command {
+            name: "docs",
+            help_description: "Explanation of the coding language",
+            runner: docs_cmd,
         },
         Command {
             name: "code",

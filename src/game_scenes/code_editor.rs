@@ -1,7 +1,7 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
-use crate::game_state::with_game_state;
+use crate::game_state::{with_game_state, with_game_state_mut};
 use crate::widgets::code_editor::editor::Editor;
 use crate::widgets::code_editor::input::{EditorCommand, apply_key_event, apply_mouse_event};
 use crate::widgets::code_editor::not_python_logos::{
@@ -37,7 +37,7 @@ impl CodeEditorScene {
 
     fn save_code(&self) {
         let content = self.editor.get_content();
-        with_game_state(|state| {
+        with_game_state_mut(|state| {
             state.program_code = content.clone();
         });
     }

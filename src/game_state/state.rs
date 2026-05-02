@@ -7,10 +7,18 @@ use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 use std::sync::LazyLock;
 
+/// Lock the global game state and run `f` with a reference to it.
+///
+/// This is the single entry point for reading [`GameState`].
+pub fn with_game_state<T>(f: impl FnOnce(&GameState) -> T) -> T {
+    let lock = GLOBAL_GAME_STATE.lock();
+    f(lock.deref().borrow().deref())
+}
+
 /// Lock the global game state and run `f` with a mutable reference to it.
 ///
-/// This is the single entry point for reading or mutating [`GameState`].
-pub fn with_game_state<T>(f: impl FnOnce(&mut GameState) -> T) -> T {
+/// This is the single entry point for mutating [`GameState`].
+pub fn with_game_state_mut<T>(f: impl FnOnce(&mut GameState) -> T) -> T {
     let lock = GLOBAL_GAME_STATE.lock();
     f(lock.deref().borrow_mut().deref_mut())
 }

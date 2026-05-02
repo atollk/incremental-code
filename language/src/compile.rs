@@ -73,7 +73,7 @@ struct ProgramExecutionCallState<'a> {
     loop_nesting: usize,
 }
 
-type PredefinedFunction = dyn Fn(Vec<ProgramValue>) -> anyhow::Result<ProgramValue>;
+pub type PredefinedFunction = dyn Fn(Vec<ProgramValue>) -> anyhow::Result<ProgramValue>;
 
 enum Callable<'a> {
     PredefinedFunction(&'a PredefinedFunction),

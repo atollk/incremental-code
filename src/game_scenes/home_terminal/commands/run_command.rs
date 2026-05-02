@@ -1,9 +1,9 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_state::{CompiledProgram, GameState, with_game_state};
+use crate::game_state::{CompiledProgram, GameState, with_game_state, with_game_state_mut};
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
 use anyhow::anyhow;
-use language::{compile_with_meta, parse_program};
+use language::{PredefinedFunction, compile_with_meta, parse_program};
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::text::Text;
@@ -28,7 +28,7 @@ pub(super) fn run_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
                         Text::from(e.to_string())
                     } else {
                         let resource_gain = compiled_program.resource_gain();
-                        with_game_state(|game_state| {
+                        with_game_state_mut(|game_state| {
                             game_state.current_resources += resource_gain.clone()
                         });
                         Text::from(format!("Gained {}", resource_gain.fmt_oneline()))
@@ -65,13 +65,17 @@ impl RunCmd {
         }
     }
 
+    fn get_predefined_functions() -> HashMap<&'static str, &'static PredefinedFunction> {
+        HashMap::new() // TODO
+    }
+
     fn compile_result(game_state: &mut GameState) -> anyhow::Result<()> {
         let parsed = parse_program(&game_state.program_code);
         match parsed {
             Ok(parsed) => {
                 let mut compiled = CompiledProgram::new();
-                let predefined_function = HashMap::new();
-                let run_result = compile_with_meta(&parsed, predefined_function, &mut compiled);
+                let run_result =
+                    compile_with_meta(&parsed, Self::get_predefined_functions(), &mut compiled);
                 game_state.compiled_program = Some(match run_result {
                     Ok(()) => Ok(compiled),
                     Err(e) => Err(e.to_string()),
@@ -95,7 +99,7 @@ impl RunningCommand<SceneSwitch> for RunCmd {
         if self.completion_duration <= self.active_duration {
             if self.result.is_none() {
                 // TODO: run this while actually waiting, not just at the end
-                self.result = Some(with_game_state(|game_state| {
+                self.result = Some(with_game_state_mut(|game_state| {
                     Self::compile_result(game_state)
                 }));
             }
