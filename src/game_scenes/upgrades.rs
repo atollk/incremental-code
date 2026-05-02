@@ -2,7 +2,7 @@ use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind, MouseEventKind};
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
-use crate::game_state::{Resources, Upgrade, UpgradeCollection, Upgrades, with_game_state};
+use crate::game_state::{Resources, Upgrade, Upgrades, with_game_state};
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
 use crate::widgets::hud::hud_layout;
 use crate::widgets::tree::{Tree, TreeItem, TreeState};
@@ -108,17 +108,21 @@ fn hash_upgrade(upgrade: &dyn Upgrade) -> u64 {
 
 impl<'a> UpgradesScene<'a> {
     fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'a, u64>> {
-        let upgrades_l1: Vec<&dyn Upgrade> = upgrades.level1.upgrades().collect_vec();
-        let name_width = upgrades_l1
+        let upgrade_list = upgrades.upgrades();
+        let name_width = upgrade_list
             .iter()
             .map(|u| u.name().len())
             .max()
             .unwrap_or(0);
-        let level_width = upgrades_l1.iter().map(|u| u.max_level()).max().unwrap_or(0);
+        let level_width = upgrade_list
+            .iter()
+            .map(|u| u.max_level())
+            .max()
+            .unwrap_or(0);
         let level1 = TreeItem::new(
             1,
             "Level 1 upgrades".to_string(),
-            upgrades_l1
+            upgrade_list
                 .into_iter()
                 .map(|u| {
                     TreeItem::new_leaf(
@@ -147,14 +151,15 @@ impl<'a> UpgradesScene<'a> {
         // Find the upgrade instance from the tree identifier
         let identifier_path: &[u64; 2] = identifier_path.try_into().unwrap();
         let upgrade_level = match identifier_path[0] {
-            1 => &mut self.upgrades_working_copy.level1,
+            1 => &mut self.upgrades_working_copy,
             _ => unreachable!(),
         };
         let (pos, _) = upgrade_level
             .upgrades()
+            .into_iter()
             .find_position(|&u| hash_upgrade(u) == identifier_path[1])
             .expect("find the identifier from the hash");
-        let upgrade = upgrade_level.upgrades_mut().nth(pos).unwrap();
+        let upgrade = upgrade_level.upgrade_at_mut(pos);
 
         // Perform the leveling
         let refresh_required = if level_up {

@@ -1,9 +1,7 @@
 check:
     cargo check --features tui
     cargo check --features opengl
-    cargo check --features ratzilla
-    cargo check --features egui-desktop
-    cargo check --features egui-web --target wasm32-unknown-unknown
+    cargo check --features ratzilla --target wasm32-unknown-unknown
 
 clippy:
     cargo clippy --fix --features tui

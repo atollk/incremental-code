@@ -5,6 +5,9 @@ use language::CompiledProgram;
 use serde::{Deserialize, Serialize};
 use std::sync::{LazyLock, Mutex};
 
+/// Lock the global game state and run `f` with a mutable reference to it.
+///
+/// This is the single entry point for reading or mutating [`GameState`].
 pub fn with_game_state<T>(f: impl Fn(&mut GameState) -> T) -> T {
     let mut lock = GLOBAL_GAME_STATE.lock().unwrap();
     f(&mut lock)
@@ -13,6 +16,9 @@ pub fn with_game_state<T>(f: impl Fn(&mut GameState) -> T) -> T {
 static GLOBAL_GAME_STATE: LazyLock<Mutex<GameState>> =
     LazyLock::new(|| Mutex::new(GameState::default()));
 
+/// Persistent game state stored in a global singleton.
+///
+/// Access it exclusively via [`with_game_state`].
 #[derive(Serialize, Deserialize)]
 pub struct GameState {
     // Program
@@ -38,6 +44,7 @@ impl Default for GameState {
 }
 
 impl GameState {
+    /// Returns the sum of current and carryover resources.
     pub fn total_resources(&self) -> Resources {
         &self.current_resources + &self.carryover_resources
     }

@@ -1,37 +1,33 @@
 use crate::parser::{NotPythonExpr, NotPythonExprOp, NotPythonProgram, NotPythonStmt};
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::ops::{Add, Deref};
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CompiledProgram {
-    pub execution_time: f64,
-    pub instruction_count: u128,
+trait CompilingMetadata {
+    fn log_zero_instruction(&mut self) -> anyhow::Result<()>;
+    fn log_atomic_instruction(&mut self) -> anyhow::Result<()>;
 }
 
-impl Add for CompiledProgram {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        CompiledProgram {
-            execution_time: self.execution_time + rhs.execution_time,
-            instruction_count: self.instruction_count + rhs.instruction_count,
-        }
-    }
+impl CompilingMetadata for () {
+    fn log_zero_instruction(&mut self) {}
+    fn log_atomic_instruction(&mut self) {}
 }
 
-pub fn compile(program: &NotPythonProgram) -> CompiledProgram {
+pub fn compile(program: &NotPythonProgram) -> anyhow::Result<()> {
+    compile_with_meta(program, &())
+}
+
+pub fn compile_with_meta(
+    program: &NotPythonProgram,
+    meta: &mut dyn CompilingMetadata,
+) -> anyhow::Result<()> {
     let mut state = ProgramExecutionState {
         control_flow: ProgramExecutionControlFlow::Normal,
         call_stack: vec![ProgramExecutionCallState::default()],
-        instruction_speedup_count: 1,
     };
-    compile_stmt(&program.statement, &mut state).unwrap_or(CompiledProgram {
-        execution_time: 0.0,
-        instruction_count: 0,
-    })
+    compile_stmt(&program.statement, &mut state, meta)
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
@@ -66,18 +62,11 @@ struct ProgramExecutionCallState<'a> {
 }
 
 struct ProgramExecutionState<'a> {
-    // Execution state
     control_flow: ProgramExecutionControlFlow,
     call_stack: Vec<ProgramExecutionCallState<'a>>,
-    // Counting compilation data
-    instruction_speedup_count: u128,
 }
 
 impl<'a> ProgramExecutionState<'a> {
-    fn statement_execution_time(&self) -> f64 {
-        1.0 / self.instruction_speedup_count as f64
-    }
-
     fn get_variable(&self, name: &str) -> anyhow::Result<&ProgramValue> {
         for call_state in self.call_stack.iter().rev() {
             if let Some(value) = call_state.variables.get(name) {
@@ -126,41 +115,26 @@ impl<'a> ProgramExecutionState<'a> {
 fn compile_stmt<'a>(
     stmt: &'a NotPythonStmt,
     state: &mut ProgramExecutionState<'a>,
-) -> anyhow::Result<CompiledProgram> {
-    let zero_compile = CompiledProgram {
-        execution_time: 0.0,
-        instruction_count: 0,
-    };
-    let atom_compile = CompiledProgram {
-        execution_time: state.statement_execution_time(),
-        instruction_count: 1,
-    };
-    state.instruction_speedup_count += 1;
-    if let NotPythonStmt::Call(_, _) = stmt {
-    } else if let ProgramExecutionControlFlow::Return(_) = state.control_flow {
-        return Ok(zero_compile);
+    meta: &'a mut dyn CompilingMetadata,
+) -> anyhow::Result<()> {
+    if matches!(state.control_flow, ProgramExecutionControlFlow::Return(_)) {
+        meta.log_zero_instruction()?;
+        return Ok(());
     }
     match stmt {
         NotPythonStmt::Block(stmts) => {
-            stmts
-                .iter()
-                .map(|s| compile_stmt(s, state))
-                .try_fold(zero_compile, |acc, b| {
-                    let b = b?;
-                    Ok(CompiledProgram {
-                        execution_time: acc.execution_time + b.execution_time,
-                        instruction_count: acc.instruction_count + b.instruction_count,
-                    })
-                })
+            for stmt in stmts {
+                compile_stmt(stmt, state, meta)?;
+            }
         }
-        NotPythonStmt::Pass => Ok(atom_compile),
+        NotPythonStmt::Pass => meta.log_atomic_instruction()?,
         NotPythonStmt::Break => {
             state.control_flow = ProgramExecutionControlFlow::Break;
-            Ok(atom_compile)
+            meta.log_atomic_instruction()?;
         }
         NotPythonStmt::Continue => {
             state.control_flow = ProgramExecutionControlFlow::Continue;
-            Ok(atom_compile)
+            meta.log_atomic_instruction()?;
         }
         NotPythonStmt::Return(expr) => {
             state.control_flow = ProgramExecutionControlFlow::Return(
@@ -168,18 +142,18 @@ fn compile_stmt<'a>(
                     .map(|e| eval_expr(e, state))
                     .unwrap_or(Ok(ProgramValue::None))?,
             );
-            Ok(atom_compile)
+            meta.log_atomic_instruction()?;
         }
         NotPythonStmt::Decl(name, expr) => {
             let expr = eval_expr(expr, state)?;
             state.decl_variable(name, expr);
-            Ok(atom_compile)
+            meta.log_atomic_instruction()?;
         }
         NotPythonStmt::Assign(name, expr) => {
             state.get_variable(name)?;
             let expr = eval_expr(expr, state)?;
             state.assign_variable(name, expr)?;
-            Ok(atom_compile)
+            meta.log_atomic_instruction()?;
         }
         NotPythonStmt::If {
             condition,
@@ -187,25 +161,23 @@ fn compile_stmt<'a>(
             else_,
         } => match eval_expr(condition, state)? {
             ProgramValue::Hashable(HashableProgramValue::Bool(b)) => {
-                let stmt = if b {
-                    Some(&**then)
+                if b {
+                    compile_stmt(then, state, meta)?;
+                    meta.log_atomic_instruction()?;
+                } else if let Some(else_) = else_ {
+                    compile_stmt(else_, state, meta)?;
+                    meta.log_atomic_instruction()?;
                 } else {
-                    else_.as_ref().map(|s| &**s)
-                };
-                let rec = if let Some(stmt) = stmt {
-                    compile_stmt(stmt, state)? + atom_compile
-                } else {
-                    atom_compile
-                };
-                Ok(rec)
+                    meta.log_atomic_instruction()?;
+                }
             }
-            _ => Err(anyhow!("Condition expression is not a boolean")),
+            _ => bail!("Condition expression is not a boolean"),
         },
         NotPythonStmt::Loop(body) => {
             state.call_stack.last_mut().unwrap().loop_nesting += 1;
-            let mut total = atom_compile;
+            meta.log_atomic_instruction()?;
             loop {
-                total = total + compile_stmt(body, state)?;
+                compile_stmt(body, state, meta)?;
                 match &state.control_flow {
                     ProgramExecutionControlFlow::Break => {
                         state.control_flow = ProgramExecutionControlFlow::Normal;
@@ -219,7 +191,6 @@ fn compile_stmt<'a>(
                 }
             }
             state.call_stack.last_mut().unwrap().loop_nesting -= 1;
-            Ok(total)
         }
         NotPythonStmt::Function {
             name,
@@ -227,7 +198,7 @@ fn compile_stmt<'a>(
             body: _,
         } => {
             state.decl_function(name, stmt);
-            Ok(atom_compile)
+            meta.log_atomic_instruction()?;
         }
         NotPythonStmt::Call(name, args) => {
             let func = state.get_function(name)?;
@@ -258,14 +229,15 @@ fn compile_stmt<'a>(
             state.call_stack.push(frame);
 
             // Run function & return
-            let result = compile_stmt(body, state);
+            let result = compile_stmt(body, state, meta);
             state.call_stack.pop();
             if let ProgramExecutionControlFlow::Return(_) = state.control_flow {
                 state.control_flow = ProgramExecutionControlFlow::Normal;
             }
-            Ok(result? + atom_compile)
+            meta.log_atomic_instruction()?;
         }
-    }
+    };
+    Ok(())
 }
 
 fn eval_unary_op(
@@ -548,6 +520,7 @@ mod tests {
             control_flow: ProgramExecutionControlFlow::Normal,
             call_stack: vec![ProgramExecutionCallState::default()],
             instruction_speedup_count: 1,
+            instr_count_to_exec_time: Box::new(|n| 1.0),
         };
         compile_stmt(&program.statement, &mut state).unwrap_err()
     }

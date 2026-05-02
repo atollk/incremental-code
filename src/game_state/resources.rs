@@ -48,28 +48,28 @@ pub struct Resources {
 }
 
 impl Resources {
-    pub const fn from_bronze(bronze: f64) -> Self {
+    pub const fn new(bronze: f64, silver: f64, gold: f64) -> Self {
         Resources {
             bronze: Currency(bronze),
-            silver: Currency(0.0),
-            gold: Currency(0.0),
+            silver: Currency(silver),
+            gold: Currency(gold),
         }
+    }
+
+    pub const fn zero() -> Self {
+        Resources::new(0.0, 0.0, 0.0)
+    }
+
+    pub const fn from_bronze(bronze: f64) -> Self {
+        Resources::new(bronze, 0.0, 0.0)
     }
 
     pub const fn from_silver(silver: f64) -> Self {
-        Resources {
-            bronze: Currency(0.0),
-            silver: Currency(silver),
-            gold: Currency(0.0),
-        }
+        Resources::new(0.0, silver, 0.0)
     }
 
     pub const fn from_gold(gold: f64) -> Self {
-        Resources {
-            bronze: Currency(0.0),
-            silver: Currency(0.0),
-            gold: Currency(gold),
-        }
+        Resources::new(0.0, 0.0, gold)
     }
 
     pub const fn fmt_oneline(&self) -> impl Display {
