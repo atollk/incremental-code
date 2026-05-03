@@ -28,8 +28,8 @@ impl CodeEditorScene {
         let (code, max_lines, max_line_width) = with_game_state(|game_state| {
             (
                 game_state.program_code.clone(),
-                game_state.upgrades.code_line_count_1.current_value(),
-                game_state.upgrades.code_line_width_1.current_value(),
+                game_state.upgrades.code_line_count.value(),
+                game_state.upgrades.code_line_width.value(),
             )
         });
         let lang = not_python_language(not_python_default_theme());

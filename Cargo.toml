@@ -54,6 +54,7 @@ unicode-width = "~0.2"
 unicode-segmentation = "^1.12"
 logos = "0.16.1"
 serde_json = "1.0.149"
+dyn-clone = "1.0.20"
 
 [package.metadata.bin]
 trunk = { version = "0.21.14" }

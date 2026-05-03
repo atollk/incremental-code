@@ -13,7 +13,6 @@ use crate::backend::with_backend;
 use crate::basic_terminal_app::BasicTerminalApp;
 use crate::game_scenes::base::SceneGame;
 use crate::game_scenes::home_terminal::HomeTerminalScene;
-use crate::game_state::load_game_state;
 
 pub fn main() {
     with_backend(|backend| backend.init_logging().unwrap());

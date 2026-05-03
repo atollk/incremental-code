@@ -23,7 +23,7 @@ impl CompiledProgram {
             game_state
                 .upgrades
                 .speed_up_per_instruction_constant
-                .current_value()
+                .value()
         });
         instruction_counts
             .iter()
@@ -37,12 +37,8 @@ impl CompiledProgram {
     }
 
     pub fn resource_gain(&self) -> Resources {
-        let bronze_linear = with_game_state(|game_state| {
-            game_state
-                .upgrades
-                .bronze_per_instruction_linear
-                .current_value()
-        });
+        let bronze_linear =
+            with_game_state(|game_state| game_state.upgrades.bronze_per_instruction.value());
         let total_instructions: u64 = self.instruction_counts.iter().sum();
         Resources::from_bronze((total_instructions * bronze_linear as u64) as f64)
     }

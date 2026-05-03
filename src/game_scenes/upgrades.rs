@@ -71,8 +71,11 @@ fn render_upgrade(upgrade: &dyn Upgrade, name_width: usize, level_width: usize) 
     const FULL_BOX: char = '⬛';
     let level_str = upgrade.format_level_str(EMPTY_BOX, FULL_BOX);
     let cost_str = upgrade.format_cost_str();
-    let current_value_str = upgrade.current_value_text();
-    let next_value_str = upgrade.next_value_text().unwrap_or("".to_string());
+    let current_value_str = upgrade.value_text();
+    let next_value_str = upgrade
+        .next_level()
+        .map(|u| u.value_text().to_string())
+        .unwrap_or_default();
     Line::from_iter(vec![
         Span::raw(format!("{:<name_width$}", upgrade.name())),
         Span::raw("     "),
@@ -178,7 +181,7 @@ impl<'a> UpgradesScene<'a> {
                 false
             }
         } else {
-            if upgrade.current_level() == 0 {
+            if upgrade.get_level() == 0 {
                 // can't level down
                 false
             } else {
