@@ -392,12 +392,17 @@ where
             })
             .boxed();
 
-        choice((
-            pass, break_, continue_, return_, if_stmt, loop_stmt, func_stmt, decl, assign,
-            call_stmt,
-        ))
-        .then_ignore(line_end.or_not())
-        .boxed()
+        just(NotPythonLangToken::Newline)
+            .repeated()
+            .collect::<Vec<_>>()
+            .ignore_then(
+                choice((
+                    pass, break_, continue_, return_, if_stmt, loop_stmt, func_stmt, decl, assign,
+                    call_stmt,
+                ))
+                .then_ignore(line_end.or_not()),
+            )
+            .boxed()
     });
 
     // Top-level: each statement carries its own terminator, so no padding needed.
@@ -436,9 +441,9 @@ pub struct NotPythonProgram {
 /// Parses NotPython source `src` into a [`NotPythonProgram`].
 ///
 /// Returns an `Err` containing one or more rich parse errors on failure.
-pub fn parse_program<'a>(
-    src: &'a str,
-) -> anyhow::Result<NotPythonProgram, Vec<Rich<'a, NotPythonLangToken>>> {
+pub fn parse_program(
+    src: &str,
+) -> anyhow::Result<NotPythonProgram, Vec<Rich<'_, NotPythonLangToken>>> {
     parse(src)
         .map(|ast| NotPythonProgram { statement: ast })
         .into()
@@ -705,5 +710,45 @@ mod tests {
     #[test]
     fn non_newline_after_block_header_is_error() {
         assert!(parse("loop: pass;\nend\n").is_err());
+    }
+
+    // -------------------------------------------------------------------------
+    // Other
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn newline_issues() {
+        let code = r#"x := 0;
+loop:
+
+    if x == 1000:
+        break;
+    end
+    x = x+1;
+end
+            "#;
+        assert_eq!(
+            stmts(code),
+            vec![
+                NotPythonStmt::Decl("x".into(), NotPythonExpr::Int(0)),
+                NotPythonStmt::Loop(Box::new(NotPythonStmt::Block(vec![
+                    NotPythonStmt::If {
+                        condition: NotPythonExpr::Op(NotPythonExprOp::Equal(
+                            Box::new(NotPythonExpr::Identifier("x".into())),
+                            Box::new(NotPythonExpr::Int(1000)),
+                        )),
+                        then: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Break])),
+                        else_: None,
+                    },
+                    NotPythonStmt::Assign(
+                        "x".into(),
+                        NotPythonExpr::Op(NotPythonExprOp::Add(
+                            Box::new(NotPythonExpr::Identifier("x".into())),
+                            Box::new(NotPythonExpr::Int(1)),
+                        )),
+                    ),
+                ]))),
+            ],
+        )
     }
 }

@@ -95,6 +95,14 @@ impl<'a> Callable<'a> {
         match self {
             Callable::PredefinedFunction(body) => body(arg_values),
             Callable::UserFunction(NotPythonStmt::Function { params, body, .. }) => {
+                if arg_values.len() != params.len() {
+                    bail!(
+                        "'{}' expects {} arguments but got {}",
+                        name,
+                        params.len(),
+                        arg_values.len()
+                    );
+                }
                 let mut frame = ProgramExecutionCallState::default();
                 for (param, val) in params.iter().zip(arg_values) {
                     frame.variables.insert(param.as_str(), val);

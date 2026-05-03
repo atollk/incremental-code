@@ -1,9 +1,8 @@
-use std::time::Duration;
-
 use crate::backend::events::Event;
 use ratatui::widgets::Paragraph;
 use ratatui::{buffer::Buffer, layout::Rect, style::Style};
 use ratatui_core::widgets::Widget;
+use std::time::Duration;
 
 /// Trait for commands that run inside the terminal widget.
 ///
@@ -119,8 +118,7 @@ impl<Meta: Default> RunningCommand<Meta> for ParagraphCmd<'_> {
 /// Chains two commands sequentially.
 pub struct ChainCmd<C1, C2> {
     first_command: Box<C1>,
-    second_command: Option<Box<C2>>,
-    second_command_constructor: Box<dyn Fn(&C1) -> Box<C2>>,
+    second_command: ChainCmd2nd<C1, C2>,
     keep_rendering_first_command: bool,
 }
 
@@ -132,13 +130,12 @@ impl<C1, C2> ChainCmd<C1, C2> {
     /// above the second command while the second runs.
     pub fn new(
         first_command: Box<C1>,
-        second_command_constructor: Box<dyn Fn(&C1) -> Box<C2>>,
+        second_command_constructor: Box<dyn FnOnce(&C1) -> Box<C2>>,
         keep_rendering_first_command: bool,
     ) -> ChainCmd<C1, C2> {
         ChainCmd {
             first_command,
-            second_command: None,
-            second_command_constructor,
+            second_command: ChainCmd2nd::Constructor(second_command_constructor),
             keep_rendering_first_command,
         }
     }
@@ -148,7 +145,7 @@ impl<Meta, C1: RunningCommand<Meta>, C2: RunningCommand<Meta>> RunningCommand<Me
     for ChainCmd<C1, C2>
 {
     fn is_done(&self) -> bool {
-        if let Some(second_command) = self.second_command.as_ref() {
+        if let ChainCmd2nd::Constructed(second_command) = &self.second_command {
             second_command.is_done()
         } else {
             false
@@ -156,18 +153,20 @@ impl<Meta, C1: RunningCommand<Meta>, C2: RunningCommand<Meta>> RunningCommand<Me
     }
 
     fn update(&mut self, events: &[Event], time_delta: Duration) {
-        if self.first_command.is_done() && self.second_command.is_none() {
-            self.second_command = Some((self.second_command_constructor)(&self.first_command));
-        }
-        if let Some(second_command) = self.second_command.as_mut() {
-            second_command.update(events, time_delta);
-        } else {
+        if !self.first_command.is_done() {
             self.first_command.update(events, time_delta);
+        } else {
+            self.second_command.construct(&self.first_command);
+            if let ChainCmd2nd::Constructed(cmd) = &mut self.second_command {
+                cmd.update(events, time_delta);
+            } else {
+                unreachable!();
+            }
         }
     }
 
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        if let Some(second_command) = self.second_command.as_ref() {
+        if let ChainCmd2nd::Constructed(second_command) = &self.second_command {
             if self.keep_rendering_first_command {
                 let first_height = self.first_command.height(area.width);
                 let second_area = Rect {
@@ -185,7 +184,7 @@ impl<Meta, C1: RunningCommand<Meta>, C2: RunningCommand<Meta>> RunningCommand<Me
     }
 
     fn height(&self, columns: u16) -> u16 {
-        if let Some(second_command) = self.second_command.as_ref() {
+        if let ChainCmd2nd::Constructed(second_command) = &self.second_command {
             if self.keep_rendering_first_command {
                 self.first_command.height(columns) + second_command.height(columns)
             } else {
@@ -197,10 +196,47 @@ impl<Meta, C1: RunningCommand<Meta>, C2: RunningCommand<Meta>> RunningCommand<Me
     }
 
     fn get_metadata(&self) -> Meta {
-        if let Some(second_command) = self.second_command.as_ref() {
+        if let ChainCmd2nd::Constructed(second_command) = &self.second_command {
             second_command.get_metadata()
         } else {
             self.first_command.get_metadata()
+        }
+    }
+}
+
+enum ChainCmd2nd<C1, C2> {
+    Constructor(Box<dyn FnOnce(&C1) -> Box<C2>>),
+    Constructed(Box<C2>),
+}
+
+impl<C1, C2> ChainCmd2nd<C1, C2> {
+    fn construct(&mut self, other_command: &C1) {
+        if matches!(self, ChainCmd2nd::Constructor(_)) {
+            struct AbortOnDrop;
+            impl Drop for AbortOnDrop {
+                fn drop(&mut self) {
+                    std::process::abort();
+                }
+            }
+
+            // SAFETY: We read the Constructor variant out by value, call the FnOnce,
+            // and write the Constructed variant back. Between the read and the write,
+            // `self.second_command` contains a logically-moved-from value that must
+            // not be observed. The only way it could be observed is if `ctor` panics,
+            // which we guard against with a panic-abort bomb.
+            unsafe {
+                let old = std::ptr::read(self);
+                let ctor = match old {
+                    ChainCmd2nd::Constructor(f) => f,
+                    _ => std::hint::unreachable_unchecked(),
+                };
+
+                let bomb = AbortOnDrop;
+                let cmd = ctor(other_command);
+                std::mem::forget(bomb);
+
+                std::ptr::write(self, ChainCmd2nd::Constructed(cmd));
+            }
         }
     }
 }

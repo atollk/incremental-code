@@ -1,18 +1,21 @@
 check:
-    cargo check --features tui
-    cargo check --features opengl
-    cargo check --features ratzilla --target wasm32-unknown-unknown
+    cargo check --workspace --features tui
+
+check-all:
+    cargo check --workspace --features tui
+    cargo check --workspace --features opengl
+    cargo check --workspace --features ratzilla --target wasm32-unknown-unknown
 
 clippy:
-    cargo clippy --fix --features tui
+    cargo clippy --workspace --fix --features tui
 
 clippy-all:
-    cargo clippy --fix --features tui
-    cargo clippy --fix --features opengl --allow-dirty
-    cargo clippy --fix --features ratzilla --target wasm32-unknown-unknown --allow-dirty
+    cargo clippy --workspace --fix --features tui
+    cargo clippy --workspace --fix --features opengl --allow-dirty
+    cargo clippy --workspace --fix --features ratzilla --target wasm32-unknown-unknown --allow-dirty
 
 test:
-    cargo test --features tui
+    cargo test --workspace --features tui
 
 [parallel]
 build-all: build-tui build-opengl build-ratzilla build-egui-desktop build-egui-web

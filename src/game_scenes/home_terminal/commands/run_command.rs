@@ -1,9 +1,8 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_state::{CompiledProgram, GameState, with_game_state, with_game_state_mut};
+use crate::game_state::{CompiledProgram, with_game_state, with_game_state_mut};
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
-use anyhow::anyhow;
-use language::{PredefinedFunction, compile_with_meta, parse_program};
+use language::PredefinedFunction;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::text::Text;
@@ -19,23 +18,24 @@ pub(super) fn run_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
             "The current code has not been compiled yet.",
         )))),
         Some(result) => match result {
-            Err(err) => Box::new(ParagraphCmd::new(Paragraph::new(Text::from(err.clone())))),
+            Err((err, instructions)) => Box::new(ChainCmd::new(
+                Box::new(RunCmd::new(CompiledProgram::instr_to_execution_time(
+                    &instructions,
+                ))),
+                Box::new(move |_| Box::new(ParagraphCmd::new(Paragraph::new(Text::from(err))))),
+                false,
+            )),
             Ok(compiled_program) => Box::new(ChainCmd::new(
                 Box::new(RunCmd::new(compiled_program.execution_time())),
-                Box::new(move |run_cmd| {
-                    let result = run_cmd.result.as_ref().expect("run command to finish");
-                    let text = if let Err(e) = result {
-                        Text::from(e.to_string())
-                    } else {
-                        let resource_gain = compiled_program.resource_gain();
-                        with_game_state_mut(|game_state| {
-                            game_state.current_resources += resource_gain.clone()
-                        });
-                        Text::from(format!("Gained {}", resource_gain.fmt_oneline()))
-                    };
+                Box::new(move |_| {
+                    let resource_gain = compiled_program.resource_gain();
+                    with_game_state_mut(|game_state| {
+                        game_state.current_resources += resource_gain.clone()
+                    });
+                    let text = Text::from(format!("Gained {}", resource_gain.fmt_oneline()));
                     Box::new(ParagraphCmd::new(Paragraph::new(text)))
                 }),
-                true,
+                false,
             )),
         },
     }
@@ -47,7 +47,7 @@ struct RunCmd {
     completion_duration: Duration,
     throbber_state: RefCell<throbber_widgets_tui::ThrobberState>,
     // after waiting
-    result: Option<anyhow::Result<()>>,
+    result: Option<()>,
 }
 
 impl RunCmd {
@@ -68,26 +68,6 @@ impl RunCmd {
     fn get_predefined_functions() -> HashMap<&'static str, &'static PredefinedFunction> {
         HashMap::new() // TODO
     }
-
-    fn compile_result(game_state: &mut GameState) -> anyhow::Result<()> {
-        let parsed = parse_program(&game_state.program_code);
-        match parsed {
-            Ok(parsed) => {
-                let mut compiled = CompiledProgram::new();
-                let run_result =
-                    compile_with_meta(&parsed, Self::get_predefined_functions(), &mut compiled);
-                game_state.compiled_program = Some(match run_result {
-                    Ok(()) => Ok(compiled),
-                    Err(e) => Err(e.to_string()),
-                });
-                Ok(())
-            }
-            Err(richs) => {
-                let errs = richs.into_iter().map(|rich| Err(anyhow!("{rich}")));
-                errs.collect()
-            }
-        }
-    }
 }
 
 impl RunningCommand<SceneSwitch> for RunCmd {
@@ -97,12 +77,7 @@ impl RunningCommand<SceneSwitch> for RunCmd {
 
     fn update(&mut self, _events: &[Event], time_delta: Duration) {
         if self.completion_duration <= self.active_duration {
-            if self.result.is_none() {
-                // TODO: run this while actually waiting, not just at the end
-                self.result = Some(with_game_state_mut(|game_state| {
-                    Self::compile_result(game_state)
-                }));
-            }
+            self.result = Some(());
         } else {
             // Animate loading
             let throbber_animation_steps =

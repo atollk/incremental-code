@@ -8,6 +8,9 @@ pub struct CompiledProgram {
     pub instruction_counts: Vec<u64>,
 }
 
+// TODO: balancing
+const INSTRUCTION_BASIC_DURATION: Duration = Duration::from_millis(10);
+
 impl CompiledProgram {
     pub fn new() -> CompiledProgram {
         CompiledProgram {
@@ -15,18 +18,22 @@ impl CompiledProgram {
         }
     }
 
-    pub fn execution_time(&self) -> Duration {
+    pub fn instr_to_execution_time(instruction_counts: &[u64]) -> Duration {
         let constant_speed_up = with_game_state(|game_state| {
             game_state
                 .upgrades
                 .speed_up_per_instruction_constant
                 .current_value()
         });
-        self.instruction_counts
+        instruction_counts
             .iter()
-            .map(|&count| Duration::from_secs(count))
+            .map(|&count| INSTRUCTION_BASIC_DURATION * count as u32)
             .map(|duration| duration / constant_speed_up)
             .sum()
+    }
+
+    pub fn execution_time(&self) -> Duration {
+        Self::instr_to_execution_time(&self.instruction_counts)
     }
 
     pub fn resource_gain(&self) -> Resources {

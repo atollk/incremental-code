@@ -76,7 +76,7 @@ impl CompileCmd {
                 let run_result = compile_with_meta(&parsed, predefined_function, &mut compiled);
                 game_state.compiled_program = Some(match run_result {
                     Ok(()) => Ok(compiled),
-                    Err(e) => Err(e.to_string()),
+                    Err(e) => Err((e.to_string(), compiled.instruction_counts)),
                 });
                 Ok(())
             }

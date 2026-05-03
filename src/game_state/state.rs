@@ -33,7 +33,7 @@ static GLOBAL_GAME_STATE: LazyLock<ReentrantMutex<RefCell<GameState>>> =
 pub struct GameState {
     // Program
     pub program_code: String,
-    pub compiled_program: Option<Result<CompiledProgram, String>>,
+    pub compiled_program: Option<Result<CompiledProgram, (String, Vec<u64>)>>,
     // Resources
     pub current_resources: Resources,
     pub carryover_resources: Resources,
@@ -43,8 +43,17 @@ pub struct GameState {
 
 impl Default for GameState {
     fn default() -> Self {
+        let start_code = r#"
+x := 0;
+loop:
+    if x == 1000:
+        break;
+    end
+    x = x+1;
+end
+            "#;
         GameState {
-            program_code: "def foo():\n  return 1;\nend\n\nfoo();".to_string(),
+            program_code: start_code.to_string(),
             compiled_program: None,
             current_resources: Resources::from_bronze(999.),
             carryover_resources: Resources::default(),
