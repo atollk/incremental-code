@@ -23,13 +23,15 @@ impl StorageBackend for StoreWeb {
 
     fn load<T: for<'a> Deserialize<'a>>(&self, key: &str) -> anyhow::Result<Option<T>> {
         let storage = get_local_storage()?;
-        match storage
+        let result = match storage
             .get_item(&format!("save_{key}"))
             .map_err(|e| anyhow!(format!("{e:?}")))?
         {
-            None => Ok(None),
-            Some(json) => Ok(serde_json::from_str(&json).map(Some)?),
-        }
+            None => None,
+            Some(json) => serde_json::from_str(&json).map(Some)?,
+        };
+        log::info!("loaded from local storage with key: {key}");
+        Ok(result)
     }
 
     fn delete(&self, key: &str) -> anyhow::Result<()> {

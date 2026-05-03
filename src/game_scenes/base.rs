@@ -1,5 +1,6 @@
 use crate::backend::events::Event;
 use crate::basic_terminal_app::App;
+use crate::game_state::load_game_state;
 use std::ops::{ControlFlow, FromResidual, Residual, Try};
 
 /// A game scene that renders itself and handles input each frame.
@@ -66,6 +67,7 @@ pub struct SceneGame {
 impl SceneGame {
     /// Creates a `SceneGame` starting with the given initial scene.
     pub fn new(scene: Box<dyn Scene>) -> Self {
+        load_game_state().unwrap();
         SceneGame {
             active_scene: scene,
             last_frame: web_time::Instant::now(),

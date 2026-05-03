@@ -25,7 +25,11 @@ impl StorageBackend for StoreNative {
         let json = serde_json::to_string_pretty(data)?;
         std::fs::create_dir_all(path.parent().unwrap())?;
         std::fs::write(&path, json)?;
-        log::info!("saved to {:?}", path::absolute(path)?.into_os_string());
+        log::info!(
+            "saved {} to {:?}",
+            key,
+            path::absolute(path)?.into_os_string()
+        );
         Ok(())
     }
 
@@ -34,8 +38,14 @@ impl StorageBackend for StoreNative {
         if !path.exists() {
             return Ok(None);
         }
-        let json = std::fs::read_to_string(path)?;
-        Ok(serde_json::from_str(&json).map(Some)?)
+        let json = std::fs::read_to_string(&path)?;
+        let result = serde_json::from_str(&json).map(Some)?;
+        log::info!(
+            "loaded {} from {:?}",
+            key,
+            path::absolute(path)?.into_os_string()
+        );
+        Ok(result)
     }
 
     fn delete(&self, key: &str) -> anyhow::Result<()> {
