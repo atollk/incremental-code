@@ -89,7 +89,7 @@ pub struct Upgrades {
     pub unlock_level5: UnlockLevel5,
     // Level 5
     pub auto_run: AutoRun,
-    pub unlock_break: UnlockBreak,
+    pub unlock_brk: UnlockBrk,
     pub break_slowdown: BreakSlowdown,
     pub diamond_per_break: DiamondPerBreakPoint,
     pub unlock_level6: UnlockLevel6,
@@ -503,7 +503,7 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    UnlockBreak,
+    UnlockBrk,
     type=bool,
     level=5,
     [

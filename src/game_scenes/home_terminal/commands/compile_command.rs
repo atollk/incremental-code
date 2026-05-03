@@ -1,9 +1,9 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_state::{CompiledProgram, GameState, with_game_state, with_game_state_mut};
+use crate::game_state::{CompiledProgram, with_game_state, with_game_state_mut};
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
 use anyhow::anyhow;
-use language::{compile_with_meta, parse_program};
+use language::{PredefinedFunction, ProgramValue, compile_with_meta, parse_program};
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::text::Text;
@@ -69,24 +69,69 @@ impl CompileCmd {
         }
     }
 
-    fn compile_result(game_state: &mut GameState) -> anyhow::Result<()> {
-        let parsed = parse_program(&game_state.program_code);
-        match parsed {
-            Ok(parsed) => {
-                let mut compiled = CompiledProgram::new();
-                let predefined_function = HashMap::new();
-                let run_result = compile_with_meta(&parsed, predefined_function, &mut compiled);
-                game_state.compiled_program = Some(match run_result {
-                    Ok(()) => Ok(compiled),
-                    Err(e) => Err((e.to_string(), compiled.instruction_counts)),
-                });
-                Ok(())
-            }
-            Err(richs) => {
-                let errs = richs.into_iter().map(|rich| Err(anyhow!("{rich}")));
-                errs.collect()
-            }
+    fn predefined_function_print(
+        _meta: &mut CompiledProgram,
+        _args: Vec<ProgramValue>,
+    ) -> anyhow::Result<ProgramValue> {
+        todo!()
+    }
+
+    fn predefined_functions() -> HashMap<&'static str, &'static PredefinedFunction<CompiledProgram>>
+    {
+        let (unlock_print, unlock_sleep, unlock_brk) = with_game_state(|game_state| {
+            (
+                game_state.upgrades.unlock_print.value(),
+                game_state.upgrades.unlock_sleep.value(),
+                game_state.upgrades.unlock_brk.value(),
+            )
+        });
+        let mut functions = HashMap::new();
+
+        if unlock_print {
+            functions.insert(
+                "print_function",
+                &Self::predefined_function_print as &'static PredefinedFunction<CompiledProgram>,
+            );
         }
+
+        if unlock_sleep {
+            todo!()
+        }
+
+        if unlock_brk {
+            todo!()
+        }
+
+        functions
+    }
+
+    fn compile_result() -> anyhow::Result<()> {
+        let parse_result_run_result = with_game_state(|game_state| -> anyhow::Result<_> {
+            let parsed = parse_program(&game_state.program_code);
+            match parsed {
+                Ok(parsed) => {
+                    let mut compiled = CompiledProgram::new();
+                    let run_result =
+                        compile_with_meta(&parsed, Self::predefined_functions(), &mut compiled);
+                    Ok(match run_result {
+                        Ok(()) => Ok(compiled),
+                        Err(e) => Err((e.to_string(), compiled.instruction_counts)),
+                    })
+                }
+                Err(richs) => Err(anyhow!(
+                    richs
+                        .into_iter()
+                        .map(|rich| format!("{rich}"))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                )),
+            }
+        });
+        let run_result = parse_result_run_result?;
+        with_game_state_mut(|game_state| {
+            game_state.compiled_program = Some(run_result);
+        });
+        Ok(())
     }
 }
 
@@ -99,9 +144,7 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
         if self.compile_duration <= self.running_duration {
             if self.result.is_none() {
                 // TODO: run this while actually waiting, not just at the end
-                self.result = Some(with_game_state_mut(|game_state| {
-                    Self::compile_result(game_state)
-                }));
+                self.result = Some(Self::compile_result());
             }
         } else {
             // Animate loading

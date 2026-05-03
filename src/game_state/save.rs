@@ -1,6 +1,31 @@
 use crate::backend::backend::StorageBackend;
 use crate::backend::with_backend;
 use crate::game_state::{with_game_state, with_game_state_mut};
+use std::sync::{LazyLock, Mutex};
+use std::thread;
+use std::thread::JoinHandle;
+use std::time::Duration;
+
+pub struct AutoSaver {}
+
+impl AutoSaver {
+    fn new() -> Self {
+        Self {}
+    }
+
+    pub fn start(&mut self, period: Duration) -> JoinHandle<anyhow::Result<()>> {
+        thread::spawn(move || -> anyhow::Result<()> {
+            loop {
+                thread::sleep(period);
+                save_game_state()?;
+            }
+        })
+    }
+
+    // TODO: cancellation
+}
+
+pub static AUTO_SAVER: LazyLock<Mutex<AutoSaver>> = LazyLock::new(|| Mutex::new(AutoSaver::new()));
 
 const KEY: &'static str = "save";
 

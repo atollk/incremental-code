@@ -22,17 +22,18 @@ impl CompilingMetadata for () {
 /// Validates and executes a parsed [`NotPythonProgram`], returning an error if execution fails.
 pub fn compile(
     program: &NotPythonProgram,
-    predefined_functions: HashMap<&str, &PredefinedFunction>,
+    predefined_functions: HashMap<&str, &PredefinedFunction<()>>,
 ) -> anyhow::Result<()> {
-    compile_with_meta(program, predefined_functions, &mut ())
+    let mut meta = ();
+    compile_with_meta(program, predefined_functions, &mut meta)
 }
 
 /// Like [`compile`], but calls back into `meta` at each zero-cost and atomic instruction
 /// so callers can measure or profile execution.
-pub fn compile_with_meta(
+pub fn compile_with_meta<Meta: CompilingMetadata>(
     program: &NotPythonProgram,
-    predefined_functions: HashMap<&str, &PredefinedFunction>,
-    meta: &mut impl CompilingMetadata,
+    predefined_functions: HashMap<&str, &PredefinedFunction<Meta>>,
+    meta: &mut Meta,
 ) -> anyhow::Result<()> {
     let mut state = ProgramExecutionState {
         control_flow: ProgramExecutionControlFlow::Normal,
@@ -73,27 +74,28 @@ struct ProgramExecutionCallState<'a> {
     loop_nesting: usize,
 }
 
-pub type PredefinedFunction = dyn Fn(Vec<ProgramValue>) -> anyhow::Result<ProgramValue>;
+pub type PredefinedFunction<Meta> =
+    dyn Fn(&mut Meta, Vec<ProgramValue>) -> anyhow::Result<ProgramValue>;
 
-enum Callable<'a> {
-    PredefinedFunction(&'a PredefinedFunction),
+enum Callable<'a, Meta: CompilingMetadata> {
+    PredefinedFunction(&'a PredefinedFunction<Meta>),
     UserFunction(&'a NotPythonStmt),
 }
 
-impl<'a> Callable<'a> {
+impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
     fn call(
         self,
         name: &str,
         args: &[NotPythonExpr],
-        state: &mut ProgramExecutionState<'a>,
-        meta: &mut impl CompilingMetadata,
+        state: &mut ProgramExecutionState<'a, Meta>,
+        meta: &mut Meta,
     ) -> anyhow::Result<ProgramValue> {
         let arg_values: Vec<ProgramValue> = args
             .iter()
             .map(|a| eval_expr(a, state, meta))
             .collect::<anyhow::Result<_>>()?;
         match self {
-            Callable::PredefinedFunction(body) => body(arg_values),
+            Callable::PredefinedFunction(body) => body(meta, arg_values),
             Callable::UserFunction(NotPythonStmt::Function { params, body, .. }) => {
                 if arg_values.len() != params.len() {
                     bail!(
@@ -126,13 +128,13 @@ impl<'a> Callable<'a> {
     }
 }
 
-struct ProgramExecutionState<'a> {
+struct ProgramExecutionState<'a, Meta: CompilingMetadata> {
     control_flow: ProgramExecutionControlFlow,
     call_stack: Vec<ProgramExecutionCallState<'a>>,
-    predefined_functions: HashMap<&'a str, &'a PredefinedFunction>,
+    predefined_functions: HashMap<&'a str, &'a PredefinedFunction<Meta>>,
 }
 
-impl<'a> ProgramExecutionState<'a> {
+impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
     fn get_variable(&self, name: &str) -> anyhow::Result<&ProgramValue> {
         for call_state in self.call_stack.iter().rev() {
             if let Some(value) = call_state.variables.get(name) {
@@ -168,7 +170,7 @@ impl<'a> ProgramExecutionState<'a> {
             .insert(name, stmt);
     }
 
-    fn get_function(&self, name: &str) -> anyhow::Result<Callable<'a>> {
+    fn get_function(&self, name: &str) -> anyhow::Result<Callable<'a, Meta>> {
         for call_state in self.call_stack.iter().rev() {
             if let Some(&stmt) = call_state.functions.get(name) {
                 return Ok(Callable::UserFunction(stmt));
@@ -181,10 +183,10 @@ impl<'a> ProgramExecutionState<'a> {
     }
 }
 
-fn compile_stmt<'a>(
+fn compile_stmt<'a, Meta: CompilingMetadata>(
     stmt: &'a NotPythonStmt,
-    state: &mut ProgramExecutionState<'a>,
-    meta: &mut impl CompilingMetadata,
+    state: &mut ProgramExecutionState<'a, Meta>,
+    meta: &mut Meta,
 ) -> anyhow::Result<()> {
     if matches!(state.control_flow, ProgramExecutionControlFlow::Return(_)) {
         meta.log_zero_instruction()?;
@@ -278,11 +280,7 @@ fn compile_stmt<'a>(
     Ok(())
 }
 
-fn eval_unary_op(
-    val: ProgramValue,
-    op: &NotPythonExprOp,
-    _state: &mut ProgramExecutionState,
-) -> anyhow::Result<ProgramValue> {
+fn eval_unary_op(val: ProgramValue, op: &NotPythonExprOp) -> anyhow::Result<ProgramValue> {
     match op {
         NotPythonExprOp::Neg(_) => match val {
             ProgramValue::Hashable(HashableProgramValue::Int(i)) => {
@@ -305,7 +303,6 @@ fn eval_binary_op(
     lhs: ProgramValue,
     rhs: ProgramValue,
     op: &NotPythonExprOp,
-    _state: &mut ProgramExecutionState,
 ) -> anyhow::Result<ProgramValue> {
     use HashableProgramValue::*;
     use ProgramValue::*;
@@ -416,10 +413,10 @@ fn eval_binary_op(
     }
 }
 
-fn eval_expr<'a>(
+fn eval_expr<'a, Meta: CompilingMetadata>(
     expr: &NotPythonExpr,
-    state: &mut ProgramExecutionState<'a>,
-    meta: &mut impl CompilingMetadata,
+    state: &mut ProgramExecutionState<'a, Meta>,
+    meta: &mut Meta,
 ) -> anyhow::Result<ProgramValue> {
     match expr {
         NotPythonExpr::Int(i) => Ok(ProgramValue::Hashable(HashableProgramValue::Int(*i))),
@@ -467,10 +464,9 @@ fn eval_expr<'a>(
                 eval_expr(lhs, state, meta)?,
                 eval_expr(rhs, state, meta)?,
                 o,
-                state,
             ),
             NotPythonExprOp::Neg(val) | NotPythonExprOp::Not(val) => {
-                eval_unary_op(eval_expr(val, state, meta)?, o, state)
+                eval_unary_op(eval_expr(val, state, meta)?, o)
             }
         },
         NotPythonExpr::Call(name_expr, args) => {

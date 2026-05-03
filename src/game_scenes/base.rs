@@ -1,7 +1,7 @@
 use crate::backend::events::Event;
 use crate::basic_terminal_app::App;
-use crate::game_state::load_game_state;
-use std::ops::{ControlFlow, FromResidual, Residual, Try};
+use crate::game_state::{AUTO_SAVER, load_game_state};
+use std::ops::{ControlFlow, DerefMut, FromResidual, Residual, Try};
 
 /// A game scene that renders itself and handles input each frame.
 pub trait Scene {
@@ -58,7 +58,7 @@ impl Default for SceneSwitch {
     }
 }
 
-/// Root [`App`](crate::basic_terminal_app::App) that owns the active scene and tracks frame timing.
+/// Root [`App`](App) that owns the active scene and tracks frame timing.
 pub struct SceneGame {
     active_scene: Box<dyn Scene>,
     last_frame: web_time::Instant,
@@ -70,6 +70,10 @@ impl SceneGame {
         if let Err(e) = load_game_state() {
             log::error!("{e}");
         }
+        AUTO_SAVER
+            .lock()
+            .unwrap()
+            .start(std::time::Duration::from_secs(60));
         SceneGame {
             active_scene: scene,
             last_frame: web_time::Instant::now(),
