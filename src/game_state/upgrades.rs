@@ -8,15 +8,22 @@ pub trait Upgrade {
     /// The unlock tier this upgrade belongs to.
     fn group(&self) -> u8;
     /// The player's current level for this upgrade (0-based).
-    fn current_level(&self) -> u8;
+    fn get_level(&self) -> u8;
     /// The highest level this upgrade can reach.
     fn max_level(&self) -> u8;
-    /// Cost to advance from the current level to the next, or `None` if already maxed.
-    fn next_level_cost(&self) -> Option<Resources>;
     /// Human-readable description of the current effect value.
-    fn current_value_text(&self) -> String;
-    /// Human-readable description of the effect value at the next level, or `None` if maxed.
-    fn next_value_text(&self) -> Option<String>;
+    fn value_text(&self) -> String;
+
+    /// Create a new object for the next level instance.
+    fn next_level(&self) -> Option<Self> {
+        if self.get_level() == self.max_level() {
+            None
+        } else {
+            let mut other = self.clone();
+            other.level_up();
+            Some(other)
+        }
+    }
 
     /// Advance this upgrade by one level, capping at [`max_level`](Self::max_level).
     fn level_up(&mut self);
@@ -53,10 +60,39 @@ pub struct Upgrades {
     // Level 1
     pub compile_time: CompileTime,
     pub speed_up_per_instruction_constant: SpeedUpPerInstructionConstant,
-    pub bronze_per_instruction_linear: BronzePerInstructionLinear,
-    pub code_line_width_1: CodeLineWidth1,
-    pub code_line_count_1: CodeLineCount1,
-    pub loop_statements: LoopStatements,
+    pub code_line_width: CodeLineWidth,
+    pub code_line_count: CodeLineCount,
+    pub max_instructions: MaxInstructions,
+    pub literals: CodeExpressionLiterals,
+    pub unlock_level2: UnlockLevel2,
+    // Level 2
+    pub speed_up_per_instruction_linear: SpeedUpPerInstructionLinear,
+    pub bronze_per_instruction: BronzePerInstruction,
+    pub statements: CodeStatements,
+    pub unlock_reboot: UnlockReboot,
+    pub keep_prestige_upgrades: KeepPrestigeUpgrades,
+    pub unlock_level3: UnlockLevel3,
+    // Level 3
+    pub auto_compile: AutoCompile,
+    pub unlock_print: UnlockPrint,
+    pub print_speed_reset: PrintSpeedReset,
+    pub silver_per_print_character_linear: SilverPerPrintCharacterPolynomial,
+    pub unlock_level4: UnlockLevel4,
+    // Level 4
+    pub unlock_sleep: UnlockSleep,
+    pub min_instruction_duration: MinInstructionDuration,
+    pub instruction_speed_to_sleep: InstructionSpeedToSleep,
+    pub gold_per_sleep_second: GoldPerSleepSecond,
+    pub unlock_level5: UnlockLevel5,
+    // Level 5
+    pub auto_run: AutoRun,
+    pub unlock_break: UnlockBreak,
+    pub break_slowdown: BreakSlowdown,
+    pub diamond_per_break: DiamondPerBreakPoint,
+    pub unlock_level6: UnlockLevel6,
+    // Level 6
+    pub gain_currency_function: GainCurrencyFunction,
+    pub win_condition: WinCondition,
 }
 
 impl Upgrades {
@@ -66,9 +102,9 @@ impl Upgrades {
             &self.compile_time,
             &self.speed_up_per_instruction_constant,
             &self.bronze_per_instruction_linear,
-            &self.code_line_width_1,
-            &self.code_line_count_1,
-            &self.loop_statements,
+            &self.code_line_width,
+            &self.code_line_count,
+            &self.literals,
         ] as [&dyn Upgrade; _]
     }
 
@@ -77,9 +113,9 @@ impl Upgrades {
             &mut self.compile_time,
             &mut self.speed_up_per_instruction_constant,
             &mut self.bronze_per_instruction_linear,
-            &mut self.code_line_width_1,
-            &mut self.code_line_count_1,
-            &mut self.loop_statements,
+            &mut self.code_line_width,
+            &mut self.code_line_count,
+            &mut self.literals,
         ] as [&mut dyn Upgrade; _]
     }
 
@@ -94,13 +130,20 @@ macro_rules! impl_upgrade {
         $struct:ident,
         type=$val:ty,
         level=$group_level:expr,
-        [ $( ($value:expr, $cost:expr) ),+ $(,)? ]
+        [ $( ($value:expr, $cost:expr, $text:expr) ),+ $(,)? ]
     ) => {
         #[derive(Debug, Default, Clone, PartialEq, std::hash::Hash, serde::Serialize, serde::Deserialize)]
         pub(crate) struct $struct (u8);
 
         impl $struct {
-            pub(crate) fn value(level: u8) -> Option<$val> {
+            fn fail_oob(&self) {
+                panic!(
+                    concat!(stringify!($struct), ": level {} out of bounds"),
+                    self.0
+                )
+            }
+
+            pub(crate) fn value_at(level: u8) -> Option<$val> {
                 let mut __i: u8 = 0;
                 $(
                     if level == __i { return Some($value); }
@@ -109,15 +152,27 @@ macro_rules! impl_upgrade {
                 None
             }
 
-            pub(crate) fn current_value(&self) -> $val {
-                if let Some(v) = Self::value(self.0) {
-                    v
-                } else {
-                    panic!(
-                        concat!(stringify!($struct), ": level {} out of bounds"),
-                        self.0
-                    )
-                }
+            pub(crate) fn cost_at(level: u8) -> Option<Resources> {
+                let mut __i: u8 = 0;
+                $(
+                    if level == __i { return Some($cost); }
+                    __i += 1;
+                )+
+                None
+            }
+
+            pub(crate) fn value_text_at(level: u8) -> Option<&'static str> {
+                let mut __i: u8 = 0;
+                $(
+                    if level == __i { return Some($text); }
+                    __i += 1;
+                )+
+                None
+            }
+
+
+            pub(crate) fn value(&self) -> $val {
+                Self::value_at(self.0).unwrap_or_else(self.fail_oob)
             }
         }
 
@@ -130,7 +185,7 @@ macro_rules! impl_upgrade {
                 $group_level
             }
 
-            fn current_level(&self) -> u8 {
+            fn get_level(&self) -> u8 {
                 self.0
             }
 
@@ -138,28 +193,8 @@ macro_rules! impl_upgrade {
                 [ $( impl_upgrade!(@unit $value) ),+ ].len().saturating_sub(1) as u8
             }
 
-            #[allow(unused_assignments)]
-            fn current_value_text(&self) -> String {
-                format!("{}", self.current_value())
-            }
-
-            #[allow(unused_assignments)]
-            fn next_value_text(&self) -> Option<String> {
-                Self::value(self.0.checked_add(1)?).map(|v| format!("{}", v))
-            }
-
-            #[allow(unused_assignments)]
-            fn next_level_cost(&self) -> Option<Resources> {
-                let __next = self.0.checked_add(1)?;
-                if __next >= [ $( impl_upgrade!(@unit $value) ),+ ].len() as u8 {
-                    return None;
-                }
-                let mut __i: u8 = 0;
-                $(
-                    if self.0 == __i { return Some($cost); }
-                    __i += 1;
-                )+
-                None
+            fn value_text(&self) -> &'static str {
+                Self::value_text_at(self.0).unwrap_or_else(self.fail_oob)
             }
 
             fn level_up(&mut self) {
@@ -181,12 +216,12 @@ impl_upgrade!(
     type=f32,
     level=1,
     [
-        (5., Resources::from_bronze(10.)),
-        (4., Resources::from_bronze(1e3)),
-        (3., Resources::from_bronze(1e6)),
-        (2., Resources::from_bronze(1e9)),
-        (1., Resources::from_silver(10.)),
-        (0.1, Resources::zero()),
+        (5., Resources::from_bronze(10.), "5s"),
+        (4., Resources::from_bronze(1e3), "4s"),
+        (3., Resources::from_bronze(1e6), "3s"),
+        (2., Resources::from_bronze(1e9), "2s"),
+        (1., Resources::from_silver(10.), "1s"),
+        (0.1, Resources::zero(), "0.1s"),
     ]
 );
 
@@ -195,28 +230,16 @@ impl_upgrade!(
     type=u32,
     level=1,
     [
-        (1, Resources::from_bronze(10.)),
-        (2, Resources::from_bronze(100.)),
-        (8, Resources::from_bronze(2e3)),
-        (64, Resources::from_bronze(30e3)),
-        (1024, Resources::zero()),
+        (1, Resources::from_bronze(10.), "1"),
+        (2, Resources::from_bronze(100.), "1/2"),
+        (8, Resources::from_bronze(2e3), "1/8"),
+        (64, Resources::from_bronze(30e3), "1/64"),
+        (1024, Resources::zero(), "1/1024"),
     ]
 );
 
 impl_upgrade!(
-    BronzePerInstructionLinear,
-    type=u32,
-    level=1,
-    [
-        (1, Resources::from_bronze(10.)),
-        (5, Resources::from_bronze(100.)),
-        (25, Resources::from_bronze(2e3)),
-        (125, Resources::from_bronze(30e3)),
-        (625, Resources::zero()),
-    ]
-);
-impl_upgrade!(
-    CodeLineWidth1,
+    CodeLineWidth,
     type=u8,
     level=1,
     [
@@ -228,7 +251,7 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    CodeLineCount1,
+    CodeLineCount,
     type=u8,
     level=1,
     [

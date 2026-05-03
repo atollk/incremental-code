@@ -25,9 +25,17 @@ impl Default for CodeEditorScene {
 
 impl CodeEditorScene {
     pub fn new() -> Self {
-        let code = with_game_state(|state| state.program_code.clone());
+        let (code, max_lines, max_line_width) = with_game_state(|game_state| {
+            (
+                game_state.program_code.clone(),
+                game_state.upgrades.code_line_count_1.current_value(),
+                game_state.upgrades.code_line_width_1.current_value(),
+            )
+        });
         let lang = not_python_language(not_python_default_theme());
-        let editor = Editor::new(Box::new(lang), &code);
+        let editor = Editor::new(Box::new(lang), &code)
+            .with_max_line_width(max_line_width as usize)
+            .with_max_lines(max_lines as usize);
         CodeEditorScene {
             editor,
             original_code: code,
