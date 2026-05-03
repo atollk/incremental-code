@@ -1,5 +1,6 @@
 #![feature(try_trait_v2)]
 #![feature(try_trait_v2_residual)]
+#![feature(impl_trait_in_bindings)]
 
 mod backend;
 mod basic_terminal_app;

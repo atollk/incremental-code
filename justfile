@@ -7,12 +7,12 @@ check-all:
     cargo check --workspace --features ratzilla --target wasm32-unknown-unknown
 
 clippy:
-    cargo clippy --workspace --fix --features tui
+    cargo clippy --workspace --fix --features tui -- -D warnings
 
 clippy-all:
-    cargo clippy --workspace --fix --features tui
-    cargo clippy --workspace --fix --features opengl --allow-dirty
-    cargo clippy --workspace --fix --features ratzilla --target wasm32-unknown-unknown --allow-dirty
+    cargo clippy --workspace --fix --features tui -- -D warnings
+    cargo clippy --workspace --fix --features opengl --allow-dirty -- -D warnings
+    cargo clippy --workspace --fix --features ratzilla --target wasm32-unknown-unknown --allow-dirty -- -D warnings
 
 test:
     cargo test --workspace --features tui

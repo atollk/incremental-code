@@ -2,14 +2,12 @@ use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_state::{CompiledProgram, with_game_state, with_game_state_mut};
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
-use language::PredefinedFunction;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::text::Text;
 use ratatui_core::widgets::StatefulWidget;
 use ratatui_widgets::paragraph::Paragraph;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::time::Duration;
 
 pub(super) fn run_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
@@ -63,10 +61,6 @@ impl RunCmd {
             throbber_state,
             result: None,
         }
-    }
-
-    fn get_predefined_functions() -> HashMap<&'static str, &'static PredefinedFunction> {
-        HashMap::new() // TODO
     }
 }
 
