@@ -5,7 +5,9 @@ use crossterm::execute;
 use crossterm::terminal::{EnterAlternateScreen, enable_raw_mode};
 use log::LevelFilter;
 use ratatui::backend::CrosstermBackend;
+use std::cell::RefCell;
 use std::io::{Stdout, stdout};
+use std::rc::Rc;
 use std::sync::{LazyLock, Mutex, RwLock};
 use std::time::Duration;
 
@@ -19,11 +21,14 @@ pub static BACKEND_INSTANCE: LazyLock<RwLock<CrosstermBackendSuite>> =
 pub struct CrosstermBackendSuite {}
 
 impl BackendSuite<BackendType, StorageType> for CrosstermBackendSuite {
-    fn run(&self, app: &mut dyn TerminalApp<BackendType>) -> anyhow::Result<()> {
+    fn run(
+        &self,
+        mut app: Rc<RefCell<dyn TerminalApp<crate::backend::BackendType>>>,
+    ) -> anyhow::Result<()> {
         let backend = BackendType::new(stdout());
         enable_raw_mode()?;
         execute!(stdout(), EnterAlternateScreen)?;
-        app.init(backend)?;
+        app.borrow_mut().init(backend)?;
 
         let mut events = Vec::new();
         let mut exit = false;
@@ -34,7 +39,7 @@ impl BackendSuite<BackendType, StorageType> for CrosstermBackendSuite {
                     events.push(event);
                 }
             }
-            exit = app.frame(&events)?;
+            exit = app.borrow_mut().frame(&events)?;
             events.clear();
         }
         Ok(())

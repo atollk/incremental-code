@@ -1,10 +1,13 @@
+use crate::backend::BackendType;
 use crate::backend::events::Event;
 use serde::{Deserialize, Serialize};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// A backend implementation that can own and drive a [`TerminalApp`] event loop.
 pub trait BackendSuite<B: ratatui::backend::Backend, S: StorageBackend + Default> {
     /// Start the event loop and run `app` until it requests an exit.
-    fn run(&self, app: &mut dyn TerminalApp<B>) -> anyhow::Result<()>;
+    fn run(&self, app: Rc<RefCell<dyn TerminalApp<B>>>) -> anyhow::Result<()>;
 
     /// Enable logging.
     fn init_logging(&self) -> anyhow::Result<()>;

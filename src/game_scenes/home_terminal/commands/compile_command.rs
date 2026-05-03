@@ -58,7 +58,9 @@ impl CompileCmd {
 
     fn new() -> Self {
         let mut throbber_state = RefCell::new(throbber_widgets_tui::ThrobberState::default());
-        throbber_state.get_mut().calc_step(0); // randomize animation start
+        throbber_state
+            .get_mut()
+            .calc_step(rand::random_range(0..Self::THROBBER_SET.symbols.len()) as i8);
         CompileCmd {
             running_duration: Duration::from_millis(0),
             compile_duration: Duration::from_millis(500),

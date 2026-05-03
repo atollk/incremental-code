@@ -20,6 +20,6 @@ pub fn main() {
     // let app = BasicTerminalApp::new(demos::CodeEditorDemo::default());
     // let app = BasicTerminalApp::<demos::CounterDemo>::new();
     // let app = BasicTerminalApp::<BeamtermDemo>::new();
-    let mut app = BasicTerminalApp::new(SceneGame::new(Box::new(HomeTerminalScene::new())));
+    let app = BasicTerminalApp::new(SceneGame::new(Box::new(HomeTerminalScene::new())));
     app.run().unwrap();
 }

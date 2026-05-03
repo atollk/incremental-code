@@ -23,7 +23,10 @@ pub static BACKEND_INSTANCE: LazyLock<RwLock<RatzillaBackendSuite>> =
 pub struct RatzillaBackendSuite {}
 
 impl BackendSuite<BackendType, StorageType> for RatzillaBackendSuite {
-    fn run(&self, terminal_app: &mut dyn TerminalApp<BackendType>) -> anyhow::Result<()> {
+    fn run(
+        &self,
+        mut terminal_app: Rc<RefCell<dyn TerminalApp<BackendType>>>,
+    ) -> anyhow::Result<()> {
         let mut backend = WebGl2Backend::new().map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
         let events: Rc<RefCell<Vec<Event>>> = Rc::new(RefCell::new(Vec::new()));
@@ -50,9 +53,7 @@ impl BackendSuite<BackendType, StorageType> for RatzillaBackendSuite {
                 .ok();
         }
 
-        terminal_app.init(backend)?;
-
-        let terminal_app = Rc::new(RefCell::new(terminal_app));
+        terminal_app.borrow_mut().init(backend)?;
 
         let f: Rc<RefCell<Option<Closure<dyn FnMut()>>>> = Rc::new(RefCell::new(None));
         let g = f.clone();
@@ -64,7 +65,7 @@ impl BackendSuite<BackendType, StorageType> for RatzillaBackendSuite {
                 .frame(&current_events)
                 .unwrap_or(true);
             if !exit {
-                ratzilla::web_sys::window()
+                web_sys::window()
                     .unwrap()
                     .request_animation_frame(f.borrow().as_ref().unwrap().as_ref().unchecked_ref())
                     .unwrap();

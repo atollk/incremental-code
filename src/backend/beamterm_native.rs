@@ -17,6 +17,7 @@ use glutin_winit::DisplayBuilder;
 use log::LevelFilter;
 use ratbeam::BeamtermBackend;
 use raw_window_handle::HasWindowHandle;
+use std::cell::RefCell;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::sync::{LazyLock, Mutex, RwLock};
@@ -51,7 +52,7 @@ impl BeamtermCoreBackendSuite {
 }
 
 impl BackendSuite<BackendType, StorageType> for BeamtermCoreBackendSuite {
-    fn run(&self, terminal_app: &mut dyn TerminalApp<BackendType>) -> anyhow::Result<()> {
+    fn run(&self, terminal_app: Rc<RefCell<dyn TerminalApp<BackendType>>>) -> anyhow::Result<()> {
         let event_loop = EventLoop::new().expect("failed to create event loop");
         let mut app = BeamtermCoreApplicationHandler {
             terminal_app,
@@ -70,8 +71,8 @@ impl BackendSuite<BackendType, StorageType> for BeamtermCoreBackendSuite {
     }
 }
 
-struct BeamtermCoreApplicationHandler<'a> {
-    terminal_app: &'a mut dyn TerminalApp<BackendType>,
+struct BeamtermCoreApplicationHandler {
+    terminal_app: Rc<RefCell<dyn TerminalApp<BackendType>>>,
     window_state: Option<WindowState>,
     events: Vec<Event>,
 }
@@ -100,12 +101,12 @@ impl WindowState {
     }
 }
 
-impl<'a> ApplicationHandler for BeamtermCoreApplicationHandler<'a> {
+impl<'a> ApplicationHandler for BeamtermCoreApplicationHandler {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let window_state = BeamtermCoreBackendSuite::get_window_state(event_loop);
         self.window_state = Some(window_state);
         let backend = self.window_state.as_ref().unwrap().create_backend();
-        self.terminal_app.init(backend).unwrap();
+        self.terminal_app.borrow_mut().init(backend).unwrap();
     }
 
     fn window_event(
@@ -130,17 +131,23 @@ impl<'a> ApplicationHandler for BeamtermCoreApplicationHandler<'a> {
             WindowEvent::Resized(new_size) => {
                 if new_size.width > 0 && new_size.height > 0 {
                     state.win.resize_surface(new_size);
-                    let _ = self.terminal_app.backend_mut().grid_mut().resize(
-                        &state.gl,
-                        (new_size.width as i32, new_size.height as i32),
-                        state.win.pixel_ratio(),
-                    );
+                    let _ = self
+                        .terminal_app
+                        .borrow_mut()
+                        .backend_mut()
+                        .grid_mut()
+                        .resize(
+                            &state.gl,
+                            (new_size.width as i32, new_size.height as i32),
+                            state.win.pixel_ratio(),
+                        );
                     state.win.window.request_redraw();
                 }
             }
             WindowEvent::RedrawRequested => {
                 let exit = self
                     .terminal_app
+                    .borrow_mut()
                     .frame(&self.events)
                     .expect("failed to draw");
                 if exit {
@@ -149,7 +156,12 @@ impl<'a> ApplicationHandler for BeamtermCoreApplicationHandler<'a> {
                 self.events.clear();
 
                 // GL render
-                let (w, h) = self.terminal_app.backend().grid().canvas_size();
+                let (w, h) = self
+                    .terminal_app
+                    .borrow_mut()
+                    .backend()
+                    .grid()
+                    .canvas_size();
                 state.gl_state.viewport(&state.gl, 0, 0, w, h);
                 state.gl_state.clear_color(&state.gl, 0.0, 0.0, 0.0, 1.0);
 
@@ -162,7 +174,8 @@ impl<'a> ApplicationHandler for BeamtermCoreApplicationHandler<'a> {
                     gl: &state.gl,
                     state: &mut state.gl_state,
                 };
-                let grid = self.terminal_app.backend().grid();
+                let app = self.terminal_app.borrow_mut();
+                let grid = app.backend().grid();
                 grid.prepare(&mut ctx).expect("failed to prepare grid");
                 grid.draw(&mut ctx);
                 grid.cleanup(&mut ctx);
