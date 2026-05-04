@@ -28,7 +28,7 @@ impl Widget for HudWidget {
 /// Renders the [`HudWidget`] on the left side of the frame and returns the remaining content area.
 ///
 /// If the frame is narrower than [`HUD_WIDTH`], the full area is returned unchanged.
-pub fn hud_layout(frame: &mut Frame) -> Rect {
+pub fn draw_hud(frame: &mut Frame) -> Rect {
     let full_area = frame.area();
     if full_area.width <= HUD_WIDTH {
         return full_area;

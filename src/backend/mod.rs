@@ -38,6 +38,8 @@ pub use beamterm_web::{BackendType, StorageType};
 #[cfg(feature = "ratzilla")]
 mod store_web;
 
+pub mod audio;
+
 pub fn with_backend<T>(
     f: impl FnOnce(&dyn backend::BackendSuite<BackendType, StorageType>) -> T,
 ) -> T {

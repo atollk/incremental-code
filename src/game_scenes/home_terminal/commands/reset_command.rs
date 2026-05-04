@@ -1,7 +1,6 @@
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_scenes::home_terminal::HomeTerminalScene;
 use crate::game_scenes::reboot::RebootScene;
 use crate::game_state::erase_game_state;
 use crate::widgets::terminal::RunningCommand;
@@ -73,10 +72,10 @@ impl RunningCommand<SceneSwitch> for ResetCmd {
     }
 
     fn get_metadata(&self) -> SceneSwitch {
-        match self.state {
-            ResetState::Asking => SceneSwitch::NoSwitch,
-            ResetState::Confirmed => SceneSwitch::SwitchTo(Box::new(RebootScene::new())),
-            ResetState::Cancelled => SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new())),
+        if matches!(self.state, ResetState::Confirmed) {
+            SceneSwitch::SwitchTo(Box::new(RebootScene::new()))
+        } else {
+            SceneSwitch::NoSwitch
         }
     }
 }

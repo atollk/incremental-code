@@ -4,7 +4,7 @@ use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
 use crate::game_state::{Resources, Upgrade, Upgrades, with_game_state, with_game_state_mut};
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
-use crate::widgets::hud::hud_layout;
+use crate::widgets::hud::draw_hud;
 use crate::widgets::tree::{Tree, TreeItem, TreeState};
 use itertools::Itertools;
 use ouroboros::self_referencing;
@@ -122,7 +122,8 @@ impl<'a> UpgradesScene<'a> {
             .map(|u| u.max_level())
             .max()
             .unwrap_or(0);
-        let groups = (1..=6).map(|group| {
+        // TODO: only show the unlocked groups
+        let groups = (0..=6).map(|group| {
             TreeItem::new(
                 group as u64,
                 format!("Level {group} upgrades"),
@@ -157,6 +158,7 @@ impl<'a> UpgradesScene<'a> {
         // Find the upgrade instance from the tree identifier
         let identifier_path: &[u64; 2] = identifier_path.try_into().unwrap();
         let upgrade_level = match identifier_path[0] {
+            // TODO
             1 => &mut self.upgrades_working_copy,
             _ => unreachable!(),
         };
@@ -331,7 +333,7 @@ impl<'a> Scene for UpgradesScene<'a> {
                 None => SceneSwitch::NoSwitch,
             };
 
-            let content_area = hud_layout(frame);
+            let content_area = draw_hud(frame);
             self.tree_widget.with_mut(|tree| {
                 frame.render_stateful_widget(&*tree.tree, content_area, tree.tree_state)
             });
@@ -346,7 +348,11 @@ impl<'a> Scene for UpgradesScene<'a> {
         for event in events {
             self.process_input_event(event)?;
         }
-        let content_area = hud_layout(frame);
+        let content_area = if with_game_state(|game_state| game_state.upgrades.unlock_hud.value()) {
+            draw_hud(frame)
+        } else {
+            frame.area()
+        };
         self.tree_widget.with_mut(|tree| {
             frame.render_stateful_widget(&*tree.tree, content_area, tree.tree_state)
         });

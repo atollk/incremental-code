@@ -62,6 +62,10 @@ impl dyn Upgrade + '_ {
 #[fields_as(Upgrade)]
 /// Container for all in-game upgrades, serialized as part of [`GameState`](crate::game_state::GameState).
 pub struct Upgrades {
+    // Level 0
+    pub unlock_code: UnlockCode,
+    pub unlock_hud: UnlockHud,
+    pub unlock_music: UnlockMusic,
     // Level 1
     pub compile_time: CompileTime,
     pub speed_up_per_instruction_constant: SpeedUpPerInstructionConstant,
@@ -102,7 +106,7 @@ pub struct Upgrades {
 
 impl Upgrades {
     /// Returns all upgrades as an array of trait-object references.
-    pub fn upgrades(&self) -> [&dyn Upgrade; 30] {
+    pub fn upgrades(&self) -> [&dyn Upgrade; 33] {
         self.fields_as()
     }
 
@@ -199,6 +203,38 @@ macro_rules! impl_upgrade {
     };
     (@unit $_:expr) => { () };
 }
+
+// Level 0
+
+impl_upgrade!(
+    UnlockCode,
+    type=bool,
+    level=0,
+    [
+        (false, Resources::from_bronze(0.), "locked"),
+        (true, Resources::zero(), "unlocked"),
+    ]
+);
+
+impl_upgrade!(
+    UnlockHud,
+    type=bool,
+    level=0,
+    [
+        (false, Resources::from_bronze(1.), "locked"),
+        (true, Resources::zero(), "unlocked"),
+    ]
+);
+
+impl_upgrade!(
+    UnlockMusic,
+    type=bool,
+    level=0,
+    [
+        (false, Resources::from_bronze(10.), "locked"),
+        (true, Resources::zero(), "unlocked"),
+    ]
+);
 
 // Level 1
 
