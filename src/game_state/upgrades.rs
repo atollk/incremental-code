@@ -7,7 +7,7 @@ pub trait Upgrade: dyn_clone::DynClone {
     /// Human-readable name of this upgrade.
     fn name(&self) -> &'static str;
     /// The unlock tier this upgrade belongs to.
-    fn group(&self) -> u8;
+    fn group(&self) -> usize;
     /// The player's current level for this upgrade (0-based).
     fn get_level(&self) -> u8;
     /// The highest level this upgrade can reach.
@@ -66,6 +66,7 @@ pub struct Upgrades {
     pub unlock_code: UnlockCode,
     pub unlock_hud: UnlockHud,
     pub unlock_music: UnlockMusic,
+    pub unlock_level1: UnlockLevel1,
     // Level 1
     pub compile_time: CompileTime,
     pub speed_up_per_instruction_constant: SpeedUpPerInstructionConstant,
@@ -106,7 +107,7 @@ pub struct Upgrades {
 
 impl Upgrades {
     /// Returns all upgrades as an array of trait-object references.
-    pub fn upgrades(&self) -> [&dyn Upgrade; 33] {
+    pub fn upgrades(&self) -> [&dyn Upgrade; 34] {
         self.fields_as()
     }
 
@@ -172,7 +173,7 @@ macro_rules! impl_upgrade {
                 stringify!($struct)
             }
 
-            fn group(&self) -> u8 {
+            fn group(&self) -> usize {
                 $group_level
             }
 
@@ -231,7 +232,17 @@ impl_upgrade!(
     type=bool,
     level=0,
     [
-        (false, Resources::from_bronze(10.), "locked"),
+        (false, Resources::from_bronze(5.), "locked"),
+        (true, Resources::zero(), "unlocked"),
+    ]
+);
+
+impl_upgrade!(
+    UnlockLevel1,
+    type=bool,
+    level=0,
+    [
+        (false, Resources::from_bronze(3.), "locked"),
         (true, Resources::zero(), "unlocked"),
     ]
 );

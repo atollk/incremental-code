@@ -25,11 +25,11 @@ pub struct UpgradesScene<'a> {
 
 #[self_referencing]
 struct TreeWidget<'a> {
-    tree_items: Vec<TreeItem<'a, u64>>,
+    tree_items: Vec<TreeItem<'a, usize>>,
     #[borrows(tree_items)]
     #[covariant]
-    tree: Tree<'this, u64>,
-    tree_state: TreeState<u64>,
+    tree: Tree<'this, usize>,
+    tree_state: TreeState<usize>,
 }
 
 impl<'a> Default for UpgradesScene<'a> {
@@ -42,7 +42,7 @@ impl<'a> Default for UpgradesScene<'a> {
             )
         });
         let mut tree_widget = Self::create_tree_widget(&upgrades);
-        tree_widget.with_tree_state_mut(|state| state.select(vec![1]));
+        tree_widget.with_tree_state_mut(|state| state.select(vec![0]));
         UpgradesScene {
             tree_widget,
             confirm_dialog: None,
@@ -52,10 +52,10 @@ impl<'a> Default for UpgradesScene<'a> {
     }
 }
 
-fn find_item_in_tree<'a, 'b>(
-    tree_items: &'b [TreeItem<'a, u64>],
-    identifier_path: &[u64],
-) -> Option<&'b TreeItem<'a, u64>> {
+fn find_item_in_tree<'a, 'b, T: Eq + Hash + Clone>(
+    tree_items: &'b [TreeItem<'a, T>],
+    identifier_path: &[T],
+) -> Option<&'b TreeItem<'a, T>> {
     if let [head, tail @ ..] = identifier_path {
         tree_items
             .iter()
@@ -103,14 +103,8 @@ fn render_upgrade(upgrade: &dyn Upgrade, name_width: usize, level_width: usize) 
     ])
 }
 
-fn hash_upgrade(upgrade: &dyn Upgrade) -> u64 {
-    let mut s = DefaultHasher::new();
-    upgrade.name().hash(&mut s);
-    s.finish()
-}
-
 impl<'a> UpgradesScene<'a> {
-    fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'a, u64>> {
+    fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'a, usize>> {
         let upgrade_list = upgrades.upgrades();
         let name_width = upgrade_list
             .iter()
@@ -123,18 +117,25 @@ impl<'a> UpgradesScene<'a> {
             .max()
             .unwrap_or(0);
         // TODO: only show the unlocked groups
-        let groups = (0..=6).map(|group| {
+        let group_unlocks = [
+            true,
+            upgrades.unlock_level1.value(),
+            upgrades.unlock_level2.value(),
+            upgrades.unlock_level3.value(),
+            upgrades.unlock_level4.value(),
+            upgrades.unlock_level5.value(),
+            upgrades.unlock_level6.value(),
+        ];
+        let groups = (0..=6).filter(|i| group_unlocks[*i]).map(|group| {
             TreeItem::new(
-                group as u64,
+                group,
                 format!("Level {group} upgrades"),
                 upgrade_list
                     .iter()
-                    .filter(|&&u| u.group() == group)
-                    .map(|&u| {
-                        TreeItem::new_leaf(
-                            hash_upgrade(u),
-                            render_upgrade(u, name_width, level_width as usize),
-                        )
+                    .enumerate()
+                    .filter(|(_, u)| u.group() == group)
+                    .map(|(i, &u)| {
+                        TreeItem::new_leaf(i, render_upgrade(u, name_width, level_width as usize))
                     })
                     .collect(),
             )
@@ -154,20 +155,22 @@ impl<'a> UpgradesScene<'a> {
         )
     }
 
-    fn level(&mut self, identifier_path: &[u64], level_up: bool) {
+    fn level(&mut self, identifier_path: &[usize], level_up: bool) {
         // Find the upgrade instance from the tree identifier
-        let identifier_path: &[u64; 2] = identifier_path.try_into().unwrap();
-        let upgrade_level = match identifier_path[0] {
-            // TODO
-            1 => &mut self.upgrades_working_copy,
-            _ => unreachable!(),
-        };
-        let (pos, _) = upgrade_level
+        let identifier_path: &[usize; 2] = identifier_path.try_into().unwrap();
+        let pos = self
+            .upgrades_working_copy
             .upgrades()
             .into_iter()
-            .find_position(|&u| hash_upgrade(u) == identifier_path[1])
-            .expect("find the identifier from the hash");
-        let upgrade = upgrade_level.upgrade_at_mut(pos);
+            .enumerate()
+            .filter(|(_, u)| u.group() == identifier_path[0])
+            .nth(identifier_path[1] as usize)
+            .expect(&format!(
+                "identifier_path out of bounds: {:?}",
+                identifier_path
+            ))
+            .0;
+        let upgrade = self.upgrades_working_copy.upgrade_at_mut(pos);
 
         // Perform the leveling
         let refresh_required = if level_up {
@@ -333,7 +336,12 @@ impl<'a> Scene for UpgradesScene<'a> {
                 None => SceneSwitch::NoSwitch,
             };
 
-            let content_area = draw_hud(frame);
+            let content_area =
+                if with_game_state(|game_state| game_state.upgrades.unlock_hud.value()) {
+                    draw_hud(frame)
+                } else {
+                    frame.area()
+                };
             self.tree_widget.with_mut(|tree| {
                 frame.render_stateful_widget(&*tree.tree, content_area, tree.tree_state)
             });

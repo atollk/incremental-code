@@ -15,7 +15,7 @@ impl AudioBackend {
         Ok(Self { sink, player })
     }
 
-    pub fn play(&mut self) -> anyhow::Result<()> {
+    pub fn start_bgm(&mut self) -> anyhow::Result<()> {
         let bytes = include_bytes!("../../assets/purrplecat-tabula-rasa-360276.mp3");
         let source = rodio::Decoder::try_from(Cursor::new(bytes.as_slice()))?;
         self.player.append(source);
