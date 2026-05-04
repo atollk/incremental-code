@@ -1,4 +1,5 @@
 use crate::game_state::Resources;
+use proc_macro::FieldsAs;
 use serde::{Deserialize, Serialize};
 
 /// Common interface for all purchasable upgrades.
@@ -57,7 +58,8 @@ impl dyn Upgrade + '_ {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, FieldsAs)]
+#[fields_as(Upgrade)]
 /// Container for all in-game upgrades, serialized as part of [`GameState`](crate::game_state::GameState).
 pub struct Upgrades {
     // Level 1
@@ -79,7 +81,7 @@ pub struct Upgrades {
     pub auto_compile: AutoCompile,
     pub unlock_print: UnlockPrint,
     pub print_speed_reset: PrintSpeedReset,
-    pub silver_per_print_character_linear: SilverPerPrintCharacterPolynomial,
+    pub silver_per_print_character: SilverPerPrintCharacter,
     pub unlock_level4: UnlockLevel4,
     // Level 4
     pub unlock_sleep: UnlockSleep,
@@ -100,31 +102,13 @@ pub struct Upgrades {
 
 impl Upgrades {
     /// Returns all upgrades as an array of trait-object references.
-    pub fn upgrades(&self) -> [&dyn Upgrade; 6] {
-        [
-            &self.compile_time,
-            &self.speed_up_per_instruction_constant,
-            &self.bronze_per_instruction,
-            &self.code_line_width,
-            &self.code_line_count,
-            &self.literals,
-        ] as [&dyn Upgrade; _]
-    }
-
-    fn upgrades_mut(&mut self) -> [&mut dyn Upgrade; 6] {
-        [
-            &mut self.compile_time,
-            &mut self.speed_up_per_instruction_constant,
-            &mut self.bronze_per_instruction,
-            &mut self.code_line_width,
-            &mut self.code_line_count,
-            &mut self.literals,
-        ] as [&mut dyn Upgrade; _]
+    pub fn upgrades(&self) -> [&dyn Upgrade; 30] {
+        self.fields_as()
     }
 
     /// Returns a mutable reference to the upgrade at the given index.
     pub fn upgrade_at_mut(&mut self, index: usize) -> &mut dyn Upgrade {
-        self.upgrades_mut()[index]
+        self.fields_as_mut()[index]
     }
 }
 
@@ -252,8 +236,9 @@ impl_upgrade!(
     [
         (10, Resources::from_bronze(100.), "10"),
         (15, Resources::from_bronze(100e3), "15"),
-        (20, Resources::from_bronze(10e6), "20"),
-        (30, Resources::zero(), "30"),
+        (30, Resources::from_bronze(10e6), "20"),
+        (50, Resources::from_bronze(1.), "30"),
+        (80, Resources::zero(), "30"),
     ]
 );
 
@@ -262,20 +247,14 @@ impl_upgrade!(
     type=u8,
     level=1,
     [
-        (3, Resources::from_bronze(100.), "3"),
-        (5, Resources::from_bronze(100e3), "5"),
+        (2, Resources::from_bronze(100.), "3"),
+        (4, Resources::from_bronze(100.), "3"),
+        (6, Resources::from_bronze(100e3), "5"),
         (8, Resources::from_bronze(10e6), "8"),
         (10, Resources::zero(), "10"),
-    ]
-);
-
-impl_upgrade!(
-    LoopStatements,
-    type=bool,
-    level=1,
-    [
-        (false, Resources::from_bronze(50e3), "locked"),
-        (true, Resources::zero(), "unlocked"),
+        (20, Resources::zero(), "10"),
+        (30, Resources::zero(), "10"),
+        (40, Resources::zero(), "10"),
     ]
 );
 
@@ -294,11 +273,11 @@ impl_upgrade!(
 
 impl_upgrade!(
     CodeExpressionLiterals,
-    type=bool,
+    type=(),
     level=1,
     [
-        (false, Resources::from_bronze(200.), "locked"),
-        (true, Resources::zero(), "unlocked"),
+        ((), Resources::from_bronze(200.), "locked"),
+        ((), Resources::zero(), "unlocked"),
     ]
 );
 
@@ -414,14 +393,18 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    SilverPerPrintCharacterPolynomial,
-    type=f32,
+    SilverPerPrintCharacter,
+    type=(u32, u8),
     level=3,
     [
-        (1.0, Resources::from_silver(50e3), "1"),
-        (2.0, Resources::from_silver(500e3), "2"),
-        (5.0, Resources::from_gold(1.), "5"),
-        (10.0, Resources::zero(), "10"),
+        ((0, 0), Resources::from_silver(50e3), "1"),
+        ((1, 1), Resources::from_silver(50e3), "n"),
+        ((2, 1), Resources::from_silver(500e3), "2n"),
+        ((5, 1), Resources::from_gold(1.), "5n"),
+        ((1, 2), Resources::zero(), "n^2"),
+        ((1, 3), Resources::zero(), "n^3"),
+        ((1, 5), Resources::zero(), "n^5"),
+        ((1, 10), Resources::zero(), "n^10"),
     ]
 );
 

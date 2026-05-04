@@ -1178,6 +1178,7 @@ dependencies = [
  "logos",
  "ouroboros",
  "parking_lot",
+ "proc_macro",
  "rand 0.10.1",
  "ratatui",
  "ratatui-core",
@@ -2231,6 +2232,15 @@ dependencies = [
  "syn 2.0.117",
  "version_check",
  "yansi",
+]
+
+[[package]]
+name = "proc_macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
 ]
 
 [[package]]

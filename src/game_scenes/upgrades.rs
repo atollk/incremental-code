@@ -122,20 +122,23 @@ impl<'a> UpgradesScene<'a> {
             .map(|u| u.max_level())
             .max()
             .unwrap_or(0);
-        let level1 = TreeItem::new(
-            1,
-            "Level 1 upgrades".to_string(),
-            upgrade_list
-                .into_iter()
-                .map(|u| {
-                    TreeItem::new_leaf(
-                        hash_upgrade(u),
-                        render_upgrade(u, name_width, level_width as usize),
-                    )
-                })
-                .collect(),
-        );
-        vec![level1.unwrap()]
+        let groups = (1..=6).map(|group| {
+            TreeItem::new(
+                group as u64,
+                format!("Level {group} upgrades"),
+                upgrade_list
+                    .iter()
+                    .filter(|&&u| u.group() == group)
+                    .map(|&u| {
+                        TreeItem::new_leaf(
+                            hash_upgrade(u),
+                            render_upgrade(u, name_width, level_width as usize),
+                        )
+                    })
+                    .collect(),
+            )
+        });
+        groups.map(|item| item.unwrap()).collect()
     }
 
     fn create_tree_widget(upgrades: &Upgrades) -> TreeWidget<'a> {
