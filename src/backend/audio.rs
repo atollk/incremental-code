@@ -1,8 +1,5 @@
-use crate::widgets::tree::{Tree, TreeItem, TreeState};
-use ouroboros::self_referencing;
 use rodio::{MixerDeviceSink, Player};
-use std::cell::LazyCell;
-use std::error::Error;
+use std::io::Cursor;
 use std::sync::{LazyLock, Mutex};
 
 pub struct AudioBackend {
@@ -19,12 +16,19 @@ impl AudioBackend {
     }
 
     pub fn play(&mut self) -> anyhow::Result<()> {
-        let file = std::fs::File::open("assets/purrplecat-tabula-rasa-360276.mp3")?;
-        let source = rodio::Decoder::try_from(file)?;
+        let bytes = include_bytes!("../../assets/purrplecat-tabula-rasa-360276.mp3");
+        let source = rodio::Decoder::try_from(Cursor::new(bytes.as_slice()))?;
         self.player.append(source);
         Ok(())
     }
 }
 
-pub static AUDIO_BACKEND: LazyLock<Mutex<AudioBackend>> =
-    LazyLock::new(|| Mutex::new(AudioBackend::new().unwrap()));
+/// `None` if the audio device could not be opened (logs a warning, does not panic).
+pub static AUDIO_BACKEND: LazyLock<Option<Mutex<AudioBackend>>> =
+    LazyLock::new(|| match AudioBackend::new() {
+        Ok(b) => Some(Mutex::new(b)),
+        Err(e) => {
+            log::warn!("Audio backend unavailable: {e}");
+            None
+        }
+    });

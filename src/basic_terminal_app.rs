@@ -1,6 +1,7 @@
 use crate::backend;
 use crate::backend::backend::TerminalApp;
 use crate::backend::events::Event;
+use crate::game_state::AUTO_SAVER;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -41,6 +42,7 @@ impl<A: App> TerminalApp<backend::BackendType> for BasicTerminalApp<A> {
     }
 
     fn frame(&mut self, events: &[Event]) -> anyhow::Result<bool> {
+        AUTO_SAVER.lock().unwrap().tick();
         let terminal = self.terminal.as_mut().unwrap();
         let app = &mut self.app;
         let mut exit = false;

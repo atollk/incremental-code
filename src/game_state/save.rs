@@ -2,27 +2,44 @@ use crate::backend::backend::StorageBackend;
 use crate::backend::with_backend;
 use crate::game_state::{with_game_state, with_game_state_mut};
 use std::sync::{LazyLock, Mutex};
-use std::thread;
-use std::thread::JoinHandle;
-use std::time::Duration;
+use web_time::{Duration, Instant};
 
-pub struct AutoSaver {}
+pub struct AutoSaver {
+    last_save_time: Instant,
+    save_period: Option<Duration>,
+}
 
 impl AutoSaver {
     fn new() -> Self {
-        Self {}
+        Self {
+            last_save_time: Instant::now(),
+            save_period: None,
+        }
     }
 
-    pub fn start(&mut self, period: Duration) -> JoinHandle<anyhow::Result<()>> {
-        thread::spawn(move || -> anyhow::Result<()> {
-            loop {
-                thread::sleep(period);
-                save_game_state()?;
+    fn save(&mut self) {
+        self.last_save_time = Instant::now();
+        if let Err(e) = save_game_state() {
+            log::error!("Auto-save failed: {e}");
+        }
+    }
+
+    pub fn tick(&mut self) {
+        if let Some(save_period) = &self.save_period {
+            if (Instant::now() - self.last_save_time).ge(save_period) {
+                self.save();
             }
-        })
+        }
     }
 
-    // TODO: cancellation
+    pub fn start(&mut self, period: Duration) {
+        self.save_period = Some(period);
+        self.save();
+    }
+
+    pub fn stop(&mut self) {
+        self.save_period = None;
+    }
 }
 
 pub static AUTO_SAVER: LazyLock<Mutex<AutoSaver>> = LazyLock::new(|| Mutex::new(AutoSaver::new()));

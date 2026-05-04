@@ -1,4 +1,6 @@
+use crate::backend::audio::AUDIO_BACKEND;
 use crate::backend::events::Event;
+use crate::backend::input::{KeyEventKind, KeyEventState, MouseEventKind};
 use crate::basic_terminal_app::App;
 use crate::game_state::{AUTO_SAVER, load_game_state};
 use std::ops::{ControlFlow, FromResidual, Residual, Try};
@@ -62,6 +64,7 @@ impl Default for SceneSwitch {
 pub struct SceneGame {
     active_scene: Box<dyn Scene>,
     last_frame: web_time::Instant,
+    audio_started: bool,
 }
 
 impl SceneGame {
@@ -77,6 +80,7 @@ impl SceneGame {
         SceneGame {
             active_scene: scene,
             last_frame: web_time::Instant::now(),
+            audio_started: false,
         }
     }
 }
@@ -87,6 +91,23 @@ impl App for SceneGame {
         events: &[Event],
         frame: &mut ratatui_core::terminal::Frame,
     ) -> anyhow::Result<bool> {
+        if !self.audio_started && !events.is_empty() {
+            for event in events {
+                let is_user_interaction = match event {
+                    Event::KeyEvent(event) => event.kind == KeyEventKind::Press,
+                    Event::MouseEvent(event) => matches!(event.kind, MouseEventKind::Down(_)),
+                };
+                if is_user_interaction {
+                    self.audio_started = true;
+                    if let Some(backend) = AUDIO_BACKEND.as_ref() {
+                        if let Err(e) = backend.lock().unwrap().play() {
+                            log::warn!("Audio playback failed: {e}");
+                        }
+                    }
+                    break;
+                }
+            }
+        }
         let elapsed = web_time::Instant::now() - self.last_frame;
         self.last_frame = web_time::Instant::now();
         let scene_switch = self.active_scene.frame(events, frame, elapsed);

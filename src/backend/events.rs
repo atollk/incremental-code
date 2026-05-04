@@ -1,6 +1,7 @@
 use crate::backend::input::{KeyEvent, MouseEvent};
 
 /// A normalised input event produced by the active backend.
+#[derive(Debug)]
 pub enum Event {
     KeyEvent(KeyEvent),
     MouseEvent(MouseEvent),
