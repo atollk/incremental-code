@@ -60,7 +60,7 @@ impl BlinkingCursor {
         self
     }
 
-    /// Override the glyph drawn. By default the existing cell's symbol is
+    /// Override the glyph drawn. By default, the existing cell's symbol is
     /// preserved and only the style is changed (block-over-character look).
     /// Set this to e.g. "_" or "▏" for underscore / bar cursors.
     pub fn symbol(mut self, symbol: &'static str) -> Self {

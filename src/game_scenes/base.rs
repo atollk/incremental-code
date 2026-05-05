@@ -67,13 +67,6 @@ pub struct SceneGame {
 impl SceneGame {
     /// Creates a `SceneGame` starting with the given initial scene.
     pub fn new(scene: Box<dyn Scene>) -> Self {
-        if let Err(e) = load_game_state() {
-            log::error!("{e}");
-        }
-        AUTO_SAVER
-            .lock()
-            .unwrap()
-            .start(std::time::Duration::from_secs(60));
         SceneGame {
             active_scene: scene,
             last_frame: web_time::Instant::now(),

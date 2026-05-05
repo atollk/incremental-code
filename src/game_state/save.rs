@@ -32,6 +32,10 @@ impl AutoSaver {
         }
     }
 
+    pub fn get_last_save_time(&self) -> Instant {
+        self.last_save_time
+    }
+
     pub fn start(&mut self, period: Duration) {
         self.save_period = Some(period);
         self.save();
@@ -52,13 +56,15 @@ pub fn save_game_state() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn load_game_state() -> anyhow::Result<()> {
+pub fn load_game_state() -> anyhow::Result<bool> {
     let storage_backend: impl StorageBackend = with_backend(|backend| backend.storage_backend());
     let loaded_state = storage_backend.load(KEY)?;
     if let Some(state) = loaded_state {
         with_game_state_mut(|game_state| *game_state = state);
+        Ok(true)
+    } else {
+        Ok(false)
     }
-    Ok(())
 }
 
 pub fn erase_game_state() -> anyhow::Result<()> {

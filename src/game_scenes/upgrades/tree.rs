@@ -96,8 +96,8 @@ fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'static, usize>> {
             format!("Level {group} upgrades"),
             upgrade_list
                 .iter()
+                .filter(|u| u.group() == group)
                 .enumerate()
-                .filter(|(_, u)| u.group() == group)
                 .map(|(i, &u)| {
                     TreeItem::new_leaf(i, render_upgrade(u, name_width, level_width as usize))
                 })

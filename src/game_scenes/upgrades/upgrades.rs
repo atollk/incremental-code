@@ -48,7 +48,7 @@ impl<'a> UpgradesScene<'a> {
             .into_iter()
             .enumerate()
             .filter(|(_, u)| u.group() == identifier_path[0])
-            .nth(identifier_path[1] as usize)
+            .nth(identifier_path[1])
             .unwrap_or_else(|| panic!("identifier_path out of bounds: {:?}", identifier_path))
             .0;
         let upgrade = self.upgrades_working_copy.upgrade_at_mut(pos);

@@ -57,7 +57,7 @@ pub enum DefaultAction {
     /// Toggles line comments at the start of the selected lines.
     ///
     /// If all lines in the selection already start with the language's comment string,
-    /// removes it. Otherwise prepends it. Applies to the line under the cursor if no
+    /// removes it. Otherwise, prepends it. Applies to the line under the cursor if no
     /// selection exists.
     ToggleComment,
 

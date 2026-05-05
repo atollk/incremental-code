@@ -2,7 +2,8 @@ use crate::backend::audio::with_audio_backend;
 use crate::backend::events::Event;
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
-use crate::game_state::with_game_state;
+use crate::game_scenes::reboot::RebootScene;
+use crate::game_state::{AUTO_SAVER, load_game_state, with_game_state};
 use ratatui_core::terminal::Frame;
 use web_time::Duration;
 
@@ -14,6 +15,13 @@ impl AppStartScene {
     }
 
     fn finish(&self) -> SceneSwitch {
+        let loaded_state = match load_game_state() {
+            Ok(b) => b,
+            Err(e) => {
+                log::error!("{e}");
+                false
+            }
+        };
         if with_game_state(|game_state| game_state.upgrades.unlock_music.value()) {
             with_audio_backend(|audio| {
                 audio
@@ -21,7 +29,13 @@ impl AppStartScene {
                     .map_err(|e| log::warn!("Error starting bgm: {}", e))
             });
         }
-        SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
+        AUTO_SAVER.lock().unwrap().start(Duration::from_secs(60));
+        let scene: Box<dyn Scene> = if loaded_state {
+            Box::new(HomeTerminalScene::new())
+        } else {
+            Box::new(RebootScene::new())
+        };
+        SceneSwitch::SwitchTo(scene)
     }
 
     #[cfg(not(feature = "ratzilla"))]
