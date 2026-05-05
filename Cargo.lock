@@ -1298,6 +1298,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "helper_macros"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "hermit-abi"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1338,6 +1346,7 @@ dependencies = [
  "glow",
  "glutin",
  "glutin-winit",
+ "helper_macros",
  "itertools",
  "js-sys",
  "language",
@@ -1345,7 +1354,6 @@ dependencies = [
  "logos",
  "ouroboros",
  "parking_lot",
- "proc_macro",
  "rand 0.10.1",
  "ratatui",
  "ratatui-core",
@@ -2516,15 +2524,6 @@ dependencies = [
  "syn 2.0.117",
  "version_check",
  "yansi",
-]
-
-[[package]]
-name = "proc_macro"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.117",
 ]
 
 [[package]]

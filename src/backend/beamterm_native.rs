@@ -20,7 +20,7 @@ use raw_window_handle::HasWindowHandle;
 use std::cell::RefCell;
 use std::num::NonZeroU32;
 use std::rc::Rc;
-use std::sync::{LazyLock, Mutex, RwLock};
+use std::sync::{LazyLock, RwLock};
 use winit::event::KeyEvent;
 use winit::{
     application::ApplicationHandler,

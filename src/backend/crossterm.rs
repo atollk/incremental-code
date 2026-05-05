@@ -1,4 +1,4 @@
-use crate::backend::backend::{BackendSuite, StorageBackend, TerminalApp};
+use crate::backend::backend::{BackendSuite, TerminalApp};
 use crate::backend::events::{Event, IntoEvent};
 use crate::backend::store_native::StoreNative;
 use crossterm::execute;
@@ -8,7 +8,7 @@ use ratatui::backend::CrosstermBackend;
 use std::cell::RefCell;
 use std::io::{Stdout, stdout};
 use std::rc::Rc;
-use std::sync::{LazyLock, Mutex, RwLock};
+use std::sync::{LazyLock, RwLock};
 use std::time::Duration;
 
 pub type BackendType = CrosstermBackend<Stdout>;

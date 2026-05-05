@@ -1,8 +1,6 @@
-use crate::backend::backend;
-use crate::backend::backend::{BackendSuite, StorageBackend, TerminalApp};
+use crate::backend::backend::{BackendSuite, TerminalApp};
 use crate::backend::events::{Event, IntoEvent};
 use crate::backend::store_web::StoreWeb;
-use log::LevelFilter;
 use ratzilla::event::{
     KeyCode as RzKeyCode, MouseButton as RzMouseButton, MouseEventKind as RzMouseEventKind,
 };
@@ -10,9 +8,8 @@ use ratzilla::web_sys::wasm_bindgen::JsCast;
 use ratzilla::web_sys::wasm_bindgen::closure::Closure;
 use ratzilla::{WebEventHandler, WebGl2Backend};
 use std::cell::RefCell;
-use std::ops::Deref;
 use std::rc::Rc;
-use std::sync::{LazyLock, Mutex, RwLock};
+use std::sync::{LazyLock, RwLock};
 
 pub type BackendType = WebGl2Backend;
 pub type StorageType = StoreWeb;

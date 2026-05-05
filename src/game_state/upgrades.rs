@@ -1,5 +1,5 @@
 use crate::game_state::Resources;
-use proc_macro::FieldsAs;
+use helper_macros::FieldsAs;
 use serde::{Deserialize, Serialize};
 
 /// Common interface for all purchasable upgrades.

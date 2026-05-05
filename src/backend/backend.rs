@@ -1,4 +1,3 @@
-use crate::backend::BackendType;
 use crate::backend::events::Event;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;

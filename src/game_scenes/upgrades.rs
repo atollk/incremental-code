@@ -12,7 +12,7 @@ use ratatui_core::layout::Position;
 use ratatui_core::style::{Color, Modifier, Style};
 use ratatui_core::terminal::Frame;
 use ratatui_core::text::{Line, Span};
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::{Hash, Hasher};
 use std::time::Duration;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
