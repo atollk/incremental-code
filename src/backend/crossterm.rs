@@ -23,7 +23,7 @@ pub struct CrosstermBackendSuite {}
 impl BackendSuite<BackendType, StorageType> for CrosstermBackendSuite {
     fn run(
         &self,
-        mut app: Rc<RefCell<dyn TerminalApp<crate::backend::BackendType>>>,
+        app: Rc<RefCell<dyn TerminalApp<crate::backend::BackendType>>>,
     ) -> anyhow::Result<()> {
         let backend = BackendType::new(stdout());
         enable_raw_mode()?;

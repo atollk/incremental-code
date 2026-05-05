@@ -1,6 +1,4 @@
-use crate::backend::audio::AUDIO_BACKEND;
 use crate::backend::events::Event;
-use crate::backend::input::{KeyEventKind, KeyEventState, MouseEventKind};
 use crate::basic_terminal_app::App;
 use crate::game_state::{AUTO_SAVER, load_game_state};
 use std::ops::{ControlFlow, FromResidual, Residual, Try};

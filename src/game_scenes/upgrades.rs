@@ -6,13 +6,12 @@ use crate::game_state::{Resources, Upgrade, Upgrades, with_game_state, with_game
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
 use crate::widgets::hud::draw_hud;
 use crate::widgets::tree::{Tree, TreeItem, TreeState};
-use itertools::Itertools;
 use ouroboros::self_referencing;
 use ratatui_core::layout::Position;
 use ratatui_core::style::{Color, Modifier, Style};
 use ratatui_core::terminal::Frame;
 use ratatui_core::text::{Line, Span};
-use std::hash::{Hash, Hasher};
+use std::hash::Hash;
 use std::time::Duration;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
@@ -165,10 +164,7 @@ impl<'a> UpgradesScene<'a> {
             .enumerate()
             .filter(|(_, u)| u.group() == identifier_path[0])
             .nth(identifier_path[1] as usize)
-            .expect(&format!(
-                "identifier_path out of bounds: {:?}",
-                identifier_path
-            ))
+            .unwrap_or_else(|| panic!("identifier_path out of bounds: {:?}", identifier_path))
             .0;
         let upgrade = self.upgrades_working_copy.upgrade_at_mut(pos);
 
