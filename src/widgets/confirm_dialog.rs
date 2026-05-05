@@ -1,8 +1,13 @@
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
+use crate::game_scenes::base::SceneSwitch;
+use crate::game_scenes::home_terminal::HomeTerminalScene;
+use crate::game_state::{with_game_state, with_game_state_mut};
+use crate::widgets::hud::draw_hud;
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::{Constraint, Layout, Rect};
+use ratatui_core::terminal::Frame;
 use ratatui_core::widgets::Widget;
 
 #[derive(Copy, Clone)]
@@ -57,6 +62,34 @@ impl ConfirmDialog {
     /// Returns the player's choice, or `None` if the dialog is still waiting for input.
     pub fn result(&self) -> Option<ConfirmResult> {
         self.result
+    }
+
+    pub fn render_overlay(
+        dialog: &mut Option<ConfirmDialog>,
+        frame: &mut Frame,
+        events: &[Event],
+        update_underlay: impl FnOnce() -> SceneSwitch,
+        render_content: impl FnOnce(&mut Frame),
+        on_result: impl FnOnce(ConfirmResult) -> SceneSwitch,
+    ) -> SceneSwitch {
+        if let Some(dialog) = dialog {
+            for event in events {
+                dialog.handle_event(event);
+            }
+            let dialog_scene_switch = match dialog.result() {
+                Some(result) => on_result(result.clone()),
+                None => SceneSwitch::NoSwitch,
+            };
+
+            render_content(frame);
+
+            frame.render_widget(&*dialog, frame.area());
+            dialog_scene_switch
+        } else {
+            let scene_switch = update_underlay();
+            render_content(frame);
+            scene_switch
+        }
     }
 }
 

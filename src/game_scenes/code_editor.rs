@@ -7,7 +7,7 @@ use crate::widgets::code_editor::input::{EditorCommand, apply_key_event, apply_m
 use crate::widgets::code_editor::not_python_logos::{
     not_python_default_theme, not_python_language,
 };
-use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
+use crate::widgets::confirm_dialog::{ConfirmDialog, ConfirmResult};
 use ratatui_core::terminal::Frame;
 use web_time::Duration;
 
