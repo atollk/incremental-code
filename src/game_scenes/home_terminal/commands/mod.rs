@@ -15,12 +15,14 @@ mod run_command;
 mod save_command;
 mod unknown_command;
 mod upgrades_command;
+mod volume_command;
 
 use crate::game_scenes::home_terminal::commands::docs_command::docs_cmd;
 use crate::game_scenes::home_terminal::commands::reset_command::reset_cmd;
 use crate::game_scenes::home_terminal::commands::run_command::run_cmd;
 use crate::game_scenes::home_terminal::commands::save_command::save_cmd;
 use crate::game_scenes::home_terminal::commands::upgrades_command::upgrades_cmd;
+use crate::game_scenes::home_terminal::commands::volume_command::volume_cmd;
 use crate::game_state::with_game_state;
 pub use unknown_command::unknown_cmd;
 
@@ -83,7 +85,11 @@ pub fn command_list() -> Vec<Command> {
         runner: upgrades_cmd,
     });
     if unlock_music {
-        todo!()
+        commands.push(Command {
+            name: "volume",
+            help_description: "Control the music volume",
+            runner: volume_cmd,
+        })
     }
     commands.push(Command {
         name: "reset",

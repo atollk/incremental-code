@@ -1,9 +1,10 @@
 use rodio::{MixerDeviceSink, Player};
 use std::io::Cursor;
+use std::ops::{Deref, DerefMut};
 use std::sync::{LazyLock, Mutex};
 
 pub struct AudioBackend {
-    sink: MixerDeviceSink,
+    _sink: MixerDeviceSink,
     player: Player,
 }
 
@@ -12,7 +13,10 @@ impl AudioBackend {
         let sink = rodio::DeviceSinkBuilder::open_default_sink()?;
         let player = Player::connect_new(sink.mixer());
         player.set_volume(0.7);
-        Ok(Self { sink, player })
+        Ok(Self {
+            _sink: sink,
+            player,
+        })
     }
 
     pub fn start_bgm(&mut self) -> anyhow::Result<()> {
@@ -21,10 +25,23 @@ impl AudioBackend {
         self.player.append(source);
         Ok(())
     }
+
+    pub fn get_volume(&self) -> f32 {
+        self.player.volume()
+    }
+
+    pub fn set_volume(&mut self, volume: f32) {
+        self.player.set_volume(volume);
+    }
+}
+
+pub fn with_audio_backend<T>(f: impl FnOnce(&mut AudioBackend) -> T) -> Option<T> {
+    let lock = AUDIO_BACKEND.as_ref()?.lock();
+    Some(f(&mut *lock.ok()?))
 }
 
 /// `None` if the audio device could not be opened (logs a warning, does not panic).
-pub static AUDIO_BACKEND: LazyLock<Option<Mutex<AudioBackend>>> =
+static AUDIO_BACKEND: LazyLock<Option<Mutex<AudioBackend>>> =
     LazyLock::new(|| match AudioBackend::new() {
         Ok(b) => Some(Mutex::new(b)),
         Err(e) => {

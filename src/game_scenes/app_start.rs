@@ -1,4 +1,4 @@
-use crate::backend::audio::AUDIO_BACKEND;
+use crate::backend::audio::with_audio_backend;
 use crate::backend::events::Event;
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
@@ -15,13 +15,11 @@ impl AppStartScene {
 
     fn finish(&self) -> SceneSwitch {
         if with_game_state(|game_state| game_state.upgrades.unlock_music.value()) {
-            AUDIO_BACKEND
-                .as_ref()
-                .unwrap()
-                .lock()
-                .unwrap()
-                .start_bgm()
-                .unwrap();
+            with_audio_backend(|audio| {
+                audio
+                    .start_bgm()
+                    .map_err(|e| log::warn!("Error starting bgm: {}", e))
+            });
         }
         SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
     }

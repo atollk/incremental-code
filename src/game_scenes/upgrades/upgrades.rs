@@ -1,34 +1,21 @@
+use crate::backend::audio::with_audio_backend;
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind, MouseEventKind};
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
+use crate::game_scenes::upgrades::tree::{TreeWidget, create_tree_widget, find_item_in_tree};
 use crate::game_state::{Resources, Upgrade, Upgrades, with_game_state, with_game_state_mut};
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
 use crate::widgets::hud::draw_hud;
-use crate::widgets::tree::{Tree, TreeItem, TreeState};
-use ouroboros::self_referencing;
 use ratatui_core::layout::Position;
-use ratatui_core::style::{Color, Modifier, Style};
 use ratatui_core::terminal::Frame;
-use ratatui_core::text::{Line, Span};
-use std::hash::Hash;
 use std::time::Duration;
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub struct UpgradesScene<'a> {
     tree_widget: TreeWidget<'a>,
     confirm_dialog: Option<ConfirmDialog>,
     upgrades_working_copy: Upgrades,
     resources_backup: (Resources, Resources),
-}
-
-#[self_referencing]
-struct TreeWidget<'a> {
-    tree_items: Vec<TreeItem<'a, usize>>,
-    #[borrows(tree_items)]
-    #[covariant]
-    tree: Tree<'this, usize>,
-    tree_state: TreeState<usize>,
 }
 
 impl<'a> Default for UpgradesScene<'a> {
@@ -40,7 +27,7 @@ impl<'a> Default for UpgradesScene<'a> {
                 game_state.carryover_resources.clone(),
             )
         });
-        let mut tree_widget = Self::create_tree_widget(&upgrades);
+        let mut tree_widget = create_tree_widget(&upgrades);
         tree_widget.with_tree_state_mut(|state| state.select(vec![0]));
         UpgradesScene {
             tree_widget,
@@ -51,109 +38,7 @@ impl<'a> Default for UpgradesScene<'a> {
     }
 }
 
-fn find_item_in_tree<'a, 'b, T: Eq + Hash + Clone>(
-    tree_items: &'b [TreeItem<'a, T>],
-    identifier_path: &[T],
-) -> Option<&'b TreeItem<'a, T>> {
-    if let [head, tail @ ..] = identifier_path {
-        tree_items
-            .iter()
-            .find(|child| child.identifier() == head)
-            .and_then(|child| child.find_child(tail))
-    } else {
-        None
-    }
-}
-
-fn render_upgrade(upgrade: &dyn Upgrade, name_width: usize, level_width: usize) -> Line<'static> {
-    const EMPTY_BOX: char = '🔲';
-    const FULL_BOX: char = '⬛';
-    let level_str = upgrade.format_level_str(EMPTY_BOX, FULL_BOX);
-    let cost_str = upgrade.format_cost_str();
-    let current_value_str = upgrade.value_text();
-    let next_value_str = upgrade
-        .next_level()
-        .map(|u| u.value_text().to_string())
-        .unwrap_or_default();
-    Line::from_iter(vec![
-        Span::raw(format!("{:<name_width$}", upgrade.name())),
-        Span::raw("     "),
-        Span::raw(format!(
-            "{}{}",
-            level_str,
-            " ".repeat((level_width * FULL_BOX.width().unwrap()).saturating_sub(level_str.width()))
-        )),
-        Span::raw("     "),
-        Span::raw(format!("{} -> {}", current_value_str, next_value_str)),
-        Span::raw("     "),
-        Span::styled(cost_str, {
-            let cost = upgrade.next_level_cost();
-            match cost {
-                None => Style::default().fg(Color::Gray),
-                Some(cost) => {
-                    if cost <= with_game_state(|game_state| game_state.total_resources()) {
-                        Style::default().fg(Color::White)
-                    } else {
-                        Style::default().fg(Color::LightRed)
-                    }
-                }
-            }
-        }),
-    ])
-}
-
 impl<'a> UpgradesScene<'a> {
-    fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'a, usize>> {
-        let upgrade_list = upgrades.upgrades();
-        let name_width = upgrade_list
-            .iter()
-            .map(|u| u.name().len())
-            .max()
-            .unwrap_or(0);
-        let level_width = upgrade_list
-            .iter()
-            .map(|u| u.max_level())
-            .max()
-            .unwrap_or(0);
-        // TODO: only show the unlocked groups
-        let group_unlocks = [
-            true,
-            upgrades.unlock_level1.value(),
-            upgrades.unlock_level2.value(),
-            upgrades.unlock_level3.value(),
-            upgrades.unlock_level4.value(),
-            upgrades.unlock_level5.value(),
-            upgrades.unlock_level6.value(),
-        ];
-        let groups = (0..=6).filter(|i| group_unlocks[*i]).map(|group| {
-            TreeItem::new(
-                group,
-                format!("Level {group} upgrades"),
-                upgrade_list
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, u)| u.group() == group)
-                    .map(|(i, &u)| {
-                        TreeItem::new_leaf(i, render_upgrade(u, name_width, level_width as usize))
-                    })
-                    .collect(),
-            )
-        });
-        groups.map(|item| item.unwrap()).collect()
-    }
-
-    fn create_tree_widget(upgrades: &Upgrades) -> TreeWidget<'a> {
-        TreeWidget::new(
-            Self::build_tree_items(&upgrades),
-            |tree_items| {
-                Tree::new(tree_items)
-                    .unwrap()
-                    .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
-            },
-            TreeState::default(),
-        )
-    }
-
     fn level(&mut self, identifier_path: &[usize], level_up: bool) {
         // Find the upgrade instance from the tree identifier
         let identifier_path: &[usize; 2] = identifier_path.try_into().unwrap();
@@ -205,7 +90,7 @@ impl<'a> UpgradesScene<'a> {
             let old_tree_state = self
                 .tree_widget
                 .with_tree_state(|tree_state| tree_state.clone());
-            self.tree_widget = Self::create_tree_widget(&self.upgrades_working_copy);
+            self.tree_widget = create_tree_widget(&self.upgrades_working_copy);
             self.tree_widget
                 .with_tree_state_mut(|new_tree_state| *new_tree_state = old_tree_state);
         }
@@ -219,39 +104,29 @@ impl<'a> UpgradesScene<'a> {
                     self.tree_widget
                         .with_tree_state_mut(|ts| ts.toggle_selected());
                 }
-                KeyCode::Left => {
+                KeyCode::Left | KeyCode::Right => {
                     let selected = self
                         .tree_widget
                         .with_tree_state(|ts| ts.selected().to_vec());
                     if !selected.is_empty() {
-                        let children_empty = self.tree_widget.with(|tw| {
-                            find_item_in_tree(tw.tree_items, &selected)
+                        let children_empty = self.tree_widget.with_tree_items(|tree_items| {
+                            find_item_in_tree(tree_items, &selected)
                                 .expect("when a tree item is selected, you should be able to find it via its identifier")
                                 .children()
                                 .is_empty()
                         });
-                        if children_empty {
-                            self.level(&selected, false);
+                        if key.code == KeyCode::Left {
+                            if children_empty {
+                                self.level(&selected, false);
+                            } else {
+                                self.tree_widget.with_tree_state_mut(|ts| ts.key_left());
+                            }
                         } else {
-                            self.tree_widget.with_tree_state_mut(|ts| ts.key_left());
-                        }
-                    }
-                }
-                KeyCode::Right => {
-                    let selected = self
-                        .tree_widget
-                        .with_tree_state(|ts| ts.selected().to_vec());
-                    if !selected.is_empty() {
-                        let children_empty = self.tree_widget.with(|tw| {
-                            find_item_in_tree(tw.tree_items, &selected)
-                                .expect("when a tree item is selected, you should be able to find it via its identifier")
-                                .children()
-                                .is_empty()
-                        });
-                        if children_empty {
-                            self.level(&selected, true);
-                        } else {
-                            self.tree_widget.with_tree_state_mut(|ts| ts.key_right());
+                            if children_empty {
+                                self.level(&selected, true);
+                            } else {
+                                self.tree_widget.with_tree_state_mut(|ts| ts.key_right());
+                            }
                         }
                     }
                 }
@@ -316,6 +191,7 @@ impl<'a> Scene for UpgradesScene<'a> {
                     with_game_state_mut(|game_state| {
                         game_state.upgrades = self.upgrades_working_copy.clone()
                     });
+                    on_upgrades_commit();
                     SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
                 }
                 Some(ConfirmResult::No) => {
@@ -338,9 +214,7 @@ impl<'a> Scene for UpgradesScene<'a> {
                 } else {
                     frame.area()
                 };
-            self.tree_widget.with_mut(|tree| {
-                frame.render_stateful_widget(&*tree.tree, content_area, tree.tree_state)
-            });
+            frame.render_widget(&mut self.tree_widget, content_area);
 
             if let Some(dialog) = &self.confirm_dialog {
                 frame.render_widget(dialog, frame.area());
@@ -357,9 +231,18 @@ impl<'a> Scene for UpgradesScene<'a> {
         } else {
             frame.area()
         };
-        self.tree_widget.with_mut(|tree| {
-            frame.render_stateful_widget(&*tree.tree, content_area, tree.tree_state)
-        });
+        frame.render_widget(&mut self.tree_widget, content_area);
         SceneSwitch::NoSwitch
+    }
+}
+
+fn on_upgrades_commit() {
+    let unlock_music = with_game_state(|game_state| game_state.upgrades.unlock_music.value());
+    if unlock_music {
+        with_audio_backend(|audio| {
+            audio
+                .start_bgm()
+                .map_err(|e| log::warn!("Error starting bgm: {}", e))
+        });
     }
 }
