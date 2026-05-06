@@ -2,9 +2,6 @@ use std::time::Duration;
 
 use ratatui::{buffer::Buffer, layout::Rect, style::Color, widgets::StatefulWidget};
 
-const DEFAULT_PHASE1_MS: f32 = 200.0;
-const DEFAULT_PHASE2_MS: f32 = 200.0;
-
 fn ease_out(t: f32) -> f32 {
     1.0 - (1.0 - t).powi(2)
 }
@@ -89,33 +86,31 @@ impl CctvAnimationState {
         self.elapsed = self.elapsed.saturating_add(delta);
     }
 
-    fn elapsed_ms(&self) -> f32 {
-        self.elapsed.as_secs_f32() * 1000.0
+    fn elapsed(&self) -> Duration {
+        self.elapsed
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct CctvAnimation {
-    pub phase1_ms: f32,
-    pub phase2_ms: f32,
+    pub phase1_duration: Duration,
+    pub phase2_duration: Duration,
 }
 
 impl CctvAnimation {
     pub fn is_done(&self, state: &CctvAnimationState) -> bool {
-        state.elapsed_ms() >= self.phase1_ms + self.phase2_ms
+        state.elapsed() >= self.phase1_duration + self.phase2_duration
     }
-}
 
-impl Default for CctvAnimation {
-    fn default() -> Self {
+    pub(crate) fn new(phase1_duration: Duration, phase2_duration: Duration) -> Self {
         Self {
-            phase1_ms: DEFAULT_PHASE1_MS,
-            phase2_ms: DEFAULT_PHASE2_MS,
+            phase1_duration,
+            phase2_duration,
         }
     }
 }
 
-impl StatefulWidget for CctvAnimation {
+impl StatefulWidget for &CctvAnimation {
     type State = CctvAnimationState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
@@ -123,35 +118,39 @@ impl StatefulWidget for CctvAnimation {
             return;
         }
 
-        let elapsed_ms = state.elapsed_ms();
+        let elapsed = state.elapsed();
         let w = area.width;
         let h = area.height;
 
         match state.direction {
             Direction::Off => {
-                if elapsed_ms < self.phase1_ms {
+                if elapsed < self.phase1_duration {
                     // Vertical collapse toward a horizontal line
-                    let p1 = elapsed_ms / self.phase1_ms;
+                    let p1 = elapsed.div_duration_f32(self.phase1_duration);
                     let active_rows = ((h as f32 * ease_out(1.0 - p1)).round() as u16)
                         .max(1)
                         .min(h);
                     render_vertical_band(buf, area, active_rows);
                 } else {
                     // Horizontal collapse toward a point
-                    let p2 = ((elapsed_ms - self.phase1_ms) / self.phase2_ms).min(1.0);
+                    let p2 = (elapsed - self.phase1_duration)
+                        .div_duration_f32(self.phase2_duration)
+                        .min(1.0);
                     let active_cols = ((w as f32 * (1.0 - p2)).round() as u16).min(w);
                     render_horizontal_line(buf, area, active_cols);
                 }
             }
             Direction::On => {
-                if elapsed_ms < self.phase2_ms {
+                if elapsed < self.phase2_duration {
                     // Horizontal expand from a point
-                    let p2 = elapsed_ms / self.phase2_ms;
+                    let p2 = elapsed.div_duration_f32(self.phase2_duration);
                     let active_cols = ((w as f32 * p2).round() as u16).min(w);
                     render_horizontal_line(buf, area, active_cols);
                 } else {
                     // Vertical expand from a horizontal line
-                    let p1 = ((elapsed_ms - self.phase2_ms) / self.phase1_ms).min(1.0);
+                    let p1 = (elapsed - self.phase2_duration)
+                        .div_duration_f32(self.phase1_duration)
+                        .min(1.0);
                     let active_rows = ((h as f32 * ease_out(p1)).round() as u16).max(1).min(h);
                     render_vertical_band(buf, area, active_rows);
                 }

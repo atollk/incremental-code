@@ -38,7 +38,6 @@ impl AutoSaver {
 
     pub fn start(&mut self, period: Duration) {
         self.save_period = Some(period);
-        self.save();
     }
 
     pub fn stop(&mut self) {

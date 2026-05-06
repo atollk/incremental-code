@@ -108,7 +108,7 @@ fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'static, usize>> {
 }
 
 pub(super) fn create_tree_widget(upgrades: &Upgrades) -> TreeWidget<'static> {
-    let mut widget = TreeWidget::new(
+    TreeWidget::new(
         build_tree_items(&upgrades),
         |tree_items| {
             Tree::new(tree_items)
@@ -116,8 +116,7 @@ pub(super) fn create_tree_widget(upgrades: &Upgrades) -> TreeWidget<'static> {
                 .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
         },
         TreeState::default(),
-    );
-    widget
+    )
 }
 
 impl Widget for &mut TreeWidget<'_> {

@@ -10,6 +10,7 @@ mod compile_command;
 mod docs_command;
 mod exit_command;
 mod help_command;
+mod reboot_command;
 mod reset_command;
 mod run_command;
 mod save_command;
@@ -18,6 +19,7 @@ mod upgrades_command;
 mod volume_command;
 
 use crate::game_scenes::home_terminal::commands::docs_command::docs_cmd;
+use crate::game_scenes::home_terminal::commands::reboot_command::reboot_cmd;
 use crate::game_scenes::home_terminal::commands::reset_command::reset_cmd;
 use crate::game_scenes::home_terminal::commands::run_command::run_cmd;
 use crate::game_scenes::home_terminal::commands::save_command::save_cmd;
@@ -55,7 +57,11 @@ pub fn command_list() -> Vec<Command> {
         runner: save_cmd,
     });
     if unlock_reboot {
-        todo!()
+        commands.push(Command {
+            name: "reboot",
+            help_description: "Reset all upgrades but gain additional currency",
+            runner: reboot_cmd,
+        });
     }
     if unlock_code {
         commands.push(Command {

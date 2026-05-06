@@ -5,7 +5,6 @@ use ratatui_core::layout::{Constraint, Layout, Rect};
 use ratatui_core::terminal::Frame;
 use ratatui_core::text::Text;
 use ratatui_core::widgets::Widget;
-use std::fmt::format;
 use std::time::Instant;
 
 /// Fixed width (in terminal columns) reserved for the HUD panel.

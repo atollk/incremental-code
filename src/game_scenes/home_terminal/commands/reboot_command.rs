@@ -2,36 +2,35 @@ use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::reboot::RebootScene;
-use crate::game_state::erase_game_state;
 use crate::widgets::terminal::RunningCommand;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::style::Style;
 use std::time::Duration;
 
-enum ResetState {
+enum RebootState {
     Asking,
     Confirmed,
     Cancelled,
 }
 
-struct ResetCmd {
-    state: ResetState,
+struct RebootCmd {
+    state: RebootState,
 }
 
-pub(super) fn reset_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    Box::new(ResetCmd {
-        state: ResetState::Asking,
+pub(super) fn reboot_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
+    Box::new(RebootCmd {
+        state: RebootState::Asking,
     })
 }
 
-impl RunningCommand<SceneSwitch> for ResetCmd {
+impl RunningCommand<SceneSwitch> for RebootCmd {
     fn is_done(&self) -> bool {
-        matches!(self.state, ResetState::Cancelled)
+        matches!(self.state, RebootState::Cancelled)
     }
 
     fn update(&mut self, events: &[Event], _time_delta: Duration) {
-        if !matches!(self.state, ResetState::Asking) {
+        if !matches!(self.state, RebootState::Asking) {
             return;
         }
         for event in events {
@@ -43,14 +42,12 @@ impl RunningCommand<SceneSwitch> for ResetCmd {
             }
             match key.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
-                    if let Err(e) = erase_game_state() {
-                        log::error!("reset: {e}");
-                    }
-                    self.state = ResetState::Confirmed;
+                    // TODO: carry over currency
+                    self.state = RebootState::Confirmed;
                     return;
                 }
                 KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc | KeyCode::Enter => {
-                    self.state = ResetState::Cancelled;
+                    self.state = RebootState::Cancelled;
                     return;
                 }
                 _ => {}
@@ -60,9 +57,11 @@ impl RunningCommand<SceneSwitch> for ResetCmd {
 
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let text = match self.state {
-            ResetState::Asking => "Reset all progress? [y/N]",
-            ResetState::Confirmed => "Rebooting...",
-            ResetState::Cancelled => "Reset cancelled.",
+            RebootState::Asking => {
+                "Reboot? This will reset all upgrades but give additional resources. [y/N]"
+            }
+            RebootState::Confirmed => "Rebooting...",
+            RebootState::Cancelled => "Reboot cancelled.",
         };
         buf.set_string(area.x, area.y, text, Style::default());
     }
@@ -72,7 +71,7 @@ impl RunningCommand<SceneSwitch> for ResetCmd {
     }
 
     fn get_metadata(&self) -> SceneSwitch {
-        if matches!(self.state, ResetState::Confirmed) {
+        if matches!(self.state, RebootState::Confirmed) {
             SceneSwitch::SwitchTo(Box::new(RebootScene::new(false, 40)))
         } else {
             SceneSwitch::NoSwitch

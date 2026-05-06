@@ -4,7 +4,7 @@ use crate::backend::input::{KeyCode, KeyEventKind, MouseEventKind};
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
 use crate::game_scenes::upgrades::tree::{TreeWidget, create_tree_widget, find_item_in_tree};
-use crate::game_state::{Resources, Upgrade, Upgrades, with_game_state, with_game_state_mut};
+use crate::game_state::{Resources, Upgrades, with_game_state, with_game_state_mut};
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
 use crate::widgets::hud::draw_hud;
 use ratatui_core::layout::Position;

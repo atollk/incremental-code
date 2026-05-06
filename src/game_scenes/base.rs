@@ -1,6 +1,5 @@
 use crate::backend::events::Event;
 use crate::basic_terminal_app::App;
-use crate::game_state::{AUTO_SAVER, load_game_state};
 use std::ops::{ControlFlow, FromResidual, Residual, Try};
 
 /// A game scene that renders itself and handles input each frame.

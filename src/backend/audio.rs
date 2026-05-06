@@ -12,7 +12,7 @@ impl AudioBackend {
     pub fn new() -> anyhow::Result<Self> {
         let sink = rodio::DeviceSinkBuilder::open_default_sink()?;
         let player = Player::connect_new(sink.mixer());
-        player.set_volume(0.7);
+        player.set_volume(0.01); // TODO: set to .7 or something
         Ok(Self {
             _sink: sink,
             player,
