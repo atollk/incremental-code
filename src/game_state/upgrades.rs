@@ -281,11 +281,12 @@ impl_upgrade!(
     type=u8,
     level=1,
     [
+        (5, Resources::from_bronze(5.), "5"),
         (10, Resources::from_bronze(100.), "10"),
         (15, Resources::from_bronze(100e3), "15"),
-        (30, Resources::from_bronze(10e6), "20"),
-        (50, Resources::from_bronze(1.), "30"),
-        (80, Resources::zero(), "30"),
+        (30, Resources::from_bronze(10e6), "30"),
+        (50, Resources::from_silver(100.), "50"),
+        (80, Resources::zero(), "80"),
     ]
 );
 
@@ -294,20 +295,21 @@ impl_upgrade!(
     type=u8,
     level=1,
     [
-        (2, Resources::from_bronze(100.), "3"),
-        (4, Resources::from_bronze(100.), "3"),
-        (6, Resources::from_bronze(100e3), "5"),
+        (1, Resources::from_bronze(5.), "1"),
+        (2, Resources::from_bronze(25.), "2"),
+        (4, Resources::from_bronze(1e3), "4"),
+        (6, Resources::from_bronze(100e3), "6"),
         (8, Resources::from_bronze(10e6), "8"),
-        (10, Resources::zero(), "10"),
-        (20, Resources::zero(), "10"),
-        (30, Resources::zero(), "10"),
-        (40, Resources::zero(), "10"),
+        (10, Resources::from_silver(10.), "10"),
+        (20, Resources::from_silver(1e3), "20"),
+        (30, Resources::from_gold(100.), "30"),
+        (40, Resources::zero(), "40"),
     ]
 );
 
 impl_upgrade!(
     MaxInstructions,
-    type=u32,
+    type=u64,
     level=1,
     [
         (100, Resources::from_bronze(50.), "100"),

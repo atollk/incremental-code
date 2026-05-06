@@ -1,4 +1,5 @@
 use crate::game_state::{Resources, with_game_state};
+use anyhow::bail;
 use language::CompilingMetadata;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -6,6 +7,7 @@ use std::time::Duration;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CompiledProgram {
     pub instruction_counts: Vec<u64>,
+    left_to_instruction_limit: u64,
 }
 
 // TODO: balancing
@@ -15,6 +17,9 @@ impl CompiledProgram {
     pub fn new() -> CompiledProgram {
         CompiledProgram {
             instruction_counts: vec![0],
+            left_to_instruction_limit: with_game_state(|game_state| {
+                game_state.upgrades.max_instructions.value()
+            }),
         }
     }
 
@@ -50,8 +55,11 @@ impl CompilingMetadata for CompiledProgram {
     }
 
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
-        // TODO: max instruction count check
         *self.instruction_counts.last_mut().unwrap() += 1;
+        self.left_to_instruction_limit -= 1;
+        if self.left_to_instruction_limit == 0 {
+            bail!("Reached instruction limit. Stopping execution to prevent overheating.")
+        }
         Ok(())
     }
 }

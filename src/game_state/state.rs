@@ -43,15 +43,7 @@ pub struct GameState {
 
 impl Default for GameState {
     fn default() -> Self {
-        let start_code = r#"
-x := 0;
-loop:
-    if x == 1000:
-        break;
-    end
-    x = x+1;
-end
-            "#;
+        let start_code = r#""#;
         GameState {
             program_code: start_code.to_string(),
             compiled_program: None,
