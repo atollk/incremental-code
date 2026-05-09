@@ -1,11 +1,12 @@
 use std::time::Duration;
 
+use super::commands::{EchoedCommand, RunningCommand};
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::widgets::blinking_cursor::BlinkingCursor;
 use ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::Widget};
-
-use super::commands::{EchoedCommand, RunningCommand};
+use ratatui_core::layout::Offset;
+use tachyonfx::BufferRenderer;
 
 /// A terminal widget with a prompt for typing commands, a running-command area,
 /// and a scrolling history of completed command outputs.
@@ -179,9 +180,37 @@ impl<Meta: 'static> TerminalWidget<Meta> {
         }
         None
     }
+
+    fn render_all_commands(&self, buf: &mut Buffer) {
+        let mut y = 0;
+
+        // Render history and currently running command
+        for entry in self.history.iter().chain(&self.running) {
+            let h = entry.height(buf.area.width);
+            entry.render(
+                Rect {
+                    x: 0,
+                    y,
+                    width: buf.area.width,
+                    height: h,
+                },
+                buf,
+            );
+            y += h;
+        }
+
+        // Prompt and cursor appear right after the last content row, but only when idle.
+        if self.running.is_none() {
+            buf.set_string(0, y, format!("> {}", self.input), Style::default());
+            // "> " prefix is 2 columns wide; cursor column is char count before byte offset.
+            let char_col = self.input[..self.input_cursor].chars().count() as u16;
+            let cx = (buf.area.left() + 2 + char_col).min(buf.area.right().saturating_sub(1));
+            self.cursor.clone().at(cx, y).render(buf.area, buf);
+        }
+    }
 }
 
-impl<Meta> Widget for &TerminalWidget<Meta> {
+impl<Meta: 'static> Widget for &TerminalWidget<Meta> {
     /// Render the terminal into `area`.
     ///
     /// Layout (top to bottom, like a real terminal):
@@ -195,60 +224,40 @@ impl<Meta> Widget for &TerminalWidget<Meta> {
             return;
         }
 
-        let mut y = area.top();
+        let total_height = self
+            .history
+            .iter()
+            .map(|cmd| cmd.height(area.width))
+            .sum::<u16>()
+            + self
+                .running
+                .as_ref()
+                .map(|cmd| cmd.height(area.width))
+                .unwrap_or(0)
+            + 1;
 
-        // History entries, oldest first, flowing downward.
-        for entry in &self.history {
-            if y >= area.bottom() {
-                break;
-            }
-            let h = entry.height(area.width).min(area.bottom() - y);
-            if h > 0 {
-                entry.render(
-                    Rect {
-                        x: area.x,
-                        y,
-                        width: area.width,
-                        height: h,
-                    },
-                    buf,
-                );
-                y += h;
-            }
-        }
+        let mut intermediate_buffer = Buffer::empty(Rect {
+            x: 0,
+            y: 0,
+            width: area.width,
+            height: total_height,
+        });
+        self.render_all_commands(&mut intermediate_buffer);
 
-        // Running command sits directly below the last history entry.
-        if let Some(running) = &self.running
-            && y < area.bottom()
-        {
-            let h = running.height(area.width).min(area.bottom() - y);
-            if h > 0 {
-                running.render(
-                    Rect {
-                        x: area.x,
-                        y,
-                        width: area.width,
-                        height: h,
-                    },
-                    buf,
-                );
-                y += h;
-            }
-        }
-
-        // Prompt and cursor appear right after the last content row, but only when idle.
-        if self.running.is_none() && y < area.bottom() {
-            buf.set_string(
-                area.left(),
-                y,
-                format!("> {}", self.input),
-                Style::default(),
-            );
-            // "> " prefix is 2 columns wide; cursor column is char count before byte offset.
-            let char_col = self.input[..self.input_cursor].chars().count() as u16;
-            let cx = (area.left() + 2 + char_col).min(area.right().saturating_sub(1));
-            self.cursor.clone().at(cx, y).render(area, buf);
-        }
+        // Render intermediate buffer onto real buffer
+        intermediate_buffer.render_buffer_region(
+            Rect {
+                x: 0,
+                y: total_height.saturating_sub(area.height),
+                width: area.width,
+                height: area.height,
+            },
+            Offset {
+                x: area.x as i32,
+                y: area.y as i32,
+            },
+            buf,
+        );
     }
 }
 
