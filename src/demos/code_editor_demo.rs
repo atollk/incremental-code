@@ -73,6 +73,7 @@ impl App for CodeEditorDemo {
                     }
                 },
                 Event::MouseEvent(_) => {}
+                _ => {}
             }
         }
 

@@ -1,5 +1,5 @@
 use crate::backend::backend::{BackendSuite, TerminalApp};
-use crate::backend::events::{Event, IntoEvent};
+use crate::backend::events::{Event, IntoEvent, MetaEvent};
 use crate::backend::store_native::StoreNative;
 use crossterm::execute;
 use crossterm::terminal::{EnterAlternateScreen, enable_raw_mode};
@@ -8,7 +8,8 @@ use ratatui::backend::CrosstermBackend;
 use std::cell::RefCell;
 use std::io::{Stdout, stdout};
 use std::rc::Rc;
-use std::sync::{LazyLock, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, LazyLock, RwLock};
 use std::time::Duration;
 
 pub type BackendType = CrosstermBackend<Stdout>;
@@ -30,9 +31,16 @@ impl BackendSuite<BackendType, StorageType> for CrosstermBackendSuite {
         execute!(stdout(), EnterAlternateScreen)?;
         app.borrow_mut().init(backend)?;
 
+        let sigterm = Arc::new(AtomicBool::new(false));
+        signal_hook::flag::register(signal_hook::consts::SIGTERM, Arc::clone(&sigterm))
+            .map_err(|e| anyhow::anyhow!(e))?;
+
         let mut events = Vec::new();
         let mut exit = false;
         while !exit {
+            if sigterm.swap(false, Ordering::Relaxed) {
+                events.push(Event::MetaEvent(MetaEvent::SigTerm));
+            }
             while crossterm::event::poll(Duration::from_millis(0))? {
                 let event = crossterm::event::read()?;
                 if let Some(event) = event.into_event() {
@@ -132,6 +140,7 @@ impl IntoEvent for crossterm::event::Event {
                     modifiers,
                 }))
             }
+            ct::Event::Resize(_, _) => Some(Event::MetaEvent(MetaEvent::ResizeApp)),
             _ => None,
         }
     }

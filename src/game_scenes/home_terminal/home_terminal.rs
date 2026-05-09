@@ -13,6 +13,7 @@ use web_time::Duration;
 pub struct HomeTerminalScene {
     terminal_widget: TerminalWidget<SceneSwitch>,
     autocomplete_cycle: Option<(String, usize)>,
+    pub(crate) height: u16,
 }
 
 impl Default for HomeTerminalScene {
@@ -26,13 +27,14 @@ impl HomeTerminalScene {
         HomeTerminalScene {
             terminal_widget: TerminalWidget::new(),
             autocomplete_cycle: None,
+            height: 0,
         }
     }
 
     fn handle_terminal_command(&self, cmd: &str) -> Box<dyn RunningCommand<SceneSwitch>> {
         let commands = command_list();
         if let Ok(cmd) = commands.iter().filter(|c| c.name == cmd).exactly_one() {
-            (cmd.runner)()
+            (cmd.runner)(self)
         } else {
             unknown_cmd(cmd.to_owned())
         }
@@ -61,6 +63,8 @@ impl HomeTerminalScene {
 
 impl Scene for HomeTerminalScene {
     fn frame(&mut self, events: &[Event], frame: &mut Frame, time_delta: Duration) -> SceneSwitch {
+        self.height = frame.area().height;
+
         // Execute command
         let cmd = self.terminal_widget.update(events, time_delta);
         if let Some(cmd) = cmd {

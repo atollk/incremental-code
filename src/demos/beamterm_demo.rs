@@ -173,6 +173,7 @@ impl App for BeamtermDemo {
                     _ => {}
                 },
                 Event::MouseEvent(_) => {}
+                _ => {}
             }
         }
         ui_draw(tick_duration, frame, self);

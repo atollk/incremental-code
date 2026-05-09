@@ -106,6 +106,7 @@ impl Scene for CodeEditorScene {
                 Event::MouseEvent(mouse) => {
                     apply_mouse_event(&mut self.editor, mouse, &frame.area());
                 }
+                _ => {}
             }
         }
         self.editor.focus(&frame.area());

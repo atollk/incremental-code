@@ -1,5 +1,5 @@
 use crate::backend::backend::{BackendSuite, StorageBackend, TerminalApp};
-use crate::backend::events::{Event, IntoEvent};
+use crate::backend::events::{Event, IntoEvent, MetaEvent};
 use crate::backend::store_native::StoreNative;
 use beamterm_core::{
     Drawable, FontAtlasData, GlState, GlslVersion, RenderContext, StaticFontAtlas, TerminalGrid,
@@ -121,7 +121,8 @@ impl<'a> ApplicationHandler for BeamtermCoreApplicationHandler {
 
         match event {
             WindowEvent::CloseRequested => {
-                event_loop.exit();
+                self.events.push(Event::MetaEvent(MetaEvent::SigTerm));
+                state.win.window.request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 if let Some(event) = event.into_event() {
@@ -141,6 +142,7 @@ impl<'a> ApplicationHandler for BeamtermCoreApplicationHandler {
                             (new_size.width as i32, new_size.height as i32),
                             state.win.pixel_ratio(),
                         );
+                    self.events.push(Event::MetaEvent(MetaEvent::ResizeApp));
                     state.win.window.request_redraw();
                 }
             }

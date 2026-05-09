@@ -1,10 +1,22 @@
+use crate::backend::events::Event;
+use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_state::with_game_state;
 use crate::widgets::terminal::{ParagraphCmd, RunningCommand};
+use ratatui_core::buffer::Buffer;
+use ratatui_core::layout::Rect;
 use ratatui_core::text::{Line, Text};
+use ratatui_core::widgets::Widget;
 use ratatui_widgets::paragraph::Paragraph;
+use std::cell::Cell;
+use std::cmp::min;
+use std::time::Duration;
 
-pub(super) fn docs_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
+pub(super) fn docs_cmd(height: u16) -> Box<dyn RunningCommand<SceneSwitch>> {
+    Box::new(DocsCommand::new(height))
+}
+
+fn get_docs_lines() -> Vec<Line<'static>> {
     let (unlock_print, unlock_sleep, unlock_brk) = with_game_state(|gs| {
         (
             gs.upgrades.unlock_print.value(),
@@ -95,5 +107,73 @@ pub(super) fn docs_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
         ln!("  Earns diamond each time a breakpoint is hit.");
     }
 
-    Box::new(ParagraphCmd::new(Paragraph::new(Text::from(lines))))
+    lines
+}
+
+struct DocsCommand {
+    scroll_y: Cell<u16>,
+    exit: bool,
+    lines: Vec<Line<'static>>,
+    height: u16,
+}
+
+impl DocsCommand {
+    fn new(height: u16) -> DocsCommand {
+        DocsCommand {
+            scroll_y: Cell::new(0),
+            exit: false,
+            lines: get_docs_lines(),
+            height,
+        }
+    }
+}
+
+impl RunningCommand<SceneSwitch> for DocsCommand {
+    fn is_done(&self) -> bool {
+        self.exit
+    }
+
+    fn update(&mut self, events: &[Event], _time_delta: Duration) {
+        for event in events {
+            if let Event::KeyEvent(key_event) = event {
+                let pressed = key_event.kind == KeyEventKind::Press;
+                let repeated = key_event.kind == KeyEventKind::Repeat;
+                match key_event.code {
+                    KeyCode::Enter | KeyCode::Esc if pressed => self.exit = true,
+                    KeyCode::Up | KeyCode::Down if pressed || repeated => {
+                        let up = key_event.code == KeyCode::Up;
+                        let scroll_y = self.scroll_y.get_mut();
+                        if up {
+                            *scroll_y = scroll_y.saturating_sub(1);
+                        } else {
+                            *scroll_y = min(*scroll_y + 1, self.lines.len() as u16);
+                        }
+                    }
+                    _ => {}
+                };
+            }
+        }
+    }
+
+    fn render(&self, area: Rect, buf: &mut Buffer) {
+        // Clip scroll_y
+        while let y = self.scroll_y.get()
+            && y + area.height > self.lines.len() as u16
+            && y > 0
+        {
+            self.scroll_y.set(self.scroll_y.get() - 1);
+        }
+
+        let y = self.scroll_y.get() as usize;
+        let sub_lines = self.lines[y..y + area.height as usize].to_vec();
+        Text::from(sub_lines).render(area, buf);
+    }
+
+    fn height(&self, _columns: u16) -> u16 {
+        min(self.height, self.lines.len() as u16) - 1
+    }
+
+    fn get_metadata(&self) -> SceneSwitch {
+        SceneSwitch::NoSwitch
+    }
 }

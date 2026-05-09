@@ -1,5 +1,5 @@
 use crate::backend::backend::{BackendSuite, TerminalApp};
-use crate::backend::events::{Event, IntoEvent};
+use crate::backend::events::{Event, IntoEvent, MetaEvent};
 use crate::backend::store_web::StoreWeb;
 use ratzilla::event::{
     KeyCode as RzKeyCode, MouseButton as RzMouseButton, MouseEventKind as RzMouseEventKind,
@@ -45,6 +45,19 @@ impl BackendSuite<BackendType, StorageType> for RatzillaBackendSuite {
                     }
                 })
                 .ok();
+        }
+
+        {
+            let events = events.clone();
+            let closure = Closure::wrap(Box::new(move || {
+                events
+                    .borrow_mut()
+                    .push(Event::MetaEvent(MetaEvent::ResizeApp));
+            }) as Box<dyn FnMut()>);
+            ratzilla::web_sys::window()
+                .unwrap()
+                .set_onresize(Some(closure.as_ref().unchecked_ref()));
+            closure.forget();
         }
 
         terminal_app.borrow_mut().init(backend)?;

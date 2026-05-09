@@ -1385,6 +1385,7 @@ dependencies = [
  "ropey",
  "serde",
  "serde_json",
+ "signal-hook",
  "simple_logger",
  "tachyonfx",
  "throbber-widgets-tui",

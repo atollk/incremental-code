@@ -56,6 +56,7 @@ impl<Identifier: Clone + Hash + PartialEq + Eq> TreeState<Identifier> {
                 }
                 _ => (),
             },
+            _ => {}
         };
     }
 }

@@ -35,6 +35,7 @@ impl App for CounterDemo {
                     _ => {}
                 },
                 Event::MouseEvent(_) => {}
+                _ => {}
             }
         }
         frame.render_widget(&*self, frame.area());
