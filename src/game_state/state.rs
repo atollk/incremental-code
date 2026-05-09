@@ -102,7 +102,7 @@ impl GameState {
     }
 
     pub fn prestige(&mut self) {
-        let convert = |x| std::cmp::min(x - 1e6, 0.0).log10();
+        let convert = |x| std::cmp::min_by(x - 1e6, 0.0, f64::total_cmp).log10();
         let current_stars = self.current_resources.stars + self.carryover_resources.stars;
 
         self.carryover_resources = Resources::new(

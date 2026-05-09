@@ -33,7 +33,9 @@ impl AppStartScene {
         let scene: Box<dyn Scene> = if loaded_state {
             Box::new(HomeTerminalScene::new())
         } else {
-            Box::new(RebootScene::new(true, 20))
+            // TODO: re-enable
+            //Box::new(RebootScene::new(true, 20))
+            Box::new(HomeTerminalScene::new())
         };
         SceneSwitch::SwitchTo(scene)
     }

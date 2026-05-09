@@ -23,18 +23,12 @@ pub trait Upgrade: dyn_clone::DynClone {
     fn level_down(&mut self);
 
     /// Renders the upgrade level as a string of box characters.
-    ///
-    /// `full_box` is used for purchased levels; `empty_box` for remaining slots.
-    fn format_level_str(&self, empty_box: char, full_box: char) -> String {
-        format!(
-            "{}{}",
-            std::iter::repeat(full_box)
-                .take(self.get_level() as usize)
-                .collect::<String>(),
-            std::iter::repeat(empty_box)
-                .take((self.max_level() - self.get_level()) as usize)
-                .collect::<String>(),
-        )
+    fn format_level_str(&self) -> String {
+        match self.max_level() {
+            0 => unreachable!(),
+            1 => (if self.get_level() == 0 { "[ ]" } else { "[x]" }).to_string(),
+            n => format!("{} / {}", self.get_level(), n),
+        }
     }
 
     /// Returns a display string for the next-level cost, or `"maxed"` if at max level.
@@ -241,7 +235,7 @@ impl_upgrade!(
     type=bool,
     level=0,
     [
-        (false, Resources::from_bronze(3.), "locked"),
+        (false, Resources::from_bronze(5.), "locked"),
         (true, Resources::zero(), "unlocked"),
     ]
 );
