@@ -45,7 +45,7 @@ pub struct GameState {
 impl Default for GameState {
     fn default() -> Self {
         let start_code = r#""#;
-        let start_resources = Resources::from_bronze(0.);
+        let start_resources = Resources::from_bronze(100.);
         GameState {
             program_code: start_code.to_string(),
             compiled_program: None,

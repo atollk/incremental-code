@@ -121,7 +121,7 @@ fn render_group_items(upgrades: &[&dyn Upgrade], group_i: usize) -> Vec<TreeItem
                 Span::raw(format!("{:<level_width$}", tc.level)),
                 Span::raw("     "),
                 Span::styled(
-                    format!("{:<level_up_cost_width$}", tc.level_up_cost),
+                    format!("{:>level_up_cost_width$}", tc.level_up_cost),
                     cost_style,
                 ),
                 Span::raw("    "),

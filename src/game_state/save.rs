@@ -47,7 +47,7 @@ impl AutoSaver {
 
 pub static AUTO_SAVER: LazyLock<Mutex<AutoSaver>> = LazyLock::new(|| Mutex::new(AutoSaver::new()));
 
-const KEY: &'static str = "save";
+const KEY: &'static str = "game_state";
 
 pub fn save_game_state() -> anyhow::Result<()> {
     let storage_backend: impl StorageBackend = with_backend(|backend| backend.storage_backend());

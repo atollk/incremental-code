@@ -1,6 +1,7 @@
 use crate::backend;
 use crate::backend::backend::TerminalApp;
 use crate::backend::events::Event;
+use crate::game_scenes::logic::audio::with_audio_backend;
 use crate::game_state::AUTO_SAVER;
 use std::cell::RefCell;
 use std::rc::Rc;

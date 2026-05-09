@@ -30,7 +30,7 @@ pub struct TerminalWidget<Meta> {
     /// Text currently being typed in the prompt.
     pub input: String,
     /// Byte offset of the cursor within `input`.
-    input_cursor: usize,
+    pub input_cursor: usize,
     /// Previously submitted command strings, for up/down arrow navigation.
     input_history: Vec<String>,
     /// Current position in `input_history` while navigating, or `None` when not navigating.

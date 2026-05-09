@@ -1,7 +1,7 @@
-use crate::backend::audio::with_audio_backend;
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::SceneSwitch;
+use crate::game_scenes::logic::audio::with_audio_backend;
 use crate::widgets::terminal::RunningCommand;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
