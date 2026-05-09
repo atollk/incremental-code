@@ -56,8 +56,15 @@ impl AudioBackend {
         }
     }
 
-    pub fn start_bgm(&mut self) -> anyhow::Result<()> {
+    pub fn start_bgm_loop(&mut self) -> anyhow::Result<()> {
         with_settings(|settings| self.player.set_volume(settings.bgm_volume));
+        if self.bgm_silence.is_none() && self.player.empty() {
+            self.start_bgm()?;
+        }
+        Ok(())
+    }
+
+    fn start_bgm(&mut self) -> anyhow::Result<()> {
         self.bgm_silence = None;
         let [asset] = MUSIC_ASSETS
             .files()

@@ -1,1 +1,0 @@
-- instruction limit in CompiledProgram needs to be updated 

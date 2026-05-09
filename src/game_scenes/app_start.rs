@@ -25,7 +25,7 @@ impl AppStartScene {
         if with_game_state(|game_state| game_state.upgrades.unlock_music.value()) {
             with_audio_backend(|audio| {
                 audio
-                    .start_bgm()
+                    .start_bgm_loop()
                     .map_err(|e| log::warn!("Error starting bgm: {}", e))
             });
         }
