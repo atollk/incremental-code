@@ -2,6 +2,7 @@ use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::reboot::RebootScene;
+use crate::game_state::with_game_state_mut;
 use crate::widgets::terminal::RunningCommand;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
@@ -42,7 +43,7 @@ impl RunningCommand<SceneSwitch> for RebootCmd {
             }
             match key.code {
                 KeyCode::Char('y') | KeyCode::Char('Y') => {
-                    // TODO: carry over currency
+                    with_game_state_mut(|game_state| game_state.prestige());
                     self.state = RebootState::Confirmed;
                     return;
                 }

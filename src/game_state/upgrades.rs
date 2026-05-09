@@ -69,14 +69,13 @@ pub struct Upgrades {
     pub unlock_level1: UnlockLevel1,
     // Level 1
     pub compile_time: CompileTime,
-    pub speed_up_per_instruction_constant: SpeedUpPerInstructionConstant,
+    pub execution_speed_per_instruction: ExecutionSpeedPerInstruction,
     pub code_line_width: CodeLineWidth,
     pub code_line_count: CodeLineCount,
     pub max_instructions: MaxInstructions,
     pub literals: CodeExpressionLiterals,
     pub unlock_level2: UnlockLevel2,
     // Level 2
-    pub speed_up_per_instruction_linear: SpeedUpPerInstructionLinear,
     pub bronze_per_instruction: BronzePerInstruction,
     pub statements: CodeStatements,
     pub unlock_reboot: UnlockReboot,
@@ -107,7 +106,7 @@ pub struct Upgrades {
 
 impl Upgrades {
     /// Returns all upgrades as an array of trait-object references.
-    pub fn upgrades(&self) -> [&dyn Upgrade; 34] {
+    pub fn upgrades(&self) -> [&dyn Upgrade; 33] {
         self.fields_as()
     }
 
@@ -254,7 +253,8 @@ impl_upgrade!(
     type=f32,
     level=1,
     [
-        (5., Resources::from_bronze(10.), "5s"),
+        (10., Resources::from_bronze(10.), "10s"),
+        (5., Resources::from_bronze(100.), "5s"),
         (4., Resources::from_bronze(1e3), "4s"),
         (3., Resources::from_bronze(1e6), "3s"),
         (2., Resources::from_bronze(1e9), "2s"),
@@ -264,15 +264,14 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    SpeedUpPerInstructionConstant,
+    ExecutionSpeedPerInstruction,
     type=u32,
     level=1,
     [
-        (1, Resources::from_bronze(10.), "1"),
-        (2, Resources::from_bronze(100.), "1/2"),
-        (8, Resources::from_bronze(2e3), "1/8"),
-        (64, Resources::from_bronze(30e3), "1/64"),
-        (1024, Resources::zero(), "1/1024"),
+        (1, Resources::from_bronze(50.), "100 %"),
+        (2, Resources::from_bronze(100.), "50 %"),
+        (4, Resources::from_bronze(100.), "25 %"),
+        (10, Resources::from_bronze(30e3), "10 %"),
     ]
 );
 
@@ -308,25 +307,13 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    MaxInstructions,
-    type=u64,
-    level=1,
-    [
-        (100, Resources::from_bronze(50.), "100"),
-        (500, Resources::from_bronze(1e3), "500"),
-        (2000, Resources::from_bronze(50e3), "2000"),
-        (10000, Resources::from_bronze(5e6), "10000"),
-        (100000, Resources::zero(), "100000"),
-    ]
-);
-
-impl_upgrade!(
-    CodeExpressionLiterals,
+    CodeStatements,
     type=(),
     level=1,
     [
-        ((), Resources::from_bronze(200.), "locked"),
-        ((), Resources::zero(), "unlocked"),
+        ((), Resources::from_bronze(500e3), ""),
+        ((), Resources::zero(), "loops"),
+        ((), Resources::zero(), "functions"),
     ]
 );
 
@@ -343,19 +330,6 @@ impl_upgrade!(
 // Level 2
 
 impl_upgrade!(
-    SpeedUpPerInstructionLinear,
-    type=u32,
-    level=2,
-    [
-        (1, Resources::from_bronze(50e3), "1"),
-        (2, Resources::from_bronze(500e3), "2"),
-        (4, Resources::from_silver(5.), "4"),
-        (8, Resources::from_silver(50.), "8"),
-        (16, Resources::zero(), "16"),
-    ]
-);
-
-impl_upgrade!(
     BronzePerInstruction,
     type=u32,
     level=2,
@@ -369,12 +343,15 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    CodeStatements,
-    type=bool,
+    MaxInstructions,
+    type=u64,
     level=2,
     [
-        (false, Resources::from_bronze(500e3), "locked"),
-        (true, Resources::zero(), "unlocked"),
+        (100, Resources::from_bronze(50.), "100"),
+        (500, Resources::from_bronze(1e3), "500"),
+        (2000, Resources::from_bronze(50e3), "2000"),
+        (10000, Resources::from_bronze(5e6), "10000"),
+        (100000, Resources::zero(), "100000"),
     ]
 );
 
@@ -385,6 +362,16 @@ impl_upgrade!(
     [
         (false, Resources::from_silver(100.), "locked"),
         (true, Resources::zero(), "unlocked"),
+    ]
+);
+
+impl_upgrade!(
+    CodeExpressionLiterals,
+    type=(),
+    level=2,
+    [
+        ((), Resources::from_bronze(200.), "locked"),
+        ((), Resources::zero(), "unlocked"),
     ]
 );
 

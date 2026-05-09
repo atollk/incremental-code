@@ -1,3 +1,4 @@
+use crate::game_state::resources::Currency;
 use crate::game_state::upgrades::Upgrades;
 use crate::game_state::{CompiledProgram, Resources};
 use anyhow::bail;
@@ -44,10 +45,11 @@ pub struct GameState {
 impl Default for GameState {
     fn default() -> Self {
         let start_code = r#""#;
+        let start_resources = Resources::from_bronze(0.);
         GameState {
             program_code: start_code.to_string(),
             compiled_program: None,
-            current_resources: Resources::from_bronze(999.),
+            current_resources: start_resources,
             carryover_resources: Resources::default(),
             upgrades: Upgrades::default(),
         }
@@ -97,5 +99,21 @@ impl GameState {
     /// Add `resources` to the carryover pool (e.g. earnings from a compiled program run).
     pub fn give_carryover_resources(&mut self, resources: Resources) {
         self.carryover_resources += resources;
+    }
+
+    pub fn prestige(&mut self) {
+        let convert = |x| std::cmp::min(x - 1e6, 0.0).log10();
+        let current_stars = self.current_resources.stars + self.carryover_resources.stars;
+
+        self.carryover_resources = Resources::new(
+            0.0,
+            convert(self.current_resources.bronze.0),
+            convert(self.current_resources.silver.0),
+            convert(self.current_resources.gold.0),
+            convert(self.current_resources.diamond.0),
+        );
+
+        self.current_resources = Resources::zero();
+        self.current_resources.stars = current_stars;
     }
 }

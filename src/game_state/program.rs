@@ -10,8 +10,7 @@ pub struct CompiledProgram {
     left_to_instruction_limit: u64,
 }
 
-// TODO: balancing
-const INSTRUCTION_BASIC_DURATION: Duration = Duration::from_millis(10);
+const INSTRUCTION_BASIC_DURATION: Duration = Duration::from_millis(1000);
 
 impl CompiledProgram {
     pub fn new() -> CompiledProgram {
@@ -25,10 +24,7 @@ impl CompiledProgram {
 
     pub fn instr_to_execution_time(instruction_counts: &[u64]) -> Duration {
         let constant_speed_up = with_game_state(|game_state| {
-            game_state
-                .upgrades
-                .speed_up_per_instruction_constant
-                .value()
+            game_state.upgrades.execution_speed_per_instruction.value()
         });
         instruction_counts
             .iter()
