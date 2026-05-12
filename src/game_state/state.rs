@@ -1,4 +1,3 @@
-use crate::game_state::resources::Currency;
 use crate::game_state::upgrades::Upgrades;
 use crate::game_state::{CompiledProgram, Resources};
 use anyhow::bail;
@@ -45,7 +44,7 @@ pub struct GameState {
 impl Default for GameState {
     fn default() -> Self {
         let start_code = r#""#;
-        let start_resources = Resources::from_bronze(100.);
+        let start_resources = Resources::new(1e9, 1e9, 1e9, 1e9, 1e9);
         GameState {
             program_code: start_code.to_string(),
             compiled_program: None,

@@ -10,6 +10,7 @@ use ratatui_core::text::{Line, Span};
 use ratatui_core::widgets::{StatefulWidget, Widget};
 use std::cmp::max;
 use std::hash::Hash;
+use std::ops::Deref;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 #[self_referencing]
@@ -55,7 +56,7 @@ fn render_column_texts(upgrade: &dyn Upgrade) -> TreeColumns<String> {
         name: upgrade.name().to_string(),
         level: level_str,
         level_up_cost: cost_str,
-        values: match (current_value_str, next_value_str.as_str()) {
+        values: match (current_value_str.deref(), next_value_str.as_str()) {
             ("", "") => "".to_string(),
             ("", _) => format!("-> {}", next_value_str),
             (_, "") => current_value_str.to_string(),

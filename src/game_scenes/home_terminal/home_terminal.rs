@@ -1,5 +1,5 @@
 use crate::backend::events::Event;
-use crate::backend::input::{KeyCode, KeyEventKind, KeyEventState};
+use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::Scene;
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::home_terminal::commands::{command_list, unknown_cmd};

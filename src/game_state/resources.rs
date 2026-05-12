@@ -1,4 +1,5 @@
 use derive_more::{Add, AddAssign, Sub, SubAssign};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
@@ -83,14 +84,24 @@ impl Resources {
         Resources::new(0.0, 0.0, gold, 0.0, 0.0)
     }
 
+    pub const fn from_diamond(diamond: f64) -> Self {
+        Resources::new(0.0, 0.0, 0.0, diamond, 0.0)
+    }
+
     /// Returns a single-line display of all non-zero denominations.
     pub const fn fmt_oneline(&self) -> impl Display {
-        ResourcesFmtOneline { parent: self }
+        ResourcesFmt {
+            parent: self,
+            separator: " ",
+        }
     }
 
     /// Returns a multi-line display with each non-zero denomination on its own line.
     pub const fn fmt_multiline(&self) -> impl Display {
-        ResourcesFmtMultiline { parent: self }
+        ResourcesFmt {
+            parent: self,
+            separator: "\n",
+        }
     }
 
     /// Subtracts `other` from `self` per denomination, clamping each to zero.
@@ -135,40 +146,36 @@ const GOLD_SYMBOL: char = '🟡';
 const DIAMOND_SYMBOL: char = '💎';
 const STAR_SYMBOL: char = '⭐';
 
-struct ResourcesFmtOneline<'a> {
+struct ResourcesFmt<'a> {
     parent: &'a Resources,
+    separator: &'a str,
 }
 
-impl Display for ResourcesFmtOneline<'_> {
+impl Display for ResourcesFmt<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        // TODO: show diamond & stars
-        let write_gold = self.parent.gold.0 != 0.0;
+        let write_stars = self.parent.stars.0 != 0.0;
+        let write_diamond = self.parent.stars.0 != 0.0 || write_stars;
+        let write_gold = self.parent.gold.0 != 0.0 || write_diamond;
         let write_silver = self.parent.silver.0 != 0.0 || write_gold;
-        if write_gold {
-            write!(f, "{} {}", self.parent.gold, GOLD_SYMBOL)?;
+        let write_strings = [
+            (write_stars, self.parent.stars, STAR_SYMBOL),
+            (write_diamond, self.parent.diamond, DIAMOND_SYMBOL),
+            (write_gold, self.parent.gold, GOLD_SYMBOL),
+            (write_silver, self.parent.silver, SILVER_SYMBOL),
+            (true, self.parent.bronze, BRONZE_SYMBOL),
+        ]
+        .into_iter()
+        .filter_map(|(write, currency, symbol)| {
+            if write {
+                Some(format!("{currency} {symbol}"))
+            } else {
+                None
+            }
+        })
+        .intersperse(self.separator.to_string());
+        for s in write_strings {
+            write!(f, "{}", s)?;
         }
-        if write_silver {
-            write!(f, "{} {}", self.parent.silver, SILVER_SYMBOL)?;
-        }
-        write!(f, "{} {}", self.parent.bronze, BRONZE_SYMBOL)
-    }
-}
-
-struct ResourcesFmtMultiline<'a> {
-    parent: &'a Resources,
-}
-
-impl Display for ResourcesFmtMultiline<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        // TODO: show diamond & stars
-        let write_gold = self.parent.gold.0 != 0.0;
-        let write_silver = self.parent.silver.0 != 0.0 || write_gold;
-        if write_gold {
-            writeln!(f, "{} {}", self.parent.gold, GOLD_SYMBOL)?;
-        }
-        if write_silver {
-            writeln!(f, "{} {}", self.parent.silver, SILVER_SYMBOL)?;
-        }
-        writeln!(f, "{} {}", self.parent.bronze, BRONZE_SYMBOL)
+        Ok(())
     }
 }

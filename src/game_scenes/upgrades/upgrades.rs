@@ -249,11 +249,7 @@ fn on_upgrades_commit() {
     }
 
     // If the instruction limit changed and the program was compiled already, re-compile it to recount the instructions
-    with_game_state(|game_state| {
-        if let Some(compiled_program) = game_state.compiled_program
-            && compiled_program.is_err()
-        {
-            let _ = compile_game_state();
-        }
-    })
+    if with_game_state(|game_state| matches!(game_state.compiled_program, Some(Err(_)))) {
+        let _ = compile_game_state();
+    }
 }

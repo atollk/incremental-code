@@ -1,0 +1,2 @@
+- cancel commands in home terminal
+- for upgrades, make the levels 'parallel' so that you can upgrade with a silver cost before you have the earlier bronze cost

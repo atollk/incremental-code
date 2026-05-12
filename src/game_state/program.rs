@@ -23,9 +23,8 @@ impl CompiledProgram {
     }
 
     pub fn instr_to_execution_time(instruction_counts: &[u64]) -> Duration {
-        let constant_speed_up = with_game_state(|game_state| {
-            game_state.upgrades.execution_speed_per_instruction.value()
-        });
+        let constant_speed_up =
+            with_game_state(|game_state| game_state.upgrades.instruction_execution_speed.value());
         instruction_counts
             .iter()
             .map(|&count| INSTRUCTION_BASIC_DURATION * count as u32)
