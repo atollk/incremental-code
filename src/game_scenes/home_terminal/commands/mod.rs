@@ -5,6 +5,7 @@ use crate::game_scenes::home_terminal::commands::exit_command::exit_cmd;
 use crate::game_scenes::home_terminal::commands::help_command::help_cmd;
 use crate::widgets::terminal::RunningCommand;
 
+mod cheat_pdcode_command;
 mod code_command;
 mod compile_command;
 mod docs_command;

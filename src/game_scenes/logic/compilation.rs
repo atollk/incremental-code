@@ -1,7 +1,10 @@
 use crate::game_state::{CompiledProgram, with_game_state, with_game_state_mut};
-use anyhow::anyhow;
-use language::{PredefinedFunction, ProgramValue, compile_with_meta, parse_program};
+use anyhow::{anyhow, bail};
+use language::{
+    CompilingMetadata, PredefinedFunction, ProgramValue, compile_with_meta, parse_program,
+};
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 fn predefined_function_print(
     _meta: &mut CompiledProgram,
@@ -58,17 +61,51 @@ fn predefined_functions() -> HashMap<&'static str, &'static PredefinedFunction<C
     functions
 }
 
+struct WipCompilingProgram {
+    program: CompiledProgram,
+    cancelled: bool,
+}
+
+impl WipCompilingProgram {
+    fn check_cancel(&self) -> anyhow::Result<()> {
+        // TODO
+        Ok(())
+    }
+}
+
+impl CompilingMetadata for WipCompilingProgram {
+    fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
+        self.check_cancel()?;
+        self.program.log_zero_instruction()
+    }
+
+    fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
+        self.check_cancel()?;
+        self.program.log_atomic_instruction()
+    }
+}
+
 pub fn compile_game_state() -> anyhow::Result<()> {
     let parse_result_run_result = with_game_state(|game_state| -> anyhow::Result<_> {
         let parsed = parse_program(&game_state.program_code);
         match parsed {
             Ok(parsed) => {
-                let mut compiled = CompiledProgram::new();
-                let run_result = compile_with_meta(&parsed, predefined_functions(), &mut compiled);
-                Ok(match run_result {
-                    Ok(()) => Ok(compiled),
-                    Err(e) => Err((e.to_string(), compiled.instruction_counts)),
-                })
+                let mut compiling_program = WipCompilingProgram {
+                    program: CompiledProgram::new(),
+                    cancelled: false,
+                };
+                let run_result =
+                    compile_with_meta(&parsed, predefined_functions(), &mut compiling_program);
+                if compiling_program.cancelled {
+                    bail!("Compilation was cancelled")
+                } else {
+                    Ok(match run_result {
+                        Ok(()) => Ok(compiling_program.program),
+                        Err(e) => {
+                            Err((e.to_string(), compiling_program.program.instruction_counts))
+                        }
+                    })
+                }
             }
             Err(richs) => Err(anyhow!(
                 richs
@@ -84,4 +121,23 @@ pub fn compile_game_state() -> anyhow::Result<()> {
         game_state.compiled_program = Some(run_result);
     });
     Ok(())
+}
+
+struct CompileThread {}
+
+enum CompileThreadStatus {}
+
+static COMPILE_THREAD: Mutex<CompileThread> = Mutex::new(CompileThread {});
+
+pub fn compile_game_state_thread() -> anyhow::Result<()> {
+    #[cfg(not(target_arch = "wasm32"))]
+    use std::thread;
+    #[cfg(target_arch = "wasm32")]
+    use wasm_thread as thread;
+
+    let t = thread::spawn(|| {
+        let compile = compile_game_state();
+        todo!();
+    });
+    todo!();
 }

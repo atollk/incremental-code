@@ -335,17 +335,26 @@ impl_upgrade!(
     ]
 );
 
+pub enum CodeStatementLevels {
+    None,
+    SimpleLoops,
+    NestedLoops,
+    Functions,
+    SingleRecursion,
+    MultiRecursion,
+}
+
 impl_upgrade!(
     CodeStatements,
-    type=(),
+    type=CodeStatementLevels,
     level=1,
     [
-        ((), Resources::from_bronze(500e3), ""),
-        ((), Resources::from_bronze(500e3), "simple loops"),
-        ((), Resources::from_bronze(500e3), "nested loops"),
-        ((), Resources::from_bronze(500e3), "functions"),
-        ((), Resources::from_bronze(500e3), "single recursion"),
-        ((), Resources::zero(), "multi recursion"),
+        (CodeStatementLevels::None, Resources::from_bronze(500e3), ""),
+        (CodeStatementLevels::SimpleLoops, Resources::from_bronze(500e3), "simple loops"),
+        (CodeStatementLevels::NestedLoops, Resources::from_bronze(500e3), "nested loops"),
+        (CodeStatementLevels::Functions, Resources::from_bronze(500e3), "functions"),
+        (CodeStatementLevels::SingleRecursion, Resources::from_bronze(500e3), "single recursion"),
+        (CodeStatementLevels::MultiRecursion, Resources::zero(), "multi recursion"),
     ]
 );
 
