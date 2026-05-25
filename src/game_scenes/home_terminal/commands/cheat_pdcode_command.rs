@@ -1,5 +1,5 @@
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_state::{CodeStatementLevels, Upgrades, with_game_state_mut};
+use crate::game_state::{CodeStatementLevels, Upgrade, Upgrades, with_game_state_mut};
 use crate::widgets::terminal::{ParagraphCmd, RunningCommand};
 use itertools::Itertools;
 use ratatui_widgets::paragraph::Paragraph;
@@ -14,30 +14,75 @@ pub(super) fn cheat_pdcode_cmd(height: u16) -> Box<dyn RunningCommand<SceneSwitc
 }
 
 fn get_predefined_code(current_upgrades: &Upgrades) -> String {
+    let width = current_upgrades.code_line_width.value() as usize;
+    let lines = current_upgrades.code_line_count.value() as usize;
+    let lit_level = current_upgrades.literals.get_level();
+
     match current_upgrades.statements.value() {
         CodeStatementLevels::None => {
             let line = "pass;";
-            iter::repeat(line)
-                .take(current_upgrades.code_line_count.value() as usize)
-                .join("\n")
-                .collect()
+            iter::repeat(line).take(lines).join("\n")
         }
-        CodeStatementLevels::SimpleLoops => {
-            todo!()
+        CodeStatementLevels::SimpleLoops => nested_loops_code(width, lines, lit_level, 1),
+        CodeStatementLevels::NestedLoops
+        | CodeStatementLevels::Functions
+        | CodeStatementLevels::SingleRecursion => {
+            nested_loops_code(width, lines, lit_level, usize::MAX)
         }
-        CodeStatementLevels::NestedLoops => {
-            todo!()
-        }
-        CodeStatementLevels::Functions => {
-            todo!()
-        }
-        CodeStatementLevels::SingleRecursion => {
-            todo!()
-        }
-        CodeStatementLevels::MultiRecursion => {
-            todo!()
-        }
+        CodeStatementLevels::MultiRecursion => multi_recursion_code(width, lines, lit_level),
     }
+}
+
+fn counter_expr(expr_len: usize, lit_level: u8) -> String {
+    let (lit, lit_chars): (&str, usize) = if lit_level >= 4 && expr_len >= 2 {
+        ("99", 2)
+    } else if lit_level >= 3 {
+        ("9", 1)
+    } else if lit_level >= 2 {
+        ("5", 1)
+    } else if lit_level >= 1 {
+        ("2", 1)
+    } else {
+        ("1", 1)
+    };
+    let n = (expr_len + 1) / (lit_chars + 1);
+    if n == 0 {
+        "1".to_string()
+    } else {
+        iter::repeat(lit).take(n).join("*")
+    }
+}
+
+fn nested_loops_code(width: usize, lines: usize, lit_level: u8, max_depth: usize) -> String {
+    if lines < 8 || width < 9 {
+        return iter::repeat("pass;").take(lines).join("\n");
+    }
+    let depth = std::cmp::min(max_depth, (lines - 1) / 7);
+    let body_passes = lines - 7 * depth;
+    let vars = ["i", "j", "k", "l", "m", "n", "o", "p", "q", "r"];
+    let expr = counter_expr(width - 4, lit_level);
+    build_nested_loop(&vars[..depth], &expr, body_passes)
+}
+
+fn build_nested_loop(vars: &[&str], expr: &str, body_passes: usize) -> String {
+    if vars.is_empty() {
+        return iter::repeat("pass;").take(body_passes).join("\n");
+    }
+    let var = vars[0];
+    format!(
+        "{var}:={expr};\nloop:\nif {var}==0:\nbreak;\nend\n{}\n{var}={var}-1;\nend",
+        build_nested_loop(&vars[1..], expr, body_passes)
+    )
+}
+
+fn multi_recursion_code(width: usize, lines: usize, lit_level: u8) -> String {
+    if lines < 8 || width < 9 {
+        return nested_loops_code(width, lines, lit_level, usize::MAX);
+    }
+    let k = std::cmp::max(2, lines - 6);
+    let expr = counter_expr(width - 4, lit_level);
+    let calls = iter::repeat("f(n-1);").take(k).join("\n");
+    format!("def f(n):\nif n==0:\nreturn 0;\nend\n{calls}\nend\nf({expr});")
 }
 
 /*
