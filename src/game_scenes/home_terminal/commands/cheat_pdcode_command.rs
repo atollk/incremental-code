@@ -2,6 +2,7 @@ use crate::game_scenes::base::SceneSwitch;
 use crate::game_state::{CodeStatementLevels, Upgrade, Upgrades, with_game_state_mut};
 use crate::widgets::terminal::{ParagraphCmd, RunningCommand};
 use itertools::Itertools;
+use js_sys::Math::exp;
 use ratatui_widgets::paragraph::Paragraph;
 use std::iter;
 
@@ -16,35 +17,32 @@ pub(super) fn cheat_pdcode_cmd(height: u16) -> Box<dyn RunningCommand<SceneSwitc
 fn get_predefined_code(current_upgrades: &Upgrades) -> String {
     let width = current_upgrades.code_line_width.value() as usize;
     let lines = current_upgrades.code_line_count.value() as usize;
-    let lit_level = current_upgrades.literals.get_level();
+    let max_int_lit = current_upgrades.literals.get_max_int_literal();
 
     match current_upgrades.statements.value() {
         CodeStatementLevels::None => {
             let line = "pass;";
             iter::repeat(line).take(lines).join("\n")
         }
-        CodeStatementLevels::SimpleLoops => nested_loops_code(width, lines, lit_level, 1),
+        CodeStatementLevels::SimpleLoops => nested_loops_code(width, lines, max_int_lit, 1),
         CodeStatementLevels::NestedLoops
         | CodeStatementLevels::Functions
         | CodeStatementLevels::SingleRecursion => {
-            nested_loops_code(width, lines, lit_level, usize::MAX)
+            nested_loops_code(width, lines, max_int_lit, usize::MAX)
         }
-        CodeStatementLevels::MultiRecursion => multi_recursion_code(width, lines, lit_level),
+        CodeStatementLevels::MultiRecursion => multi_recursion_code(width, lines, max_int_lit),
     }
 }
 
-fn counter_expr(expr_len: usize, lit_level: u8) -> String {
-    let (lit, lit_chars): (&str, usize) = if lit_level >= 4 && expr_len >= 2 {
-        ("99", 2)
-    } else if lit_level >= 3 {
-        ("9", 1)
-    } else if lit_level >= 2 {
-        ("5", 1)
-    } else if lit_level >= 1 {
-        ("2", 1)
-    } else {
-        ("1", 1)
+fn counter_expr(expr_len: usize, max_int_lit: u8) -> String {
+    let max_len_lit = match expr_len {
+        0 => 0,
+        1 => 9,
+        2 => 99,
+        _ => 255,
     };
+    let lit = std::cmp::min(max_int_lit, max_len_lit);
+    let lit_chars = lit.to_string().chars().count();
     let n = (expr_len + 1) / (lit_chars + 1);
     if n == 0 {
         "1".to_string()
@@ -53,14 +51,14 @@ fn counter_expr(expr_len: usize, lit_level: u8) -> String {
     }
 }
 
-fn nested_loops_code(width: usize, lines: usize, lit_level: u8, max_depth: usize) -> String {
+fn nested_loops_code(width: usize, lines: usize, max_int_lit: u8, max_depth: usize) -> String {
     if lines < 8 || width < 9 {
         return iter::repeat("pass;").take(lines).join("\n");
     }
     let depth = std::cmp::min(max_depth, (lines - 1) / 7);
     let body_passes = lines - 7 * depth;
     let vars = ["i", "j", "k", "l", "m", "n", "o", "p", "q", "r"];
-    let expr = counter_expr(width - 4, lit_level);
+    let expr = counter_expr(width - 4, max_int_lit);
     build_nested_loop(&vars[..depth], &expr, body_passes)
 }
 
@@ -75,261 +73,12 @@ fn build_nested_loop(vars: &[&str], expr: &str, body_passes: usize) -> String {
     )
 }
 
-fn multi_recursion_code(width: usize, lines: usize, lit_level: u8) -> String {
+fn multi_recursion_code(width: usize, lines: usize, max_int_lit: u8) -> String {
     if lines < 8 || width < 9 {
-        return nested_loops_code(width, lines, lit_level, usize::MAX);
+        return nested_loops_code(width, lines, max_int_lit, usize::MAX);
     }
     let k = std::cmp::max(2, lines - 6);
-    let expr = counter_expr(width - 4, lit_level);
+    let expr = counter_expr(width - 4, max_int_lit);
     let calls = iter::repeat("f(n-1);").take(k).join("\n");
     format!("def f(n):\nif n==0:\nreturn 0;\nend\n{calls}\nend\nf({expr});")
 }
-
-/*
-I'll write programs for the rows where the program shape actually changes (a fresh `pass`-spam isn't worth its own block). Each shows the optimal program at that state along with the resulting count.
-
-### Row 10 — max = 8
-
-State: `W=10, L=8, E=2, S=0`. No loops yet.
-
-```
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-```
-
-8 statements × 1 instruction each = **8**.
-
-### Row 11 — max ≈ 380 (single loop just unlocked)
-
-State: `W=10, L=8, E=2, S=1`. The minimal counted-loop scaffold is 7 lines; one extra `pass;` fits in the body.
-
-```
-i:=5*5*5;
-loop:
-if i==0:
-break;
-end
-pass;
-i=i-1;
-end
-```
-
-`N = 5³ = 125`. Per iter (i ≠ 0): `if` (1) + `pass` (1) + `i=i-1` (1) = 3. Final iter (i = 0): `if` (1) + `break` (1) = 2. Total: 1 (decl) + 1 (loop entry) + 125·3 + 2 = **379**.
-
-### Row 14 — max ≈ 2.9×10⁸ (W=15, E=4 — `99` is the dominant literal)
-
-State: `W=15, L=8, E=4, S=1`. `i:=99*99*99*99;` is exactly 15 chars.
-
-```
-i:=99*99*99*99;
-loop:
-if i==0:
-break;
-end
-pass;
-i=i-1;
-end
-```
-
-`N = 99⁴ = 96,059,601`. Per iter: 3. Total: 1 + 1 + 96,059,601·3 + 2 = **288,178,807**.
-
-### Row 17 — max ≈ 1.44×10⁹ (L=20 still single loop)
-
-State: `W=15, L=20, E=4, S=1`. Same `N`, but 13 extra `pass;` lines now fit in the body.
-
-```
-i:=99*99*99*99;
-loop:
-if i==0:
-break;
-end
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-i=i-1;
-end
-```
-
-Per iter: 1 + 13 + 1 = 15. Total: 2 + 9.6×10⁷·15 + 2 ≈ **1.44×10⁹**.
-
-### Row 18 — max ≈ 7.4×10¹⁶ (S=1→2, nested loops)
-
-State: `W=15, L=20, E=4, S=2`. The 13 body lines become an inner loop scaffold (7) + 6 inner-body passes.
-
-```
-i:=99*99*99*99;
-loop:
-if i==0:
-break;
-end
-j:=99*99*99*99;
-loop:
-if j==0:
-break;
-end
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-j=j-1;
-end
-i=i-1;
-end
-```
-
-Innermost iter cost: 1 + 6 + 1 = 8. Innermost iter count: `N² ≈ 9.2×10¹⁵`. Total ≈ **7.4×10¹⁶**.
-
-### Row 19 — max ≈ 6.6×10³⁶ (W=30 lets `N` jump to 99⁹)
-
-State: `W=30, L=20, E=4, S=2`. Same shape, longer literal expressions.
-
-```
-i:=99*99*99*99*99*99*99*99*99;
-loop:
-if i==0:
-break;
-end
-j:=99*99*99*99*99*99*99*99*99;
-loop:
-if j==0:
-break;
-end
-pass;
-pass;
-pass;
-pass;
-pass;
-pass;
-j=j-1;
-end
-i=i-1;
-end
-```
-
-`N = 99⁹ ≈ 9.1×10¹⁷`. Innermost iters: `N² ≈ 8.3×10³⁵`. Total ≈ **6.6×10³⁶**.
-
-### Row 21 — max ≈ 2.7×10⁷² (L=30, four-deep nesting)
-
-State: `W=30, L=30, E=4, S=3`. Four loop scaffolds (28 lines) + 2 innermost passes. `S=3` is irrelevant — functions don't beat plain nesting at this line budget, so the optimal program ignores `def`.
-
-```
-i:=99*99*99*99*99*99*99*99*99;
-loop:
-if i==0:
-break;
-end
-j:=99*99*99*99*99*99*99*99*99;
-loop:
-if j==0:
-break;
-end
-k:=99*99*99*99*99*99*99*99*99;
-loop:
-if k==0:
-break;
-end
-l:=99*99*99*99*99*99*99*99*99;
-loop:
-if l==0:
-break;
-end
-pass;
-pass;
-l=l-1;
-end
-k=k-1;
-end
-j=j-1;
-end
-i=i-1;
-end
-```
-
-Innermost iter cost: 4. Innermost iters: `N⁴ ≈ 6.86×10⁷¹`. Total ≈ **2.7×10⁷²**.
-
-### Row 24 — max ≈ 2×10²⁴⁹ (W=80, L=40 — the polynomial ceiling)
-
-State: `W=80, L=40, E=4, S=4`. Five loop scaffolds (35 lines) + 5 innermost passes. Each counter is 25 factors of `99` (78 chars), `N = 99²⁵ ≈ 7.7×10⁴⁹`. Linear recursion (S=4) doesn't beat this — it costs lines for the function scaffold without buying extra depth.
-
-```
-i:=99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99;
-loop:
-if i==0:
-break;
-end
-j:=99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99;
-loop:
-if j==0:
-break;
-end
-k:=99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99;
-loop:
-if k==0:
-break;
-end
-l:=99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99;
-loop:
-if l==0:
-break;
-end
-m:=99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99;
-loop:
-if m==0:
-break;
-end
-pass;
-pass;
-pass;
-pass;
-pass;
-m=m-1;
-end
-l=l-1;
-end
-k=k-1;
-end
-j=j-1;
-end
-i=i-1;
-end
-```
-
-Innermost iter cost: 7. Innermost iters: `N⁵ ≈ 2.7×10²⁴⁸`. Total ≈ **1.9×10²⁴⁹**.
-
-### Row 26 — saturated (S=5, tree recursion)
-
-State: `W=80, L=40, E=4, S=5`. Doubling recursion plus a width-stuffed argument blows past anything realistic.
-
-```
-def f(n):
-if n==0:
-return 0;
-end
-f(n-1);
-f(n-1);
-end
-f(99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99*99);
-```
-
-8 lines, 32 spare. `N = 99²⁵ ≈ 7.7×10⁴⁹`. Calls: `~2^N`, so instructions on the order of `5·2^(7.7×10⁴⁹)`. **Saturated** at whatever the runtime cap is — and with 32 lines unused, the player can graduate to Ackermann (`def A(m,n): if m==0: return n+1; end if n==0: return A(m-1,1); end return A(m-1,A(m,n-1)); end A(4,99);`, ~10 lines, `W=23` minimum) which saturates faster than doubling but doesn't change the practical outcome.
-
-A small note on what's *not* shown: rows where I expected meaningful program changes but they don't actually appear in the optimal program. Rows 20 (`def`, no recursion) and 25 (linear recursion) have the same optimal program as the nesting that came before, because at those line budgets the function scaffold costs as much as it saves. The player who hits S=3 or S=4 *can* write functions — they're useful for code organisation and they'll be needed to climb to S=5 — but the busy-beaver-maximising program at that exact row doesn't use them.
- */

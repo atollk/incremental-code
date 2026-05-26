@@ -463,6 +463,19 @@ impl_upgrade!(
     ]
 );
 
+impl CodeExpressionLiterals {
+    pub fn get_max_int_literal(self) -> u8 {
+        match self.0 {
+            0 => 1,
+            1 => 2,
+            2 => 5,
+            3 => 10,
+            4 => 100,
+            _ => 255,
+        }
+    }
+}
+
 impl_upgrade!(
     KeepPrestigeUpgrades,
     type=bool,
