@@ -5,7 +5,6 @@ use std::borrow::Cow;
 
 /// Common interface for all purchasable upgrades.
 pub trait Upgrade: dyn_clone::DynClone {
-    /// Human-readable name of this upgrade.
     fn name(&self) -> &'static str;
     /// The unlock tier this upgrade belongs to.
     fn group(&self) -> usize;
@@ -22,6 +21,12 @@ pub trait Upgrade: dyn_clone::DynClone {
     fn level_up(&mut self);
     /// Reduce this upgrade by one level, clamping at zero.
     fn level_down(&mut self);
+
+    fn num_cost_tracks(&self) -> usize;
+    fn track_get_level(&self, track: usize) -> u8;
+    fn track_next_cost(&self, track: usize) -> Option<Resources>;
+    fn track_level_up(&mut self, track: usize);
+    fn track_level_down(&mut self, track: usize);
 
     /// Renders the upgrade level as a string of box characters.
     fn format_level_str(&self) -> String {
@@ -117,7 +122,8 @@ macro_rules! impl_upgrade {
         $struct:ident,
         type=$val:ty,
         level=$group_level:expr,
-        [ $( ($value:expr, $cost:expr, $text:expr) ),+ $(,)? ]
+        values=[ $( ($value:expr, $text:expr) ),+ $(,)? ],
+        costs=[ $( [ $( $cost:expr ),+ $(,)? ] ),+ $(,)? ]
     ) => {
         #[derive(Debug, Default, Clone, PartialEq, std::hash::Hash, serde::Serialize, serde::Deserialize)]
         pub(crate) struct $struct (u8);
@@ -139,13 +145,24 @@ macro_rules! impl_upgrade {
                 None
             }
 
-            pub(crate) fn cost_at(level: u8) -> Option<Resources> {
-                let mut __i: u8 = 0;
+            pub(crate) fn cost_at_track(track: usize, level: u8) -> Option<Resources> {
+                let mut __t: usize = 0;
                 $(
-                    if level == __i { return Some($cost); }
-                    __i += 1;
+                    if track == __t {
+                        let mut __i: u8 = 0;
+                        $(
+                            if level == __i { return Some($cost); }
+                            __i += 1;
+                        )+
+                        return None;
+                    }
+                    __t += 1;
                 )+
                 None
+            }
+
+            pub(crate) fn cost_at(level: u8) -> Option<Resources> {
+                Self::cost_at_track(0, level)
             }
 
             pub(crate) fn value_text_at(level: u8) -> Option<Cow<'static, str>> {
@@ -157,11 +174,22 @@ macro_rules! impl_upgrade {
                 None
             }
 
-
             pub(crate) fn value(&self) -> $val {
                 Self::value_at(self.0).unwrap_or_else(|| self.fail_oob())
             }
         }
+
+        // Verify that `costs` and `values` match in size.
+        const _: () = {
+            let values_len = [ $( impl_upgrade!(@unit $value) ),+ ].len();
+            $(
+                let costs_len = [ $( impl_upgrade!(@unit $cost) ),+ ].len();
+                assert!(
+                    values_len == costs_len,
+                    concat!(stringify!($struct), ": cost track length must equal values length"),
+                );
+            )+
+        };
 
         impl Upgrade for $struct {
             fn name(&self) -> &'static str {
@@ -185,7 +213,7 @@ macro_rules! impl_upgrade {
             }
 
             fn next_level_cost(&self) -> Option<Resources> {
-                Self::cost_at(self.0)
+                self.track_next_cost(0)
             }
 
             fn level_up(&mut self) {
@@ -195,16 +223,34 @@ macro_rules! impl_upgrade {
             fn level_down(&mut self) {
                 self.0 = self.0.saturating_sub(1);
             }
+
+            fn num_cost_tracks(&self) -> usize {
+                [ $( impl_upgrade!(@unit_track [ $( $cost ),+ ]) ),+ ].len()
+            }
+
+            fn track_get_level(&self, _track: usize) -> u8 {
+                self.0
+            }
+
+            fn track_next_cost(&self, track: usize) -> Option<Resources> {
+                Self::cost_at_track(track, self.0)
+            }
+
+            fn track_level_up(&mut self, _track: usize) {
+                self.level_up()
+            }
+
+            fn track_level_down(&mut self, _track: usize) {
+                self.level_down()
+            }
         }
     };
     (@unit $_:expr) => { () };
+    (@unit_track [ $( $_track_cost:expr ),+ ]) => { () };
 }
 
 const LOCKED: &str = "🔒";
 const UNLOCKED: &str = "🔓";
-
-/*
- */
 
 // Level 0
 
@@ -212,40 +258,32 @@ impl_upgrade!(
     UnlockCode,
     type=bool,
     level=0,
-    [
-        (false, Resources::from_bronze(0.), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_bronze(0.), Resources::zero()]]
 );
 
 impl_upgrade!(
     UnlockHud,
     type=bool,
     level=0,
-    [
-        (false, Resources::from_bronze(1.), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_bronze(1.), Resources::zero()]]
 );
 
 impl_upgrade!(
     UnlockMusic,
     type=bool,
     level=0,
-    [
-        (false, Resources::from_bronze(5.), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_bronze(5.), Resources::zero()]]
 );
 
 impl_upgrade!(
     UnlockLevel1,
     type=bool,
     level=0,
-    [
-        (false, Resources::from_bronze(5.), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_bronze(5.), Resources::zero()]]
 );
 
 // Level 1
@@ -254,85 +292,335 @@ impl_upgrade!(
     CompileTime,
     type=f32,
     level=1,
-    [
-        (10., Resources::from_bronze(10.), "10s"),
-        (5., Resources::from_bronze(100.), "5s"),
-        (4., Resources::from_bronze(1e3), "4s"),
-        (3., Resources::from_bronze(1e6), "3s"),
-        (2., Resources::from_bronze(1e9), "2s"),
-        (1., Resources::from_silver(10.), "1s"),
-        (0.1, Resources::zero(), "0.1s"),
-    ]
+    values=[
+        (10., "10s"),
+        (5., "5s"),
+        (4., "4s"),
+        (3., "3s"),
+        (2., "2s"),
+        (1., "1s"),
+        (0.1, "0.1s"),
+    ],
+    costs=[[
+        Resources::from_bronze(10.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(1e3),
+        Resources::from_bronze(1e6),
+        Resources::from_bronze(1e9),
+        Resources::from_silver(10.),
+        Resources::zero(),
+    ]]
 );
 
 impl_upgrade!(
     InstructionExecutionSpeed,
     type=u32,
     level=1,
-    [
-        (1, Resources::from_bronze(50.), "100 %"),
-        (1, Resources::from_bronze(50.), "90 %"),
-        (1, Resources::from_bronze(50.), "80 %"),
-        (1, Resources::from_bronze(50.), "70 %"),
-        (1, Resources::from_bronze(50.), "60 %"),
-        (1, Resources::from_bronze(50.), "50 %"),
-        (2, Resources::from_bronze(100.), "40 %"),
-        (2, Resources::from_bronze(100.), "30 %"),
-        (4, Resources::from_bronze(100.), "25 %"),
-        (4, Resources::from_bronze(100.), "20 %"),
-        (4, Resources::from_bronze(100.), "15 %"),
-        (10, Resources::from_bronze(30e3), "10 %"),
-        (10, Resources::from_bronze(30e3), "5 %"),
-        (10, Resources::from_bronze(30e3), "2.5 %"),
-        (10, Resources::from_bronze(30e3), "1 %"),
-        (10, Resources::from_bronze(30e3), "0.5 %"),
-        (10, Resources::from_bronze(30e3), "0.25 %"),
-        (10, Resources::from_bronze(30e3), "0.1 %"),
-        (10, Resources::from_bronze(30e3), "n ^ -0.1"),
-        (10, Resources::from_bronze(30e3), "n ^ -0.2"),
-        (10, Resources::from_bronze(30e3), "n ^ -0.3"),
-        (10, Resources::from_bronze(30e3), "n ^ -0.4"),
-        (10, Resources::from_bronze(30e3), "n ^ -0.5"),
-        (10, Resources::from_bronze(30e3), "n ^ -0.6"),
-        (10, Resources::from_bronze(30e3), "n ^ -0.7"),
-        (10, Resources::from_bronze(30e3), "n ^ -0.8"),
-        (10, Resources::from_bronze(30e3), "n ^ -0.9"),
-        (10, Resources::from_bronze(30e3), "n ^ -1"),
-    ]
+    values=[
+        (1, "100 %"),
+        (1, "90 %"),
+        (1, "80 %"),
+        (1, "70 %"),
+        (1, "60 %"),
+        (1, "50 %"),
+        (2, "40 %"),
+        (2, "30 %"),
+        (4, "25 %"),
+        (4, "20 %"),
+        (4, "15 %"),
+        (10, "10 %"),
+        (10, "5 %"),
+        (10, "2.5 %"),
+        (10, "1 %"),
+        (10, "0.5 %"),
+        (10, "0.25 %"),
+        (10, "0.1 %"),
+        (10, "n ^ -0.1"),
+        (10, "n ^ -0.2"),
+        (10, "n ^ -0.3"),
+        (10, "n ^ -0.4"),
+        (10, "n ^ -0.5"),
+        (10, "n ^ -0.6"),
+        (10, "n ^ -0.7"),
+        (10, "n ^ -0.8"),
+        (10, "n ^ -0.9"),
+        (10, "n ^ -1"),
+    ],
+    costs=[[
+        Resources::from_bronze(50.),
+        Resources::from_bronze(50.),
+        Resources::from_bronze(50.),
+        Resources::from_bronze(50.),
+        Resources::from_bronze(50.),
+        Resources::from_bronze(50.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+        Resources::from_bronze(30e3),
+    ]]
 );
 
 impl_upgrade!(
     CodeLineWidth,
     type=u8,
     level=1,
-    [
-        (5, Resources::from_bronze(5.), "5"),
-        (10, Resources::from_bronze(100.), "10"),
-        (15, Resources::from_bronze(100e3), "15"),
-        (30, Resources::from_bronze(10e6), "30"),
-        (50, Resources::from_silver(100.), "50"),
-        (80, Resources::zero(), "80"),
-    ]
+    values=[
+        (5, "5"),
+        (10, "10"),
+        (15, "15"),
+        (30, "30"),
+        (50, "50"),
+        (80, "80"),
+    ],
+    costs=[[
+        Resources::from_bronze(5.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100e3),
+        Resources::from_bronze(10e6),
+        Resources::from_silver(100.),
+        Resources::zero(),
+    ]]
 );
 
 impl_upgrade!(
     CodeLineCount,
     type=u8,
     level=1,
-    [
-        (1, Resources::from_bronze(5.), "1"),
-        (2, Resources::from_bronze(25.), "2"),
-        (4, Resources::from_bronze(1e3), "4"),
-        (4, Resources::from_bronze(1e3), "5"),
-        (6, Resources::from_bronze(100e3), "6"),
-        (6, Resources::from_bronze(100e3), "7"),
-        (8, Resources::from_bronze(10e6), "8"),
-        (10, Resources::from_silver(10.), "10"),
-        (10, Resources::from_silver(10.), "15"),
-        (20, Resources::from_silver(1e3), "20"),
-        (30, Resources::from_gold(100.), "30"),
-        (40, Resources::zero(), "40"),
-    ]
+    values=[
+        (1, "1"),
+        (2, "2"),
+        (4, "4"),
+        (4, "5"),
+        (6, "6"),
+        (6, "7"),
+        (8, "8"),
+        (10, "10"),
+        (10, "15"),
+        (20, "20"),
+        (30, "30"),
+        (40, "40"),
+    ],
+    costs=[[
+        Resources::from_bronze(5.),
+        Resources::from_bronze(25.),
+        Resources::from_bronze(1e3),
+        Resources::from_bronze(1e3),
+        Resources::from_bronze(100e3),
+        Resources::from_bronze(100e3),
+        Resources::from_bronze(10e6),
+        Resources::from_silver(10.),
+        Resources::from_silver(10.),
+        Resources::from_silver(1e3),
+        Resources::from_gold(100.),
+        Resources::zero(),
+    ]]
+);
+
+impl_upgrade!(
+    UnlockLevel2,
+    type=bool,
+    level=1,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_bronze(100e3), Resources::zero()]]
+);
+
+// Level 2
+
+impl_upgrade!(
+    BronzePerInstruction,
+    type=u32,
+    level=2,
+    values=[
+        (1, "1"),
+        (1, "2"),
+        (1, "3"),
+        (1, "4"),
+        (5, "5"),
+        (5, "6"),
+        (5, "7"),
+        (5, "8"),
+        (5, "9"),
+        (5, "10"),
+        (5, "15"),
+        (5, "20"),
+        (5, "25"),
+        (5, "30"),
+        (5, "35"),
+        (5, "40"),
+        (5, "50"),
+        (5, "100"),
+        (5, "n"),
+        (5, "n ^ 1.5"),
+        (5, "n ^ 2"),
+        (5, "n ^ 2.5"),
+        (5, "n ^ 3"),
+        (5, "n ^ 4"),
+        (5, "n ^ 5"),
+        (5, "n ^ 6"),
+        (5, "n ^ 7"),
+        (5, "n ^ 8"),
+        (5, "n ^ 9"),
+        (5, "n ^ 10"),
+    ],
+    costs=[[
+        Resources::from_bronze(10.),
+        Resources::from_bronze(10.),
+        Resources::from_bronze(10.),
+        Resources::from_bronze(10.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+        Resources::from_bronze(100.),
+    ]]
+);
+
+// TODO
+impl_upgrade!(
+    MaxInstructions,
+    type=u64,
+    level=2,
+    values=[
+        (100, "100"),
+        (100, "200"),
+        (100, "300"),
+        (100, "400"),
+        (500, "500"),
+        (500, "750"),
+        (500, "1000"),
+        (500, "1250"),
+        (500, "1500"),
+        (2000, "2000"),
+        (2000, "2500"),
+        (2000, "3000"),
+        (2000, "4000"),
+        (2000, "5000"),
+        (2000, "6000"),
+        (2000, "8000"),
+        (10_000, "10000"),
+        (100_000, "10000"),
+        (1_000_000, "10000"),
+        (100_000_000, "10000"),
+        (1_000_000_000, "100000"),
+    ],
+    costs=[[
+        Resources::from_bronze(50.),
+        Resources::from_bronze(50.),
+        Resources::from_bronze(50.),
+        Resources::from_bronze(50.),
+        Resources::from_bronze(1e3),
+        Resources::from_bronze(1e3),
+        Resources::from_bronze(1e3),
+        Resources::from_bronze(1e3),
+        Resources::from_bronze(1e3),
+        Resources::from_bronze(50e3),
+        Resources::from_bronze(50e3),
+        Resources::from_bronze(50e3),
+        Resources::from_bronze(50e3),
+        Resources::from_bronze(50e3),
+        Resources::from_bronze(50e3),
+        Resources::from_bronze(50e3),
+        Resources::from_bronze(5e6),
+        Resources::from_bronze(5e6),
+        Resources::from_bronze(5e6),
+        Resources::from_bronze(5e6),
+        Resources::zero(),
+    ]]
+);
+
+impl_upgrade!(
+    UnlockReboot,
+    type=bool,
+    level=2,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_silver(100.), Resources::zero()]]
+);
+
+impl_upgrade!(
+    CodeExpressionLiterals,
+    type=(),
+    level=2,
+    values=[
+        ((), "0, 1"),
+        ((), "2"),
+        ((), "3, 4, 5"),
+        ((), "6-10"),
+        ((), "numbers to 100"),
+        ((), "numbers to 255"),
+        ((), "empty strings"),
+    ],
+    costs=[[
+        Resources::from_bronze(200.),
+        Resources::from_bronze(200.),
+        Resources::from_bronze(200.),
+        Resources::from_bronze(200.),
+        Resources::zero(),
+        Resources::zero(),
+        Resources::zero(),
+    ]]
+);
+
+impl_upgrade!(
+    KeepPrestigeUpgrades,
+    type=bool,
+    level=2,
+    values=[
+        (false, "keep L0"),
+        (false, "keep L1"),
+        (false, "keep L2"),
+        (false, "keep L3"),
+        (false, "keep L4"),
+        (false, "keep L5"),
+        (false, "keep L6"),
+    ],
+    costs=[[
+        Resources::from_bronze(500.),
+        Resources::from_bronze(500.),
+        Resources::from_bronze(500.),
+        Resources::from_bronze(500.),
+        Resources::from_bronze(500.),
+        Resources::from_bronze(500.),
+        Resources::zero(),
+    ]]
 );
 
 pub enum CodeStatementLevels {
@@ -347,124 +635,297 @@ pub enum CodeStatementLevels {
 impl_upgrade!(
     CodeStatements,
     type=CodeStatementLevels,
-    level=1,
-    [
-        (CodeStatementLevels::None, Resources::from_bronze(500e3), ""),
-        (CodeStatementLevels::SimpleLoops, Resources::from_bronze(500e3), "simple loops"),
-        (CodeStatementLevels::NestedLoops, Resources::from_bronze(500e3), "nested loops"),
-        (CodeStatementLevels::Functions, Resources::from_bronze(500e3), "functions"),
-        (CodeStatementLevels::SingleRecursion, Resources::from_bronze(500e3), "single recursion"),
-        (CodeStatementLevels::MultiRecursion, Resources::zero(), "multi recursion"),
-    ]
-);
-
-impl_upgrade!(
-    UnlockLevel2,
-    type=bool,
-    level=1,
-    [
-        (false, Resources::from_bronze(100e3), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
-);
-
-// Level 2
-
-impl_upgrade!(
-    BronzePerInstruction,
-    type=u32,
     level=2,
-    [
-        (1, Resources::from_bronze(10.), "1"),
-        (1, Resources::from_bronze(10.), "2"),
-        (1, Resources::from_bronze(10.), "3"),
-        (1, Resources::from_bronze(10.), "4"),
-        (5, Resources::from_bronze(100.), "5"),
-        (5, Resources::from_bronze(100.), "6"),
-        (5, Resources::from_bronze(100.), "7"),
-        (5, Resources::from_bronze(100.), "8"),
-        (5, Resources::from_bronze(100.), "9"),
-        (5, Resources::from_bronze(100.), "10"),
-        (5, Resources::from_bronze(100.), "15"),
-        (5, Resources::from_bronze(100.), "20"),
-        (5, Resources::from_bronze(100.), "25"),
-        (5, Resources::from_bronze(100.), "30"),
-        (5, Resources::from_bronze(100.), "35"),
-        (5, Resources::from_bronze(100.), "40"),
-        (5, Resources::from_bronze(100.), "50"),
-        (5, Resources::from_bronze(100.), "100"),
-        (5, Resources::from_bronze(100.), "n"),
-        (5, Resources::from_bronze(100.), "n ^ 1.5"),
-        (5, Resources::from_bronze(100.), "n ^ 2"),
-        (5, Resources::from_bronze(100.), "n ^ 2.5"),
-        (5, Resources::from_bronze(100.), "n ^ 3"),
-        (5, Resources::from_bronze(100.), "n ^ 4"),
-        (5, Resources::from_bronze(100.), "n ^ 5"),
-        (5, Resources::from_bronze(100.), "n ^ 6"),
-        (5, Resources::from_bronze(100.), "n ^ 7"),
-        (5, Resources::from_bronze(100.), "n ^ 8"),
-        (5, Resources::from_bronze(100.), "n ^ 9"),
-        (5, Resources::from_bronze(100.), "n ^ 10"),
-    ]
+    values=[
+        (CodeStatementLevels::None, ""),
+        (CodeStatementLevels::SimpleLoops, "simple loops"),
+        (CodeStatementLevels::NestedLoops, "nested loops"),
+        (CodeStatementLevels::Functions, "functions"),
+        (CodeStatementLevels::SingleRecursion, "single recursion"),
+        (CodeStatementLevels::MultiRecursion, "multi recursion"),
+    ],
+    costs=[[
+        Resources::from_bronze(500e3),
+        Resources::from_bronze(500e3),
+        Resources::from_bronze(500e3),
+        Resources::from_bronze(500e3),
+        Resources::from_bronze(500e3),
+        Resources::zero(),
+    ]]
+);
+
+impl_upgrade!(
+    UnlockLevel3,
+    type=bool,
+    level=2,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_silver(1e3), Resources::zero()]]
+);
+
+// Level 3
+
+impl_upgrade!(
+    AutoCompile,
+    type=bool,
+    level=3,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_silver(5e3), Resources::zero()]]
+);
+
+impl_upgrade!(
+    UnlockPrint,
+    type=bool,
+    level=3,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_silver(10e3), Resources::zero()]]
+);
+
+impl_upgrade!(
+    PrintSpeedReset,
+    type=f32,
+    level=3,
+    values=[
+        (1.0, "^0"),
+        (0.5, "^0.1"),
+        (0.5, "^0.2"),
+        (0.5, "^0.3"),
+        (0.5, "^0.4"),
+        (0.5, "^0.5"),
+        (0.5, "^0.6"),
+        (0.5, "^0.7"),
+        (0.5, "^0.8"),
+        (0.5, "^0.9"),
+        (0.5, "none"),
+    ],
+    costs=[[
+        Resources::from_silver(20e3),
+        Resources::from_silver(100e3),
+        Resources::from_silver(100e3),
+        Resources::from_silver(100e3),
+        Resources::from_silver(100e3),
+        Resources::from_silver(100e3),
+        Resources::from_silver(100e3),
+        Resources::from_silver(100e3),
+        Resources::from_silver(100e3),
+        Resources::from_silver(100e3),
+        Resources::zero(),
+    ]]
 );
 
 // TODO
 impl_upgrade!(
-    MaxInstructions,
-    type=u64,
-    level=2,
-    [
-        (100, Resources::from_bronze(50.), "100"),
-        (100, Resources::from_bronze(50.), "200"),
-        (100, Resources::from_bronze(50.), "300"),
-        (100, Resources::from_bronze(50.), "400"),
-        (500, Resources::from_bronze(1e3), "500"),
-        (500, Resources::from_bronze(1e3), "750"),
-        (500, Resources::from_bronze(1e3), "1000"),
-        (500, Resources::from_bronze(1e3), "1250"),
-        (500, Resources::from_bronze(1e3), "1500"),
-        (2000, Resources::from_bronze(50e3), "2000"),
-        (2000, Resources::from_bronze(50e3), "2500"),
-        (2000, Resources::from_bronze(50e3), "3000"),
-        (2000, Resources::from_bronze(50e3), "4000"),
-        (2000, Resources::from_bronze(50e3), "5000"),
-        (2000, Resources::from_bronze(50e3), "6000"),
-        (2000, Resources::from_bronze(50e3), "8000"),
-        (10_000, Resources::from_bronze(5e6), "10000"),
-        (100_000, Resources::from_bronze(5e6), "10000"),
-        (1_000_000, Resources::from_bronze(5e6), "10000"),
-        (100_000_000, Resources::from_bronze(5e6), "10000"),
-        (1_000_000_000, Resources::zero(), "100000"),
-    ]
+    SilverPerPrintCharacter,
+    type=(u32, u8),
+    level=3,
+    values=[
+        ((0, 0), "1"),
+        ((0, 0), "2"),
+        ((0, 0), "3"),
+        ((0, 0), "4"),
+        ((0, 0), "5"),
+        ((1, 1), "n"),
+        ((2, 1), "2n"),
+        ((2, 1), "3n"),
+        ((2, 1), "4n"),
+        ((5, 1), "5n"),
+        ((1, 2), "n^2"),
+        ((1, 3), "n^3"),
+        ((1, 5), "n^5"),
+        ((1, 10), "n^10"),
+    ],
+    costs=[[
+        Resources::from_silver(50e3),
+        Resources::from_silver(50e3),
+        Resources::from_silver(50e3),
+        Resources::from_silver(50e3),
+        Resources::from_silver(50e3),
+        Resources::from_silver(50e3),
+        Resources::from_silver(500e3),
+        Resources::from_silver(500e3),
+        Resources::from_silver(500e3),
+        Resources::from_gold(1.),
+        Resources::zero(),
+        Resources::zero(),
+        Resources::zero(),
+        Resources::zero(),
+    ]]
 );
 
 impl_upgrade!(
-    UnlockReboot,
+    RessourcesAfterReboot,
+    type=Resources,
+    level=3,
+    values=[
+        (Resources::zero(), "0"),
+        (Resources::new(100.0, 0.0, 0.0, 0.0, 0.0), format!("{}", Resources::new(100.0, 0.0, 0.0, 0.0, 0.0).fmt_oneline())),
+        (Resources::new(10_000.0, 100.0, 0.0, 0.0, 0.0), format!("{}", Resources::new(10_000.0, 100.0, 0.0, 0.0, 0.0).fmt_oneline())),
+        (Resources::new(1e6, 10_000., 100., 0.0, 0.0), format!("{}", Resources::new(1e6, 10_000., 100., 0.0, 0.0).fmt_oneline())),
+    ],
+    costs=[[
+        Resources::from_silver(100.),
+        Resources::from_gold(100.),
+        Resources::from_diamond(100.),
+        Resources::zero(),
+    ]]
+);
+
+impl_upgrade!(
+    UnlockLevel4,
     type=bool,
-    level=2,
-    [
-        (false, Resources::from_silver(100.), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
+    level=3,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_gold(10.), Resources::zero()]]
+);
+
+// Level 4
+
+impl_upgrade!(
+    UnlockSleep,
+    type=bool,
+    level=4,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_gold(50.), Resources::zero()]]
+);
+
+// TODO
+impl_upgrade!(
+    MinInstructionDuration,
+    type=f32,
+    level=4,
+    values=[
+        (1.0, "1ms"),
+        (0.1, "0.1ms"),
+        (0.01, "0.01ms"),
+    ],
+    costs=[[
+        Resources::from_gold(100.),
+        Resources::from_gold(1e3),
+        Resources::zero(),
+    ]]
+);
+
+// TODO
+impl_upgrade!(
+    InstructionSpeedToSleep,
+    type=f32,
+    level=4,
+    values=[
+        (1.0, "1x"),
+        (2.0, "2x"),
+        (5.0, "5x"),
+    ],
+    costs=[[
+        Resources::from_gold(200.),
+        Resources::from_gold(2e3),
+        Resources::zero(),
+    ]]
+);
+
+// TODO
+impl_upgrade!(
+    GoldPerSleepSecond,
+    type=f32,
+    level=4,
+    values=[
+        (1.0, "1"),
+        (5.0, "5"),
+        (25.0, "25"),
+    ],
+    costs=[[
+        Resources::from_gold(500.),
+        Resources::from_gold(5e3),
+        Resources::zero(),
+    ]]
 );
 
 impl_upgrade!(
-    CodeExpressionLiterals,
-    type=(),
-    level=2,
-    [
-        ((), Resources::from_bronze(200.), "0, 1"),
-        ((), Resources::from_bronze(200.), "2"),
-        ((), Resources::from_bronze(200.), "3, 4, 5"),
-        ((), Resources::from_bronze(200.), "6-10"),
-        ((), Resources::zero(), "numbers to 100"),
-        ((), Resources::zero(), "numbers to 255"),
-        ((), Resources::zero(), "empty strings"),
-    ]
+    UnlockLevel5,
+    type=bool,
+    level=4,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_gold(10e3), Resources::zero()]]
+);
+
+// Level 5
+
+impl_upgrade!(
+    AutoRun,
+    type=bool,
+    level=5,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_gold(50e3), Resources::zero()]]
+);
+
+impl_upgrade!(
+    UnlockBrk,
+    type=bool,
+    level=5,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_gold(100e3), Resources::zero()]]
+);
+
+// TODO
+impl_upgrade!(
+    BreakSlowdown,
+    type=f32,
+    level=5,
+    values=[
+        (2.0, "2x"),
+        (5.0, "5x"),
+        (10.0, "10x"),
+    ],
+    costs=[[
+        Resources::from_gold(500e3),
+        Resources::from_gold(5e6),
+        Resources::zero(),
+    ]]
+);
+
+// TODO
+impl_upgrade!(
+    DiamondPerBreakPoint,
+    type=f32,
+    level=5,
+    values=[
+        (1.0, "1"),
+        (5.0, "5"),
+        (25.0, "25"),
+    ],
+    costs=[[
+        Resources::from_gold(1e6),
+        Resources::from_gold(10e6),
+        Resources::zero(),
+    ]]
+);
+
+impl_upgrade!(
+    UnlockLevel6,
+    type=bool,
+    level=5,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_gold(100e6), Resources::zero()]]
+);
+
+// Level 6
+
+impl_upgrade!(
+    GainCurrencyFunction,
+    type=bool,
+    level=6,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_gold(1e9), Resources::zero()]]
+);
+
+impl_upgrade!(
+    WinCondition,
+    type=bool,
+    level=6,
+    values=[(false, "not won"), (true, "won")],
+    costs=[[Resources::from_gold(1e12), Resources::zero()]]
 );
 
 impl CodeExpressionLiterals {
-    pub fn get_max_int_literal(self) -> u8 {
+    pub(crate) fn get_max_int_literal(&self) -> u8 {
         match self.0 {
             0 => 1,
             1 => 2,
@@ -475,250 +936,3 @@ impl CodeExpressionLiterals {
         }
     }
 }
-
-impl_upgrade!(
-    KeepPrestigeUpgrades,
-    type=bool,
-    level=2,
-    [
-        (false, Resources::from_bronze(500.), "keep L0"),
-        (false, Resources::from_bronze(500.), "keep L1"),
-        (false, Resources::from_bronze(500.), "keep L2"),
-        (false, Resources::from_bronze(500.), "keep L3"),
-        (false, Resources::from_bronze(500.), "keep L4"),
-        (false, Resources::from_bronze(500.), "keep L5"),
-        (false, Resources::zero(), "keep L6"),
-    ]
-);
-
-impl_upgrade!(
-    UnlockLevel3,
-    type=bool,
-    level=2,
-    [
-        (false, Resources::from_silver(1e3), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
-);
-
-// Level 3
-
-impl_upgrade!(
-    AutoCompile,
-    type=bool,
-    level=3,
-    [
-        (false, Resources::from_silver(5e3), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
-);
-
-impl_upgrade!(
-    UnlockPrint,
-    type=bool,
-    level=3,
-    [
-        (false, Resources::from_silver(10e3), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
-);
-
-impl_upgrade!(
-    PrintSpeedReset,
-    type=f32,
-    level=3,
-    [
-        (1.0, Resources::from_silver(20e3), "^0"),
-        (0.5, Resources::from_silver(100e3), "^0.1"),
-        (0.5, Resources::from_silver(100e3), "^0.2"),
-        (0.5, Resources::from_silver(100e3), "^0.3"),
-        (0.5, Resources::from_silver(100e3), "^0.4"),
-        (0.5, Resources::from_silver(100e3), "^0.5"),
-        (0.5, Resources::from_silver(100e3), "^0.6"),
-        (0.5, Resources::from_silver(100e3), "^0.7"),
-        (0.5, Resources::from_silver(100e3), "^0.8"),
-        (0.5, Resources::from_silver(100e3), "^0.9"),
-        (0.5, Resources::from_silver(100e3), "none"),
-    ]
-);
-
-// TODO
-impl_upgrade!(
-    SilverPerPrintCharacter,
-    type=(u32, u8),
-    level=3,
-    [
-        ((0, 0), Resources::from_silver(50e3), "1"),
-        ((0, 0), Resources::from_silver(50e3), "2"),
-        ((0, 0), Resources::from_silver(50e3), "3"),
-        ((0, 0), Resources::from_silver(50e3), "4"),
-        ((0, 0), Resources::from_silver(50e3), "5"),
-        ((1, 1), Resources::from_silver(50e3), "n"),
-        ((2, 1), Resources::from_silver(500e3), "2n"),
-        ((2, 1), Resources::from_silver(500e3), "3n"),
-        ((2, 1), Resources::from_silver(500e3), "4n"),
-        ((5, 1), Resources::from_gold(1.), "5n"),
-        ((1, 2), Resources::zero(), "n^2"),
-        ((1, 3), Resources::zero(), "n^3"),
-        ((1, 5), Resources::zero(), "n^5"),
-        ((1, 10), Resources::zero(), "n^10"),
-    ]
-);
-
-impl_upgrade!(
-    RessourcesAfterReboot,
-    type=Resources,
-    level=3,
-    [
-        (Resources::zero(), Resources::from_silver(100.), "0"),
-        (Resources::new(100.0, 0.0, 0.0, 0.0, 0.0), Resources::from_gold(100.), format!("{}", Resources::new(100.0, 0.0, 0.0, 0.0, 0.0).fmt_oneline())),
-        (Resources::new(10_000.0, 100.0, 0.0, 0.0, 0.0), Resources::from_diamond(100.), format!("{}", Resources::new(10_000.0, 100.0, 0.0, 0.0, 0.0).fmt_oneline())),
-        (Resources::new(1e6, 10_000., 100., 0.0, 0.0), Resources::zero(), format!("{}", Resources::new(1e6, 10_000., 100., 0.0, 0.0).fmt_oneline())),
-    ]
-);
-
-impl_upgrade!(
-    UnlockLevel4,
-    type=bool,
-    level=3,
-    [
-        (false, Resources::from_gold(10.), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
-);
-
-// Level 4
-
-impl_upgrade!(
-    UnlockSleep,
-    type=bool,
-    level=4,
-    [
-        (false, Resources::from_gold(50.), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
-);
-
-// TODO
-impl_upgrade!(
-    MinInstructionDuration,
-    type=f32,
-    level=4,
-    [
-        (1.0, Resources::from_gold(100.), "1ms"),
-        (0.1, Resources::from_gold(1e3), "0.1ms"),
-        (0.01, Resources::zero(), "0.01ms"),
-    ]
-);
-
-// TODO
-impl_upgrade!(
-    InstructionSpeedToSleep,
-    type=f32,
-    level=4,
-    [
-        (1.0, Resources::from_gold(200.), "1x"),
-        (2.0, Resources::from_gold(2e3), "2x"),
-        (5.0, Resources::zero(), "5x"),
-    ]
-);
-
-// TODO
-impl_upgrade!(
-    GoldPerSleepSecond,
-    type=f32,
-    level=4,
-    [
-        (1.0, Resources::from_gold(500.), "1"),
-        (5.0, Resources::from_gold(5e3), "5"),
-        (25.0, Resources::zero(), "25"),
-    ]
-);
-
-impl_upgrade!(
-    UnlockLevel5,
-    type=bool,
-    level=4,
-    [
-        (false, Resources::from_gold(10e3), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
-);
-
-// Level 5
-
-impl_upgrade!(
-    AutoRun,
-    type=bool,
-    level=5,
-    [
-        (false, Resources::from_gold(50e3), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
-);
-
-impl_upgrade!(
-    UnlockBrk,
-    type=bool,
-    level=5,
-    [
-        (false, Resources::from_gold(100e3), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
-);
-
-// TODO
-impl_upgrade!(
-    BreakSlowdown,
-    type=f32,
-    level=5,
-    [
-        (2.0, Resources::from_gold(500e3), "2x"),
-        (5.0, Resources::from_gold(5e6), "5x"),
-        (10.0, Resources::zero(), "10x"),
-    ]
-);
-
-// TODO
-impl_upgrade!(
-    DiamondPerBreakPoint,
-    type=f32,
-    level=5,
-    [
-        (1.0, Resources::from_gold(1e6), "1"),
-        (5.0, Resources::from_gold(10e6), "5"),
-        (25.0, Resources::zero(), "25"),
-    ]
-);
-
-impl_upgrade!(
-    UnlockLevel6,
-    type=bool,
-    level=5,
-    [
-        (false, Resources::from_gold(100e6), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
-);
-
-// Level 6
-
-impl_upgrade!(
-    GainCurrencyFunction,
-    type=bool,
-    level=6,
-    [
-        (false, Resources::from_gold(1e9), LOCKED),
-        (true, Resources::zero(), UNLOCKED),
-    ]
-);
-
-impl_upgrade!(
-    WinCondition,
-    type=bool,
-    level=6,
-    [
-        (false, Resources::from_gold(1e12), "not won"),
-        (true, Resources::zero(), "won"),
-    ]
-);

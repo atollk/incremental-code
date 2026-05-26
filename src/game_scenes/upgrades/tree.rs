@@ -1,4 +1,4 @@
-use crate::game_state::{Upgrade, Upgrades, with_game_state};
+use crate::game_state::{Resources, Upgrade, Upgrades, with_game_state};
 use crate::widgets::tree::{Tree, TreeItem, TreeState};
 use itertools::Itertools;
 use logos::Source;
@@ -65,6 +65,42 @@ fn render_column_texts(upgrade: &dyn Upgrade) -> TreeColumns<String> {
     }
 }
 
+fn cost_style(cost: Option<Resources>) -> Style {
+    match cost {
+        None => Style::default().fg(Color::Gray),
+        Some(cost) => {
+            if cost <= with_game_state(|game_state| game_state.total_resources()) {
+                Style::default().fg(Color::White)
+            } else {
+                Style::default().fg(Color::LightRed)
+            }
+        }
+    }
+}
+
+fn render_track_items(upgrade: &dyn Upgrade) -> Vec<TreeItem<'static, usize>> {
+    (0..upgrade.num_cost_tracks())
+        .map(|track| {
+            let track_level = upgrade.track_get_level(track);
+            let max_level = upgrade.max_level();
+            let cost = upgrade.track_next_cost(track);
+            let cost_str = match &cost {
+                None => "maxed".to_string(),
+                Some(c) => c.fmt_oneline().to_string(),
+            };
+            let style = cost_style(cost);
+            let line = Line::from(vec![
+                Span::raw(format!(
+                    "Track {}  {:>3}/{:<3}  ",
+                    track, track_level, max_level
+                )),
+                Span::styled(cost_str, style),
+            ]);
+            TreeItem::new_leaf(track, line)
+        })
+        .collect()
+}
+
 fn render_group_items(upgrades: &[&dyn Upgrade], group_i: usize) -> Vec<TreeItem<'static, usize>> {
     let group_items = upgrades.iter().filter(|u| u.group() == group_i);
     let group_item_strings: Vec<(&dyn Upgrade, TreeColumns<String>)> = group_items
@@ -103,32 +139,18 @@ fn render_group_items(upgrades: &[&dyn Upgrade], group_i: usize) -> Vec<TreeItem
             let level_width = column_sizes.level;
             let level_up_cost_width = column_sizes.level_up_cost;
             let values_width = column_sizes.values;
-            let cost_style = {
-                let cost = u.next_level_cost();
-                match cost {
-                    None => Style::default().fg(Color::Gray),
-                    Some(cost) => {
-                        if cost <= with_game_state(|game_state| game_state.total_resources()) {
-                            Style::default().fg(Color::White)
-                        } else {
-                            Style::default().fg(Color::LightRed)
-                        }
-                    }
-                }
-            };
+            let style = cost_style(u.next_level_cost());
             let spans = vec![
                 Span::raw(format!("{:<name_width$}", tc.name)),
                 Span::raw("     "),
                 Span::raw(format!("{:<level_width$}", tc.level)),
                 Span::raw("     "),
-                Span::styled(
-                    format!("{:>level_up_cost_width$}", tc.level_up_cost),
-                    cost_style,
-                ),
+                Span::styled(format!("{:>level_up_cost_width$}", tc.level_up_cost), style),
                 Span::raw("    "),
                 Span::raw(format!("{:^values_width$}", tc.values)),
             ];
-            TreeItem::new_leaf(i, Line::from_iter(spans))
+            let track_children = render_track_items(u);
+            TreeItem::new(i, Line::from_iter(spans), track_children).unwrap()
         })
         .collect()
 }

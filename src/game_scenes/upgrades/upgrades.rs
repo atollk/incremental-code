@@ -40,27 +40,28 @@ impl<'a> Default for UpgradesScene<'a> {
 }
 
 impl<'a> UpgradesScene<'a> {
-    fn level(&mut self, identifier_path: &[usize], level_up: bool) {
+    fn level(&mut self, identifier_path: &[usize; 3], level_up: bool) {
+        let &[group, upgrade_idx, track] = identifier_path;
+
         // Find the upgrade instance from the tree identifier
-        let identifier_path: &[usize; 2] = identifier_path.try_into().unwrap();
         let pos = self
             .upgrades_working_copy
             .upgrades()
             .into_iter()
             .enumerate()
-            .filter(|(_, u)| u.group() == identifier_path[0])
-            .nth(identifier_path[1])
+            .filter(|(_, u)| u.group() == group)
+            .nth(upgrade_idx)
             .unwrap_or_else(|| panic!("identifier_path out of bounds: {:?}", identifier_path))
             .0;
         let upgrade = self.upgrades_working_copy.upgrade_at_mut(pos);
 
         // Perform the leveling
         let refresh_required = if level_up {
-            if let Some(cost) = upgrade.next_level_cost() {
+            if let Some(cost) = upgrade.track_next_cost(track) {
                 if with_game_state(|game_state| cost <= game_state.total_resources()) {
                     // can afford -> take resources and level up
                     with_game_state_mut(|game_state| game_state.take_resources(&cost)).unwrap();
-                    upgrade.level_up();
+                    upgrade.track_level_up(track);
                     true
                 } else {
                     // cannot afford -> do nothing
@@ -71,14 +72,14 @@ impl<'a> UpgradesScene<'a> {
                 false
             }
         } else {
-            if upgrade.get_level() == 0 {
+            if upgrade.track_get_level(track) == 0 {
                 // can't level down
                 false
             } else {
                 // level down and return resources
-                upgrade.level_down();
+                upgrade.track_level_down(track);
                 let cost = upgrade
-                    .next_level_cost()
+                    .track_next_cost(track)
                     .expect("After leveling down, a cost to level up should be defined.");
                 // TODO: shortcut - we don't remember where resources came from, so we just return them as carryover
                 with_game_state_mut(move |game_state| game_state.give_carryover_resources(cost));
@@ -118,13 +119,13 @@ impl<'a> UpgradesScene<'a> {
                         });
                         if key.code == KeyCode::Left {
                             if children_empty {
-                                self.level(&selected, false);
+                                self.level(selected.as_slice().try_into().unwrap(), false);
                             } else {
                                 self.tree_widget.with_tree_state_mut(|ts| ts.key_left());
                             }
                         } else {
                             if children_empty {
-                                self.level(&selected, true);
+                                self.level(selected.as_slice().try_into().unwrap(), true);
                             } else {
                                 self.tree_widget.with_tree_state_mut(|ts| ts.key_right());
                             }

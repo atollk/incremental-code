@@ -2,7 +2,6 @@ use crate::game_scenes::base::SceneSwitch;
 use crate::game_state::{CodeStatementLevels, Upgrade, Upgrades, with_game_state_mut};
 use crate::widgets::terminal::{ParagraphCmd, RunningCommand};
 use itertools::Itertools;
-use js_sys::Math::exp;
 use ratatui_widgets::paragraph::Paragraph;
 use std::iter;
 
