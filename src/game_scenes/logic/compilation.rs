@@ -126,9 +126,9 @@ pub mod compile_thread {
     #[cfg(target_arch = "wasm32")]
     use wasm_thread as thread;
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub enum CompileThreadStatus {
-        Idle(anyhow::Result<()>),
+        Idle(Result<(), String>),
         Running,
         Cancelled,
     }
@@ -162,14 +162,15 @@ pub mod compile_thread {
                         Ok(())
                     }
                 };
-                *status.lock().unwrap() = CompileThreadStatus::Idle(result);
+                *status.lock().unwrap() =
+                    CompileThreadStatus::Idle(result.map_err(|e| e.to_string()));
             };
             let t = thread::spawn(f);
             self.join_handle = Some(t);
         }
 
         pub fn status(&self) -> CompileThreadStatus {
-            *self.status.lock().unwrap()
+            self.status.lock().unwrap().clone()
         }
 
         pub fn cancel(&mut self) {

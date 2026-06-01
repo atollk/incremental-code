@@ -3,11 +3,9 @@ use crate::global_variable;
 use include_dir::{Dir, include_dir};
 use itertools::Itertools;
 use rand::prelude::IteratorRandom;
-use rand::{random_iter, random_range, rng};
+use rand::{random_range, rng};
 use rodio::{MixerDeviceSink, Player};
 use std::io::Cursor;
-use std::ops::{Deref, DerefMut};
-use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
 pub struct AudioBackend {

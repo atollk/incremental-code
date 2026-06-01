@@ -1,7 +1,7 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
-use crate::game_scenes::logic::audio::{with_audio_backend, with_audio_backend_mut};
+use crate::game_scenes::logic::audio::with_audio_backend_mut;
 use crate::game_state::{AUTO_SAVER, load_game_state, load_settings, with_game_state};
 use ratatui_core::terminal::Frame;
 use web_time::Duration;

@@ -3,6 +3,7 @@ use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::logic::compilation::compile_thread;
 use crate::game_state::with_game_state;
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
+use anyhow::anyhow;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::text::Text;
@@ -99,7 +100,7 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
                 if let compile_thread::CompileThreadStatus::Idle(result) =
                     compile_thread::with_compile_thread(|compile_thread| compile_thread.status())
                 {
-                    self.result = Some(result);
+                    self.result = Some(result.map_err(|s| anyhow!(s)));
                 } else {
                     unreachable!();
                 }

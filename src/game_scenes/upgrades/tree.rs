@@ -1,7 +1,6 @@
 use crate::game_state::{Resources, Upgrade, Upgrades, with_game_state};
 use crate::widgets::tree::{Tree, TreeItem, TreeState};
 use itertools::Itertools;
-use logos::Source;
 use ouroboros::self_referencing;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
@@ -11,7 +10,6 @@ use ratatui_core::widgets::{StatefulWidget, Widget};
 use std::cmp::max;
 use std::hash::Hash;
 use std::ops::Deref;
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 #[self_referencing]
 pub(super) struct TreeWidget<'a> {

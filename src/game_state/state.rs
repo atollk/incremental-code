@@ -3,7 +3,6 @@ use crate::game_state::{CompiledProgram, Resources};
 use crate::global_variable;
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 
 global_variable!(game_state, GameState);
 
