@@ -2,12 +2,8 @@ use crate::game_state::upgrades::Upgrades;
 use crate::game_state::{CompiledProgram, Resources};
 use crate::global_variable;
 use anyhow::bail;
-use parking_lot::ReentrantMutex;
-use paste::paste;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
-use std::sync::LazyLock;
 
 global_variable!(game_state, GameState);
 

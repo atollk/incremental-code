@@ -1,6 +1,6 @@
 use crate::backend::events::Event;
 use crate::basic_terminal_app::App;
-use crate::game_scenes::logic::audio::{with_audio_backend, with_audio_backend_mut};
+use crate::game_scenes::logic::audio::with_audio_backend_mut;
 use std::ops::{ControlFlow, FromResidual, Residual, Try};
 
 /// A game scene that renders itself and handles input each frame.

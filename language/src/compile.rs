@@ -22,7 +22,7 @@ impl CompilingMetadata for () {
 /// Validates and executes a parsed [`NotPythonProgram`], returning an error if execution fails.
 pub fn compile(
     program: &NotPythonProgram,
-    predefined_functions: HashMap<&str, &PredefinedFunction<()>>,
+    predefined_functions: HashMap<&str, PredefinedFunction<()>>,
 ) -> anyhow::Result<()> {
     let mut meta = ();
     compile_with_meta(program, predefined_functions, &mut meta)
@@ -32,7 +32,7 @@ pub fn compile(
 /// so callers can measure or profile execution.
 pub fn compile_with_meta<Meta: CompilingMetadata>(
     program: &NotPythonProgram,
-    predefined_functions: HashMap<&str, &PredefinedFunction<Meta>>,
+    predefined_functions: HashMap<&str, PredefinedFunction<Meta>>,
     meta: &mut Meta,
 ) -> anyhow::Result<()> {
     let mut state = ProgramExecutionState {
@@ -75,10 +75,10 @@ struct ProgramExecutionCallState<'a> {
 }
 
 pub type PredefinedFunction<Meta> =
-    dyn Fn(&mut Meta, Vec<ProgramValue>) -> anyhow::Result<ProgramValue>;
+    fn(&mut Meta, Vec<ProgramValue>) -> anyhow::Result<ProgramValue>;
 
 enum Callable<'a, Meta: CompilingMetadata> {
-    PredefinedFunction(&'a PredefinedFunction<Meta>),
+    PredefinedFunction(PredefinedFunction<Meta>),
     UserFunction(&'a NotPythonStmt),
 }
 
@@ -131,7 +131,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
 struct ProgramExecutionState<'a, Meta: CompilingMetadata> {
     control_flow: ProgramExecutionControlFlow,
     call_stack: Vec<ProgramExecutionCallState<'a>>,
-    predefined_functions: HashMap<&'a str, &'a PredefinedFunction<Meta>>,
+    predefined_functions: HashMap<&'a str, PredefinedFunction<Meta>>,
 }
 
 impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
