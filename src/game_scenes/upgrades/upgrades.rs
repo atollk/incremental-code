@@ -2,8 +2,7 @@ use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind, MouseEventKind};
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
-use crate::game_scenes::logic::audio::with_audio_backend;
-use crate::game_scenes::logic::compilation::compile_game_state;
+use crate::game_scenes::logic::audio::{with_audio_backend, with_audio_backend_mut};
 use crate::game_scenes::upgrades::tree::{TreeWidget, create_tree_widget, find_item_in_tree};
 use crate::game_state::{Resources, Upgrades, with_game_state, with_game_state_mut};
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
@@ -242,15 +241,18 @@ fn on_upgrades_commit() {
     // If music was unlocked, start the music.
     let unlock_music = with_game_state(|game_state| game_state.upgrades.unlock_music.value());
     if unlock_music {
-        with_audio_backend(|audio| {
-            audio
-                .start_bgm_loop()
-                .map_err(|e| log::warn!("Error starting bgm: {}", e))
+        with_audio_backend_mut(|audio| {
+            audio.as_mut().map(|audio| {
+                audio
+                    .start_bgm_loop()
+                    .map_err(|e| log::warn!("Error starting bgm: {}", e))
+            })
         });
     }
 
     // If the instruction limit changed and the program was compiled already, re-compile it to recount the instructions
     if with_game_state(|game_state| matches!(game_state.compiled_program, Some(Err(_)))) {
-        let _ = compile_game_state();
+        // TODO: for the moment, we just force the user to recompile manually
+        with_game_state_mut(|game_state| game_state.compiled_program = None);
     }
 }

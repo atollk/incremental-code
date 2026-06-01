@@ -7,6 +7,7 @@ mod basic_terminal_app;
 pub mod demos;
 pub mod game_scenes;
 mod game_state;
+pub mod util;
 pub mod widgets;
 
 use crate::backend::with_backend;

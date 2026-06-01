@@ -1,6 +1,6 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_scenes::logic::compilation::compile_game_state;
+use crate::game_scenes::logic::compilation::compile_thread;
 use crate::game_state::with_game_state;
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
 use ratatui_core::buffer::Buffer;
@@ -74,12 +74,14 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
     }
 
     fn update(&mut self, _events: &[Event], time_delta: Duration) {
-        if self.compile_duration <= self.running_duration {
-            if self.result.is_none() {
-                // TODO: run this while actually waiting, not just at the end
-                self.result = Some(compile_game_state());
-            }
-        } else {
+        let waiting_for_compilation = self.compile_duration > self.running_duration
+            || compile_thread::with_compile_thread(|compile_thread| {
+                !matches!(
+                    compile_thread.status(),
+                    compile_thread::CompileThreadStatus::Idle(_)
+                )
+            });
+        if waiting_for_compilation {
             // Animate loading
             let throbber_animation_steps =
                 |d: Duration| d.div_duration_f32(CompileCmd::THROBBER_STEP_SPEED) as i8;
@@ -91,6 +93,16 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
                 self.throbber_state
                     .borrow_mut()
                     .calc_step(throbber_animation_step_div);
+            }
+        } else {
+            if self.result.is_none() {
+                if let compile_thread::CompileThreadStatus::Idle(result) =
+                    compile_thread::with_compile_thread(|compile_thread| compile_thread.status())
+                {
+                    self.result = Some(result);
+                } else {
+                    unreachable!();
+                }
             }
         }
     }

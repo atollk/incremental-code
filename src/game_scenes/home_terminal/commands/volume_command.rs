@@ -1,7 +1,7 @@
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_scenes::logic::audio::with_audio_backend;
+use crate::game_scenes::logic::audio::{with_audio_backend, with_audio_backend_mut};
 use crate::widgets::terminal::RunningCommand;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
@@ -16,7 +16,7 @@ struct VolumeCmd {
 }
 
 pub(super) fn volume_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    let initial = with_audio_backend(|audio| audio.get_volume())
+    let initial = with_audio_backend(|audio| audio.as_ref().map(|audio| audio.get_volume()))
         .map(|v| (v * 100.) as u8)
         .unwrap_or(100);
     Box::new(VolumeCmd {
@@ -40,7 +40,11 @@ impl VolumeCmd {
     }
 
     fn sync_volume(&self) {
-        with_audio_backend(|audio| audio.set_volume(self.current as f32 / 100.));
+        with_audio_backend_mut(|audio| {
+            audio
+                .as_mut()
+                .map(|audio| audio.set_volume(self.current as f32 / 100.))
+        });
     }
 }
 

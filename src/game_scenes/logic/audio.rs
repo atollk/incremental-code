@@ -1,4 +1,5 @@
 use crate::game_state::{with_settings, with_settings_mut};
+use crate::global_variable;
 use include_dir::{Dir, include_dir};
 use itertools::Itertools;
 use rand::prelude::IteratorRandom;
@@ -87,17 +88,4 @@ impl AudioBackend {
     }
 }
 
-pub fn with_audio_backend<T>(f: impl FnOnce(&mut AudioBackend) -> T) -> Option<T> {
-    let lock = AUDIO_BACKEND.as_ref()?.lock();
-    Some(f(&mut *lock.ok()?))
-}
-
-/// `None` if the audio device could not be opened (logs a warning, does not panic).
-static AUDIO_BACKEND: LazyLock<Option<Mutex<AudioBackend>>> =
-    LazyLock::new(|| match AudioBackend::new() {
-        Ok(b) => Some(Mutex::new(b)),
-        Err(e) => {
-            log::warn!("Audio backend unavailable: {e}");
-            None
-        }
-    });
+global_variable!(audio_backend, Option<AudioBackend>);

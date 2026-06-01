@@ -1,30 +1,15 @@
 use crate::game_state::upgrades::Upgrades;
 use crate::game_state::{CompiledProgram, Resources};
+use crate::global_variable;
 use anyhow::bail;
 use parking_lot::ReentrantMutex;
+use paste::paste;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
 use std::sync::LazyLock;
 
-/// Lock the global game state and run `f` with a reference to it.
-///
-/// This is the single entry point for reading [`GameState`].
-pub fn with_game_state<T>(f: impl FnOnce(&GameState) -> T) -> T {
-    let lock = GLOBAL_GAME_STATE.lock();
-    f(lock.deref().borrow().deref())
-}
-
-/// Lock the global game state and run `f` with a mutable reference to it.
-///
-/// This is the single entry point for mutating [`GameState`].
-pub fn with_game_state_mut<T>(f: impl FnOnce(&mut GameState) -> T) -> T {
-    let lock = GLOBAL_GAME_STATE.lock();
-    f(lock.deref().borrow_mut().deref_mut())
-}
-
-static GLOBAL_GAME_STATE: LazyLock<ReentrantMutex<RefCell<GameState>>> =
-    LazyLock::new(|| ReentrantMutex::new(RefCell::new(GameState::default())));
+global_variable!(game_state, GameState);
 
 /// Persistent game state stored in a global singleton.
 ///
