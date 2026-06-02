@@ -1,6 +1,7 @@
-use crate::backend::events::Event;
+use crate::backend::events::{Event, MetaEvent};
 use crate::basic_terminal_app::App;
 use crate::game_scenes::logic::audio::with_audio_backend_mut;
+use crate::game_state::AUTO_SAVER;
 use std::ops::{ControlFlow, FromResidual, Residual, Try};
 
 /// A game scene that renders itself and handles input each frame.
@@ -81,6 +82,15 @@ impl App for SceneGame {
         frame: &mut ratatui_core::terminal::Frame,
     ) -> anyhow::Result<bool> {
         let elapsed = web_time::Instant::now() - self.last_frame;
+
+        AUTO_SAVER.lock().unwrap().tick();
+
+        for event in events {
+            if let Event::MetaEvent(MetaEvent::SigTerm) = event {
+                return Ok(true);
+            }
+        }
+
         with_audio_backend_mut(|audio| audio.as_mut().map(|audio| audio.tick(elapsed)));
         self.last_frame = web_time::Instant::now();
         let scene_switch = self.active_scene.frame(events, frame, elapsed);

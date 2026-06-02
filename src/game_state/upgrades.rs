@@ -161,10 +161,6 @@ macro_rules! impl_upgrade {
                 None
             }
 
-            pub(crate) fn cost_at(level: u8) -> Option<Resources> {
-                Self::cost_at_track(0, level)
-            }
-
             pub(crate) fn value_text_at(level: u8) -> Option<Cow<'static, str>> {
                 let mut __i: u8 = 0;
                 $(

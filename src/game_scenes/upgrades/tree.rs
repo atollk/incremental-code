@@ -62,12 +62,7 @@ fn cost_style(cost: Option<Resources>) -> Style {
 
 fn render_track_items(upgrade: &dyn Upgrade) -> Vec<TreeItem<'static, usize>> {
     (0..upgrade.num_cost_tracks())
-        .filter(|&track| {
-            upgrade
-                .track_next_cost(track)
-                .map(|cost| cost != Resources::zero())
-                .unwrap_or(false)
-        })
+        .filter(|&track| upgrade.track_next_cost(track).is_some())
         .map(|track| {
             let track_level = upgrade.track_get_level(track);
             let max_level = upgrade.max_level();
@@ -133,9 +128,8 @@ fn render_group_items(upgrades: &[&dyn Upgrade], group_i: usize) -> Vec<TreeItem
         .collect()
 }
 
-fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'static, usize>> {
-    let upgrade_list = upgrades.upgrades();
-    let group_unlocks = [
+fn groups_are_unlocked(upgrades: &Upgrades) -> [bool; 7] {
+    [
         true,
         upgrades.unlock_level1.value(),
         upgrades.unlock_level2.value(),
@@ -143,29 +137,28 @@ fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'static, usize>> {
         upgrades.unlock_level4.value(),
         upgrades.unlock_level5.value(),
         upgrades.unlock_level6.value(),
-    ];
-    let groups = (0..=6).filter(|i| group_unlocks[*i]).map(|group_i| {
-        TreeItem::new(
-            group_i,
-            format!("Level {group_i} upgrades"),
-            render_group_items(&upgrade_list, group_i),
-        )
-    });
+    ]
+}
+
+fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'static, usize>> {
+    let upgrade_list = upgrades.upgrades();
+    let group_unlocks = groups_are_unlocked(upgrades);
+    let groups = (0..group_unlocks.len())
+        .filter(|i| group_unlocks[*i])
+        .map(|group_i| {
+            TreeItem::new(
+                group_i,
+                format!("Level {group_i} upgrades"),
+                render_group_items(&upgrade_list, group_i),
+            )
+        });
     groups.map(|item| item.unwrap()).collect()
 }
 
 pub(super) fn open_all_upgrade_nodes(state: &mut TreeState<usize>, upgrades: &Upgrades) {
     let upgrade_list = upgrades.upgrades();
-    let group_unlocks = [
-        true,
-        upgrades.unlock_level1.value(),
-        upgrades.unlock_level2.value(),
-        upgrades.unlock_level3.value(),
-        upgrades.unlock_level4.value(),
-        upgrades.unlock_level5.value(),
-        upgrades.unlock_level6.value(),
-    ];
-    for group_i in 0..=6usize {
+    let group_unlocks = groups_are_unlocked(upgrades);
+    for group_i in 0..group_unlocks.len() {
         if !group_unlocks[group_i] {
             continue;
         }

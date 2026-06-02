@@ -13,7 +13,7 @@ pub trait App {
     fn frame(&mut self, events: &[Event], frame: &mut ratatui::Frame) -> anyhow::Result<bool>;
 }
 
-/// Wraps an [`App`] and wires it to the platform-specific [`BackendSuite`](crate::backend::backend::BackendSuite).
+/// Wraps an [`App`] and wires it to the platform-specific [`BackendSuite`](backend::backend::BackendSuite).
 pub struct BasicTerminalApp<A: App> {
     terminal: Option<ratatui::Terminal<backend::BackendType>>,
     app: A,
@@ -36,13 +36,12 @@ impl<A: App + 'static> BasicTerminalApp<A> {
 
 impl<A: App> TerminalApp<backend::BackendType> for BasicTerminalApp<A> {
     fn init(&mut self, backend: backend::BackendType) -> anyhow::Result<()> {
-        let terminal = ratatui::Terminal::new(backend).unwrap();
+        let terminal = ratatui::Terminal::new(backend)?;
         self.terminal = Some(terminal);
         Ok(())
     }
 
     fn frame(&mut self, events: &[Event]) -> anyhow::Result<bool> {
-        AUTO_SAVER.lock().unwrap().tick();
         let terminal = self.terminal.as_mut().unwrap();
         let app = &mut self.app;
         let mut exit = false;

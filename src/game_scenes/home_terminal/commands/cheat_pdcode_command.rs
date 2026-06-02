@@ -6,7 +6,7 @@ use ratatui_widgets::paragraph::Paragraph;
 use std::iter;
 
 // Adds predefined code snippets as the current program code.
-pub(super) fn cheat_pdcode_cmd(height: u16) -> Box<dyn RunningCommand<SceneSwitch>> {
+pub(super) fn cheat_pdcode_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
     with_game_state_mut(|game_state| {
         game_state.program_code = get_predefined_code(&game_state.upgrades)
     });
