@@ -1,11 +1,10 @@
-use std::time::Duration;
-
 use super::commands::{EchoedCommand, RunningCommand};
 use crate::backend::events::Event;
-use crate::backend::input::{KeyCode, KeyEventKind};
+use crate::backend::input::{KeyCode, KeyEventKind, KeyModifiers};
 use crate::widgets::blinking_cursor::BlinkingCursor;
 use ratatui::{buffer::Buffer, layout::Rect, style::Style, widgets::Widget};
 use ratatui_core::layout::Offset;
+use std::time::Duration;
 use tachyonfx::BufferRenderer;
 
 /// A terminal widget with a prompt for typing commands, a running-command area,
@@ -64,7 +63,7 @@ impl<Meta: 'static> TerminalWidget<Meta> {
         self.running = Some(Box::new(EchoedCommand::new(format!("> {cmd_text}"), cmd)));
     }
 
-    fn handle_event(&mut self, event: &Event) -> Option<String> {
+    fn handle_event_during_idle(&mut self, event: &Event) -> Option<String> {
         let Event::KeyEvent(key) = event else {
             return None;
         };
@@ -156,26 +155,26 @@ impl<Meta: 'static> TerminalWidget<Meta> {
     /// Returns a command, if one is to be executed by the user.
     pub fn update(&mut self, events: &[Event], time_delta: Duration) -> Option<String> {
         if let Some(running) = &mut self.running {
+            for event in events {
+                if let Event::KeyEvent(k) = event
+                    && k.modifiers.contains(KeyModifiers::CONTROL)
+                    && k.kind == KeyEventKind::Press
+                    && k.code == KeyCode::Char('c')
+                {
+                    running.cancel();
+                }
+            }
             running.update(events, time_delta);
             if running.is_done() {
                 let done = self.running.take().unwrap();
                 self.history.push(done);
             }
-            return None;
-        }
-
-        for event in events {
-            let cmd = self.handle_event(event);
-            if cmd.is_some() {
-                return cmd;
-            }
-        }
-
-        if let Some(running) = &mut self.running {
-            running.update(events, time_delta);
-            if running.is_done() {
-                let done = self.running.take().unwrap();
-                self.history.push(done);
+        } else {
+            for event in events {
+                let cmd = self.handle_event_during_idle(event);
+                if cmd.is_some() {
+                    return cmd;
+                }
             }
         }
         None

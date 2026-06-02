@@ -19,6 +19,9 @@ pub trait RunningCommand<Meta = ()> {
     /// elapsed time since the previous call, for time-based animation.
     fn update(&mut self, events: &[Event], time_delta: Duration);
 
+    /// Cancels this command as soon as possible.
+    fn cancel(&mut self) {}
+
     /// Render the command's current output into `area`.
     ///
     /// Called both while running (for live output) and after completion (so
@@ -56,6 +59,10 @@ impl<Meta> RunningCommand<Meta> for EchoedCommand<Meta> {
 
     fn update(&mut self, events: &[Event], time_delta: Duration) {
         self.inner.update(events, time_delta);
+    }
+
+    fn cancel(&mut self) {
+        self.inner.cancel();
     }
 
     fn render(&self, area: Rect, buf: &mut Buffer) {
@@ -162,6 +169,14 @@ impl<Meta, C1: RunningCommand<Meta>, C2: RunningCommand<Meta>> RunningCommand<Me
             } else {
                 unreachable!();
             }
+        }
+    }
+
+    fn cancel(&mut self) {
+        if let ChainCmd2nd::Constructed(second_command) = &mut self.second_command {
+            second_command.cancel();
+        } else {
+            self.first_command.cancel();
         }
     }
 

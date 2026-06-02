@@ -57,13 +57,13 @@ fn predefined_functions<T>() -> HashMap<&'static str, PredefinedFunction<T>> {
     functions
 }
 
-struct WipCompilingProgram<F: Fn() -> bool> {
+struct WipCompilingProgram<F: FnMut() -> bool> {
     program: CompiledProgram,
     is_cancelled: F,
 }
 
-impl<F: Fn() -> bool> WipCompilingProgram<F> {
-    fn check_cancel(&self) -> anyhow::Result<()> {
+impl<F: FnMut() -> bool> WipCompilingProgram<F> {
+    fn check_cancel(&mut self) -> anyhow::Result<()> {
         if (self.is_cancelled)() {
             bail!("Cancelling logic program");
         }
@@ -71,7 +71,7 @@ impl<F: Fn() -> bool> WipCompilingProgram<F> {
     }
 }
 
-impl<F: Fn() -> bool> CompilingMetadata for WipCompilingProgram<F> {
+impl<F: FnMut() -> bool> CompilingMetadata for WipCompilingProgram<F> {
     fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
         self.check_cancel()?;
         self.program.log_zero_instruction()
@@ -86,7 +86,7 @@ impl<F: Fn() -> bool> CompilingMetadata for WipCompilingProgram<F> {
 /// Compiles the given code and returns compile errors in the outer result, or runtime errors in the inner result.
 fn compile_code(
     program_code: &str,
-    is_cancelled: impl Fn() -> bool,
+    is_cancelled: impl FnMut() -> bool,
 ) -> anyhow::Result<Result<CompiledProgram, (String, Vec<u64>)>> {
     let parsed = parse_program(program_code);
     match parsed {
@@ -148,11 +148,22 @@ pub mod compile_thread {
             let status = self.status.clone();
             let f = move || {
                 *status.lock().unwrap() = CompileThreadStatus::Running;
-                let is_cancelled =
-                    || matches!(*status.lock().unwrap(), CompileThreadStatus::Cancelled);
-                let parse_result_run_result = with_game_state(|game_state| -> anyhow::Result<_> {
-                    compile_code(&game_state.program_code, is_cancelled)
-                });
+                // Debounce is_cancelled check to reduce Mutex locks.
+                let mut is_cancelled_debounce = 0;
+                let is_cancelled = || {
+                    is_cancelled_debounce = (is_cancelled_debounce + 1) % 100;
+                    if is_cancelled_debounce == 0 {
+                        matches!(*status.lock().unwrap(), CompileThreadStatus::Cancelled)
+                    } else {
+                        false
+                    }
+                };
+
+                // Compile
+                let program_code = with_game_state(|game_state| game_state.program_code.clone());
+                let parse_result_run_result = compile_code(&program_code, is_cancelled);
+
+                // Extract result from compilation and set the necessary fields.
                 let result = match parse_result_run_result {
                     Err(parse_err) => Err(parse_err),
                     Ok(run_result) => {

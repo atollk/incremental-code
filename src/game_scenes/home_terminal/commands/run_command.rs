@@ -45,7 +45,7 @@ struct RunCmd {
     completion_duration: Duration,
     throbber_state: RefCell<throbber_widgets_tui::ThrobberState>,
     // after waiting
-    result: Option<()>,
+    result: Option<Result<(), String>>,
 }
 
 impl RunCmd {
@@ -73,7 +73,9 @@ impl RunningCommand<SceneSwitch> for RunCmd {
 
     fn update(&mut self, _events: &[Event], time_delta: Duration) {
         if self.completion_duration <= self.active_duration {
-            self.result = Some(());
+            if self.result.is_none() {
+                self.result = Some(Ok(()));
+            }
         } else {
             // Animate loading
             let throbber_animation_steps =
@@ -88,6 +90,10 @@ impl RunningCommand<SceneSwitch> for RunCmd {
                     .calc_step(throbber_animation_step_div);
             }
         }
+    }
+
+    fn cancel(&mut self) {
+        self.result = Some(Err("Cancelled by user".to_string()))
     }
 
     fn render(&self, area: Rect, buf: &mut Buffer) {

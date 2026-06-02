@@ -21,7 +21,8 @@ use std::cell::RefCell;
 use std::num::NonZeroU32;
 use std::rc::Rc;
 use std::sync::{LazyLock, RwLock};
-use winit::event::KeyEvent;
+use winit::event::{KeyEvent, Modifiers};
+use winit::keyboard::ModifiersState;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -58,6 +59,7 @@ impl BackendSuite<BackendType, StorageType> for BeamtermCoreBackendSuite {
             terminal_app,
             window_state: None,
             events: Vec::new(),
+            modifiers: Modifiers::default(),
         };
         event_loop.run_app(&mut app)?;
         Ok(())
@@ -75,6 +77,7 @@ struct BeamtermCoreApplicationHandler {
     terminal_app: Rc<RefCell<dyn TerminalApp<BackendType>>>,
     window_state: Option<WindowState>,
     events: Vec<Event>,
+    modifiers: Modifiers,
 }
 
 struct WindowState {
@@ -124,9 +127,15 @@ impl<'a> ApplicationHandler for BeamtermCoreApplicationHandler {
                 self.events.push(Event::MetaEvent(MetaEvent::SigTerm));
                 state.win.window.request_redraw();
             }
+            WindowEvent::ModifiersChanged(mods) => {
+                self.modifiers = mods;
+            }
             WindowEvent::KeyboardInput { event, .. } => {
-                if let Some(event) = event.into_event() {
-                    self.events.push(event);
+                if let Some(mut ev) = event.into_event() {
+                    if let Event::KeyEvent(ref mut k) = ev {
+                        k.modifiers = winit_modifiers_to_key_modifiers(self.modifiers.state());
+                    }
+                    self.events.push(ev);
                 }
             }
             WindowEvent::Resized(new_size) => {
@@ -193,6 +202,24 @@ impl<'a> ApplicationHandler for BeamtermCoreApplicationHandler {
             state.win.window.request_redraw();
         }
     }
+}
+
+fn winit_modifiers_to_key_modifiers(state: ModifiersState) -> crate::backend::input::KeyModifiers {
+    use crate::backend::input::KeyModifiers;
+    let mut mods = KeyModifiers::NONE;
+    if state.shift_key() {
+        mods |= KeyModifiers::SHIFT;
+    }
+    if state.control_key() {
+        mods |= KeyModifiers::CONTROL;
+    }
+    if state.alt_key() {
+        mods |= KeyModifiers::ALT;
+    }
+    if state.super_key() {
+        mods |= KeyModifiers::SUPER;
+    }
+    mods
 }
 
 impl IntoEvent for KeyEvent {

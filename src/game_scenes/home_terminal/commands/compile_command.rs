@@ -60,6 +60,7 @@ impl CompileCmd {
         throbber_state
             .get_mut()
             .calc_step(rand::random_range(0..Self::THROBBER_SET.symbols.len()) as i8);
+        compile_thread::with_compile_thread_mut(|compile_thread| compile_thread.compile());
         CompileCmd {
             running_duration: Duration::from_millis(0),
             compile_duration: Duration::from_millis(500),
@@ -108,8 +109,12 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
         }
     }
 
+    fn cancel(&mut self) {
+        compile_thread::with_compile_thread_mut(|compile_thread| compile_thread.cancel());
+    }
+
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        let label = if self.compile_duration <= self.running_duration {
+        let label = if self.is_done() {
             "Compiling done".to_string()
         } else {
             format!(
