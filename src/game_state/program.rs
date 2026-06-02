@@ -42,6 +42,7 @@ impl CompiledProgram {
     }
 
     pub fn resource_gain(&self) -> Resources {
+        // TODO: silver=sleep, gold=print, diamond=brk
         struct ResourceUpgrades {
             bronze_per_instruction: (u8, f32),
             silver_per_print_character: (u8, u8, u8),
