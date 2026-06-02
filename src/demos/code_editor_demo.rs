@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crate::basic_terminal_app::App;

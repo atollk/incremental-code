@@ -174,8 +174,7 @@ where
         buf.set_style(full_area, self.style);
 
         // Get the inner area inside a possible block, otherwise use the full area
-        // TODO: don't clone
-        let area = self.block.clone().map_or(full_area, |block| {
+        let area = self.block.as_ref().map_or(full_area, |block| {
             let inner_area = block.inner(full_area);
             block.render(full_area, buf);
             inner_area
@@ -238,8 +237,7 @@ where
         state.offset = start;
         state.ensure_selected_in_view_on_next_render = false;
 
-        // TODO: don't clone
-        if let Some(scrollbar) = self.scrollbar.clone() {
+        if let Some(scrollbar) = self.scrollbar.as_ref() {
             let mut scrollbar_state = ScrollbarState::new(visible.len().saturating_sub(height))
                 .position(start)
                 .viewport_content_length(height);
@@ -251,7 +249,9 @@ where
                 x: full_area.x,
                 width: full_area.width,
             };
-            scrollbar.render(scrollbar_area, buf, &mut scrollbar_state);
+            scrollbar
+                .clone()
+                .render(scrollbar_area, buf, &mut scrollbar_state);
         }
 
         let blank_symbol = " ".repeat(self.highlight_symbol.width());

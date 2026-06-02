@@ -1,5 +1,4 @@
 use crate::game_state::{Resources, with_game_state};
-use anyhow::bail;
 use language::CompilingMetadata;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -14,9 +13,6 @@ pub struct CompiledProgram {
     pub sleep_calls: Vec<f64>,
     /// Calls to `brk`.
     pub brk_calls: u64,
-    /// Number of instructions left before reaching the game state limit.
-    // TODO: make this nicer
-    left_to_instruction_limit: u64,
 }
 
 const INSTRUCTION_BASIC_DURATION: Duration = Duration::from_millis(1000);
@@ -28,9 +24,6 @@ impl CompiledProgram {
             print_calls: vec![],
             sleep_calls: vec![],
             brk_calls: 0,
-            left_to_instruction_limit: with_game_state(|game_state| {
-                game_state.upgrades.max_instructions.value()
-            }),
         }
     }
 
@@ -63,10 +56,6 @@ impl CompilingMetadata for CompiledProgram {
 
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
         *self.instruction_counts.last_mut().unwrap() += 1;
-        self.left_to_instruction_limit -= 1;
-        if self.left_to_instruction_limit == 0 {
-            bail!("Reached instruction limit. Stopping execution to prevent overheating.")
-        }
         Ok(())
     }
 }

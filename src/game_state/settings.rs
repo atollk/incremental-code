@@ -12,8 +12,12 @@ pub fn with_settings<T>(f: impl FnOnce(&Settings) -> T) -> T {
 }
 
 pub fn with_settings_mut<T>(f: impl FnOnce(&mut Settings) -> T) -> T {
-    let lock = GLOBAL_SETTINGS.lock();
-    f(lock.deref().borrow_mut().deref_mut())
+    let result = {
+        let lock = GLOBAL_SETTINGS.lock();
+        f(lock.deref().borrow_mut().deref_mut())
+    };
+    save_settings().unwrap();
+    result
 }
 
 static GLOBAL_SETTINGS: LazyLock<ReentrantMutex<RefCell<Settings>>> =
@@ -47,9 +51,4 @@ pub fn load_settings() -> anyhow::Result<bool> {
     } else {
         Ok(false)
     }
-}
-
-pub fn erase_settings() -> anyhow::Result<()> {
-    let storage_backend: impl StorageBackend = with_backend(|backend| backend.storage_backend());
-    storage_backend.delete(KEY)
 }

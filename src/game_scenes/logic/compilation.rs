@@ -89,9 +89,20 @@ fn predefined_functions() -> HashMap<&'static str, PredefinedFunction<WipCompili
 struct WipCompilingProgram {
     program: CompiledProgram,
     is_cancelled: Box<dyn FnMut() -> bool + 'static>,
+    left_to_instruction_limit: u64,
 }
 
 impl WipCompilingProgram {
+    fn new(is_cancelled: impl FnMut() -> bool + 'static) -> Self {
+        Self {
+            program: CompiledProgram::new(),
+            is_cancelled: Box::new(is_cancelled),
+            left_to_instruction_limit: with_game_state(|game_state| {
+                game_state.upgrades.max_instructions.value()
+            }),
+        }
+    }
+
     fn check_cancel(&mut self) -> anyhow::Result<()> {
         if (self.is_cancelled)() {
             bail!("Cancelling logic program");
@@ -108,6 +119,10 @@ impl CompilingMetadata for WipCompilingProgram {
 
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
         self.check_cancel()?;
+        self.left_to_instruction_limit -= 1;
+        if self.left_to_instruction_limit == 0 {
+            bail!("Reached instruction limit. Stopping execution to prevent overheating.")
+        }
         self.program.log_atomic_instruction()
     }
 }
@@ -120,10 +135,7 @@ fn compile_code(
     let parsed = parse_program(program_code);
     match parsed {
         Ok(parsed) => {
-            let mut compiling_program = WipCompilingProgram {
-                program: CompiledProgram::new(),
-                is_cancelled: Box::new(is_cancelled),
-            };
+            let mut compiling_program = WipCompilingProgram::new(is_cancelled);
             let run_result =
                 compile_with_meta(&parsed, predefined_functions(), &mut compiling_program);
             if (compiling_program.is_cancelled)() {

@@ -7,6 +7,8 @@
 //! cargo run -p demo
 //! ```
 
+#![allow(dead_code)]
+
 use web_time::Instant;
 
 use crate::backend::events::Event;

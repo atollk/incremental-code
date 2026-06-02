@@ -513,7 +513,6 @@ impl_upgrade!(
     ]]
 );
 
-// TODO
 impl_upgrade!(
     MaxInstructions,
     type=u64,
@@ -711,7 +710,6 @@ impl_upgrade!(
     ]]
 );
 
-// TODO
 impl_upgrade!(
     SilverPerPrintCharacter,
     type=(u32, u8),
@@ -786,7 +784,6 @@ impl_upgrade!(
     costs=[[Resources::from_gold(50.), Resources::zero()]]
 );
 
-// TODO
 impl_upgrade!(
     MinInstructionDuration,
     type=f32,
@@ -803,7 +800,6 @@ impl_upgrade!(
     ]]
 );
 
-// TODO
 impl_upgrade!(
     InstructionSpeedToSleep,
     type=f32,
@@ -820,7 +816,6 @@ impl_upgrade!(
     ]]
 );
 
-// TODO
 impl_upgrade!(
     GoldPerSleepSecond,
     type=f32,
@@ -863,7 +858,6 @@ impl_upgrade!(
     costs=[[Resources::from_gold(100e3), Resources::zero()]]
 );
 
-// TODO
 impl_upgrade!(
     BreakSlowdown,
     type=f32,
@@ -880,7 +874,6 @@ impl_upgrade!(
     ]]
 );
 
-// TODO
 impl_upgrade!(
     DiamondPerBreakPoint,
     type=f32,

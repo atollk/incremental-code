@@ -1,5 +1,4 @@
 use derive_more::{Add, AddAssign, Sub, SubAssign};
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::fmt;
@@ -157,22 +156,24 @@ impl Display for ResourcesFmt<'_> {
         let write_diamond = self.parent.stars.0 != 0.0 || write_stars;
         let write_gold = self.parent.gold.0 != 0.0 || write_diamond;
         let write_silver = self.parent.silver.0 != 0.0 || write_gold;
-        let write_strings = [
-            (write_stars, self.parent.stars, STAR_SYMBOL),
-            (write_diamond, self.parent.diamond, DIAMOND_SYMBOL),
-            (write_gold, self.parent.gold, GOLD_SYMBOL),
-            (write_silver, self.parent.silver, SILVER_SYMBOL),
-            (true, self.parent.bronze, BRONZE_SYMBOL),
-        ]
-        .into_iter()
-        .filter_map(|(write, currency, symbol)| {
-            if write {
-                Some(format!("{currency} {symbol}"))
-            } else {
-                None
-            }
-        })
-        .intersperse(self.separator.to_string());
+        let write_strings = Iterator::intersperse(
+            [
+                (write_stars, self.parent.stars, STAR_SYMBOL),
+                (write_diamond, self.parent.diamond, DIAMOND_SYMBOL),
+                (write_gold, self.parent.gold, GOLD_SYMBOL),
+                (write_silver, self.parent.silver, SILVER_SYMBOL),
+                (true, self.parent.bronze, BRONZE_SYMBOL),
+            ]
+            .into_iter()
+            .filter_map(|(write, currency, symbol)| {
+                if write {
+                    Some(format!("{currency} {symbol}"))
+                } else {
+                    None
+                }
+            }),
+            self.separator.to_string(),
+        );
         for s in write_strings {
             write!(f, "{}", s)?;
         }
