@@ -7,8 +7,8 @@ use ratatui_core::layout::Rect;
 use ratatui_core::style::{Color, Modifier, Style};
 use ratatui_core::text::{Line, Span};
 use ratatui_core::widgets::{StatefulWidget, Widget};
+use ratatui_widgets::scrollbar::Scrollbar;
 use std::cmp::max;
-use std::hash::Hash;
 use std::ops::Deref;
 
 #[self_referencing]
@@ -20,20 +20,6 @@ pub(super) struct TreeWidget<'a> {
     pub tree_state: TreeState<usize>,
 }
 
-pub fn find_item_in_tree<'a, 'b, T: Eq + Hash + Clone>(
-    tree_items: &'b [TreeItem<'a, T>],
-    identifier_path: &[T],
-) -> Option<&'b TreeItem<'a, T>> {
-    if let [head, tail @ ..] = identifier_path {
-        tree_items
-            .iter()
-            .find(|child| child.identifier() == head)
-            .and_then(|child| child.find_child(tail))
-    } else {
-        None
-    }
-}
-
 struct TreeColumns<T> {
     name: T,
     level: T,
@@ -42,8 +28,6 @@ struct TreeColumns<T> {
 }
 
 fn render_column_texts(upgrade: &dyn Upgrade) -> TreeColumns<String> {
-    let level_str = upgrade.format_level_str();
-    let cost_str = upgrade.format_cost_str();
     let current_value_str = upgrade.value_text();
     let next_value_str = upgrade
         .next_level()
@@ -52,8 +36,8 @@ fn render_column_texts(upgrade: &dyn Upgrade) -> TreeColumns<String> {
 
     TreeColumns {
         name: upgrade.name().to_string(),
-        level: level_str,
-        level_up_cost: cost_str,
+        level: String::new(),
+        level_up_cost: String::new(),
         values: match (current_value_str.deref(), next_value_str.as_str()) {
             ("", "") => "".to_string(),
             ("", _) => format!("-> {}", next_value_str),
@@ -78,6 +62,12 @@ fn cost_style(cost: Option<Resources>) -> Style {
 
 fn render_track_items(upgrade: &dyn Upgrade) -> Vec<TreeItem<'static, usize>> {
     (0..upgrade.num_cost_tracks())
+        .filter(|&track| {
+            upgrade
+                .track_next_cost(track)
+                .map(|cost| cost != Resources::zero())
+                .unwrap_or(false)
+        })
         .map(|track| {
             let track_level = upgrade.track_get_level(track);
             let max_level = upgrade.max_level();
@@ -88,10 +78,7 @@ fn render_track_items(upgrade: &dyn Upgrade) -> Vec<TreeItem<'static, usize>> {
             };
             let style = cost_style(cost);
             let line = Line::from(vec![
-                Span::raw(format!(
-                    "Track {}  {:>3}/{:<3}  ",
-                    track, track_level, max_level
-                )),
+                Span::raw(format!("-  {:>3}/{:<3}  ", track_level, max_level)),
                 Span::styled(cost_str, style),
             ]);
             TreeItem::new_leaf(track, line)
@@ -134,16 +121,9 @@ fn render_group_items(upgrades: &[&dyn Upgrade], group_i: usize) -> Vec<TreeItem
         .enumerate()
         .map(|(i, (u, tc))| {
             let name_width = column_sizes.name;
-            let level_width = column_sizes.level;
-            let level_up_cost_width = column_sizes.level_up_cost;
             let values_width = column_sizes.values;
-            let style = cost_style(u.next_level_cost());
             let spans = vec![
                 Span::raw(format!("{:<name_width$}", tc.name)),
-                Span::raw("     "),
-                Span::raw(format!("{:<level_width$}", tc.level)),
-                Span::raw("     "),
-                Span::styled(format!("{:>level_up_cost_width$}", tc.level_up_cost), style),
                 Span::raw("    "),
                 Span::raw(format!("{:^values_width$}", tc.values)),
             ];
@@ -174,16 +154,41 @@ fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'static, usize>> {
     groups.map(|item| item.unwrap()).collect()
 }
 
+pub(super) fn open_all_upgrade_nodes(state: &mut TreeState<usize>, upgrades: &Upgrades) {
+    let upgrade_list = upgrades.upgrades();
+    let group_unlocks = [
+        true,
+        upgrades.unlock_level1.value(),
+        upgrades.unlock_level2.value(),
+        upgrades.unlock_level3.value(),
+        upgrades.unlock_level4.value(),
+        upgrades.unlock_level5.value(),
+        upgrades.unlock_level6.value(),
+    ];
+    for group_i in 0..=6usize {
+        if !group_unlocks[group_i] {
+            continue;
+        }
+        let count = upgrade_list.iter().filter(|u| u.group() == group_i).count();
+        for upgrade_i in 0..count {
+            state.open(vec![group_i, upgrade_i]);
+        }
+    }
+}
+
 pub(super) fn create_tree_widget(upgrades: &Upgrades) -> TreeWidget<'static> {
-    TreeWidget::new(
-        build_tree_items(&upgrades),
+    let mut widget = TreeWidget::new(
+        build_tree_items(upgrades),
         |tree_items| {
             Tree::new(tree_items)
                 .unwrap()
                 .highlight_style(Style::new().add_modifier(Modifier::REVERSED))
+                .experimental_scrollbar(Some(Scrollbar::default()))
         },
         TreeState::default(),
-    )
+    );
+    widget.with_tree_state_mut(|state| open_all_upgrade_nodes(state, upgrades));
+    widget
 }
 
 impl Widget for &mut TreeWidget<'_> {

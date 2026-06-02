@@ -233,6 +233,9 @@ macro_rules! impl_upgrade {
             }
 
             fn track_next_cost(&self, track: usize) -> Option<Resources> {
+                if self.0 >= self.max_level() {
+                    return None;
+                }
                 Self::cost_at_track(track, self.0)
             }
 

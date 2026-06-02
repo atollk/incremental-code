@@ -3,7 +3,7 @@ use crate::backend::input::{KeyCode, KeyEventKind, MouseEventKind};
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
 use crate::game_scenes::logic::audio::with_audio_backend_mut;
-use crate::game_scenes::upgrades::tree::{TreeWidget, create_tree_widget, find_item_in_tree};
+use crate::game_scenes::upgrades::tree::{TreeWidget, create_tree_widget, open_all_upgrade_nodes};
 use crate::game_state::{Resources, Upgrades, with_game_state, with_game_state_mut};
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
 use crate::widgets::hud::draw_hud;
@@ -55,12 +55,15 @@ impl<'a> UpgradesScene<'a> {
         let upgrade = self.upgrades_working_copy.upgrade_at_mut(pos);
 
         // Perform the leveling
+        let mut track_became_hidden = false;
         let refresh_required = if level_up {
             if let Some(cost) = upgrade.track_next_cost(track) {
                 if with_game_state(|game_state| cost <= game_state.total_resources()) {
                     // can afford -> take resources and level up
                     with_game_state_mut(|game_state| game_state.take_resources(&cost)).unwrap();
                     upgrade.track_level_up(track);
+                    // if the track is now maxed it will be hidden, selection must move
+                    track_became_hidden = upgrade.track_next_cost(track).is_none();
                     true
                 } else {
                     // cannot afford -> do nothing
@@ -92,44 +95,54 @@ impl<'a> UpgradesScene<'a> {
                 .tree_widget
                 .with_tree_state(|tree_state| tree_state.clone());
             self.tree_widget = create_tree_widget(&self.upgrades_working_copy);
-            self.tree_widget
-                .with_tree_state_mut(|new_tree_state| *new_tree_state = old_tree_state);
+            let upgrades_ref = &self.upgrades_working_copy;
+            self.tree_widget.with_tree_state_mut(|new_tree_state| {
+                *new_tree_state = old_tree_state;
+                open_all_upgrade_nodes(new_tree_state, upgrades_ref);
+                if track_became_hidden {
+                    new_tree_state.select(vec![group, upgrade_idx]);
+                }
+            });
         }
     }
 
     #[must_use]
     fn process_input_event(&mut self, event: &Event) -> SceneSwitch {
         match event {
+            Event::KeyEvent(key) if key.kind == KeyEventKind::Repeat => match key.code {
+                KeyCode::Down => {
+                    self.tree_widget.with_tree_state_mut(|ts| ts.key_down());
+                }
+                KeyCode::Up => {
+                    self.tree_widget.with_tree_state_mut(|ts| ts.key_up());
+                }
+                _ => {}
+            },
             Event::KeyEvent(key) if key.kind == KeyEventKind::Press => match key.code {
                 KeyCode::Enter | KeyCode::Char(' ') => {
-                    self.tree_widget
-                        .with_tree_state_mut(|ts| ts.toggle_selected());
+                    let selected = self
+                        .tree_widget
+                        .with_tree_state(|ts| ts.selected().to_vec());
+                    if selected.len() == 1 {
+                        self.tree_widget
+                            .with_tree_state_mut(|ts| ts.toggle_selected());
+                    }
                 }
                 KeyCode::Left | KeyCode::Right => {
                     let selected = self
                         .tree_widget
                         .with_tree_state(|ts| ts.selected().to_vec());
-                    if !selected.is_empty() {
-                        let children_empty = self.tree_widget.with_tree_items(|tree_items| {
-                            find_item_in_tree(tree_items, &selected)
-                                .expect("when a tree item is selected, you should be able to find it via its identifier")
-                                .children()
-                                .is_empty()
-                        });
-                        if key.code == KeyCode::Left {
-                            if children_empty {
-                                self.level(selected.as_slice().try_into().unwrap(), false);
-                            } else {
-                                self.tree_widget.with_tree_state_mut(|ts| ts.key_left());
-                            }
+                    let level_up = key.code == KeyCode::Right;
+                    if selected.len() == 3 {
+                        self.level(selected.as_slice().try_into().unwrap(), level_up);
+                    } else if selected.len() == 1 {
+                        if level_up {
+                            self.tree_widget.with_tree_state_mut(|ts| ts.key_right());
                         } else {
-                            if children_empty {
-                                self.level(selected.as_slice().try_into().unwrap(), true);
-                            } else {
-                                self.tree_widget.with_tree_state_mut(|ts| ts.key_right());
-                            }
+                            self.tree_widget.with_tree_state_mut(|ts| ts.key_left());
                         }
                     }
+                    // len == 2 (upgrade node): do nothing — stays open
                 }
                 KeyCode::Down => {
                     self.tree_widget.with_tree_state_mut(|ts| ts.key_down());
