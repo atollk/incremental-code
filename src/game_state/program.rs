@@ -42,11 +42,42 @@ impl CompiledProgram {
     }
 
     pub fn resource_gain(&self) -> Resources {
-        let bronze_linear =
-            with_game_state(|game_state| game_state.upgrades.bronze_per_instruction.value());
-        let total_instructions: u64 = self.instruction_counts.iter().sum();
-        Resources::from_bronze((total_instructions * bronze_linear as u64) as f64)
+        struct ResourceUpgrades {
+            bronze_per_instruction: (u8, f32),
+            silver_per_print_character: (u8, u8, u8),
+            gold_per_sleep_second: f32,
+            diamond_per_break: f32,
+        }
+        let upgrades = with_game_state(|game_state| ResourceUpgrades {
+            bronze_per_instruction: game_state.upgrades.bronze_per_instruction.value(),
+            silver_per_print_character: game_state.upgrades.silver_per_print_character.value(),
+            gold_per_sleep_second: game_state.upgrades.gold_per_sleep_second.value(),
+            diamond_per_break: game_state.upgrades.diamond_per_break.value(),
+        });
+        let (bronze_const, bronze_exp) = upgrades.bronze_per_instruction;
+        let bronze = self
+            .instruction_counts
+            .iter()
+            .map(|count| hurwitz(*count as f64, bronze_exp as f64) * bronze_const as f64)
+            .sum();
+        let (silver_const, silver_lin, silver_exp) = upgrades.silver_per_print_character;
+        let silver = self
+            .print_calls
+            .iter()
+            .map(|len| {
+                silver_const as f64 + silver_lin as f64 * (*len as f64).powi(silver_exp as i32)
+            })
+            .sum();
+        let gold = todo!();
+        let diamond = todo!();
+        Resources::new(bronze, silver, gold, diamond, 0.)
     }
+}
+
+// Approximates \sum_{i=1}^n i^k
+fn hurwitz(n: f64, k: f64) -> f64 {
+    let z = spfunc::zeta::zeta(-k);
+    z + n.powf(k + 1.) / (k + 1.) + n.powf(k) / 2.
 }
 
 impl CompilingMetadata for CompiledProgram {
