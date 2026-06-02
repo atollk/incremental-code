@@ -1,32 +1,58 @@
 use crate::game_state::{CompiledProgram, with_game_state};
 use anyhow::{anyhow, bail};
+use itertools::Itertools;
 use language::{
-    CompilingMetadata, PredefinedFunction, ProgramValue, compile_with_meta, parse_program,
+    CompilingMetadata, HashableProgramValue, PredefinedFunction, ProgramValue, compile_with_meta,
+    parse_program,
 };
 use std::collections::HashMap;
 
-fn predefined_function_print<T>(
-    _meta: &mut T,
-    _args: Vec<ProgramValue>,
+fn predefined_function_print(
+    meta: &mut WipCompilingProgram,
+    args: Vec<ProgramValue>,
 ) -> anyhow::Result<ProgramValue> {
-    todo!()
+    let arg = args
+        .iter()
+        .exactly_one()
+        .map_err(|_| anyhow!("print takes exactly one argument"))?;
+    let ProgramValue::Hashable(HashableProgramValue::String(s)) = arg else {
+        bail!("print requires a string argument")
+    };
+    meta.program.print_calls.push(s.len() as u64);
+    Ok(ProgramValue::None)
 }
 
-fn predefined_function_sleep<T>(
-    _meta: &mut T,
-    _args: Vec<ProgramValue>,
+fn predefined_function_sleep(
+    meta: &mut WipCompilingProgram,
+    args: Vec<ProgramValue>,
 ) -> anyhow::Result<ProgramValue> {
-    todo!()
+    let arg = args
+        .iter()
+        .exactly_one()
+        .map_err(|_| anyhow!("sleep takes exactly one argument"))?;
+    let t = if let ProgramValue::Hashable(HashableProgramValue::Int(i)) = arg {
+        *i as f64
+    } else if let ProgramValue::Float(f) = arg {
+        *f
+    } else {
+        bail!("sleep requires a numeric argument")
+    };
+    meta.program.sleep_calls.push(t);
+    Ok(ProgramValue::None)
 }
 
-fn predefined_function_brk<T>(
-    _meta: &mut T,
-    _args: Vec<ProgramValue>,
+fn predefined_function_brk(
+    meta: &mut WipCompilingProgram,
+    args: Vec<ProgramValue>,
 ) -> anyhow::Result<ProgramValue> {
-    todo!()
+    if !args.is_empty() {
+        bail!("brk takes no arguments")
+    }
+    meta.program.brk_calls += 1;
+    Ok(ProgramValue::None)
 }
 
-fn predefined_functions<T>() -> HashMap<&'static str, PredefinedFunction<T>> {
+fn predefined_functions() -> HashMap<&'static str, PredefinedFunction<WipCompilingProgram>> {
     let (unlock_print, unlock_sleep, unlock_brk) = with_game_state(|game_state| {
         (
             game_state.upgrades.unlock_print.value(),
@@ -39,30 +65,33 @@ fn predefined_functions<T>() -> HashMap<&'static str, PredefinedFunction<T>> {
     if unlock_print {
         functions.insert(
             "print",
-            predefined_function_print::<T> as PredefinedFunction<T>,
+            predefined_function_print as PredefinedFunction<WipCompilingProgram>,
         );
     }
 
     if unlock_sleep {
         functions.insert(
             "sleep",
-            predefined_function_sleep::<T> as PredefinedFunction<T>,
+            predefined_function_sleep as PredefinedFunction<WipCompilingProgram>,
         );
     }
 
     if unlock_brk {
-        functions.insert("brk", predefined_function_brk::<T> as PredefinedFunction<T>);
+        functions.insert(
+            "brk",
+            predefined_function_brk as PredefinedFunction<WipCompilingProgram>,
+        );
     }
 
     functions
 }
 
-struct WipCompilingProgram<F: FnMut() -> bool> {
+struct WipCompilingProgram {
     program: CompiledProgram,
-    is_cancelled: F,
+    is_cancelled: Box<dyn FnMut() -> bool + 'static>,
 }
 
-impl<F: FnMut() -> bool> WipCompilingProgram<F> {
+impl WipCompilingProgram {
     fn check_cancel(&mut self) -> anyhow::Result<()> {
         if (self.is_cancelled)() {
             bail!("Cancelling logic program");
@@ -71,7 +100,7 @@ impl<F: FnMut() -> bool> WipCompilingProgram<F> {
     }
 }
 
-impl<F: FnMut() -> bool> CompilingMetadata for WipCompilingProgram<F> {
+impl CompilingMetadata for WipCompilingProgram {
     fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
         self.check_cancel()?;
         self.program.log_zero_instruction()
@@ -86,14 +115,14 @@ impl<F: FnMut() -> bool> CompilingMetadata for WipCompilingProgram<F> {
 /// Compiles the given code and returns compile errors in the outer result, or runtime errors in the inner result.
 fn compile_code(
     program_code: &str,
-    is_cancelled: impl FnMut() -> bool,
+    is_cancelled: impl FnMut() -> bool + 'static,
 ) -> anyhow::Result<Result<CompiledProgram, (String, Vec<u64>)>> {
     let parsed = parse_program(program_code);
     match parsed {
         Ok(parsed) => {
             let mut compiling_program = WipCompilingProgram {
                 program: CompiledProgram::new(),
-                is_cancelled,
+                is_cancelled: Box::new(is_cancelled),
             };
             let run_result =
                 compile_with_meta(&parsed, predefined_functions(), &mut compiling_program);
@@ -150,10 +179,14 @@ pub mod compile_thread {
                 *status.lock().unwrap() = CompileThreadStatus::Running;
                 // Debounce is_cancelled check to reduce Mutex locks.
                 let mut is_cancelled_debounce = 0;
-                let is_cancelled = || {
+                let status_for_cancel = status.clone();
+                let is_cancelled = move || {
                     is_cancelled_debounce = (is_cancelled_debounce + 1) % 100;
                     if is_cancelled_debounce == 0 {
-                        matches!(*status.lock().unwrap(), CompileThreadStatus::Cancelled)
+                        matches!(
+                            *status_for_cancel.lock().unwrap(),
+                            CompileThreadStatus::Cancelled
+                        )
                     } else {
                         false
                     }

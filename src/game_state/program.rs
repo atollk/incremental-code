@@ -6,7 +6,16 @@ use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CompiledProgram {
+    /// Number of instructions that were executed, separated by each call to `sleep`.
     pub instruction_counts: Vec<u64>,
+    /// Calls to `print`, with their respective String lengths.
+    pub print_calls: Vec<u64>,
+    /// Calls to `sleep`, with their respective duration.
+    pub sleep_calls: Vec<f64>,
+    /// Calls to `brk`.
+    pub brk_calls: u64,
+    /// Number of instructions left before reaching the game state limit.
+    // TODO: make this nicer
     left_to_instruction_limit: u64,
 }
 
@@ -16,6 +25,9 @@ impl CompiledProgram {
     pub fn new() -> CompiledProgram {
         CompiledProgram {
             instruction_counts: vec![0],
+            print_calls: vec![],
+            sleep_calls: vec![],
+            brk_calls: 0,
             left_to_instruction_limit: with_game_state(|game_state| {
                 game_state.upgrades.max_instructions.value()
             }),
