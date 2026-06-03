@@ -85,14 +85,14 @@ pub struct Upgrades {
     pub auto_compile: AutoCompile,
     pub unlock_print: UnlockPrint,
     pub print_speed_reset: PrintSpeedReset,
-    pub silver_per_print_character: SilverPerPrintCharacter,
+    pub silver_per_sleep_second: SilverPerSleepSecond,
     pub resources_after_reboot: RessourcesAfterReboot,
     pub unlock_level4: UnlockLevel4,
     // Level 4
     pub unlock_sleep: UnlockSleep,
     pub min_instruction_duration: MinInstructionDuration,
     pub instruction_speed_to_sleep: InstructionSpeedToSleep,
-    pub gold_per_sleep_second: GoldPerSleepSecond,
+    pub gold_per_print_character: GoldPerPrintCharacter,
     pub unlock_level5: UnlockLevel5,
     // Level 5
     pub auto_run: AutoRun,
@@ -711,39 +711,21 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    SilverPerPrintCharacter,
-    type=(u8, u8, u8),  // constant, linear, exponent
+    SilverPerSleepSecond,
+    type=u8,  // linear
     level=3,
     values=[
-        ((1, 0, 0), "1"),
-        ((2, 0, 0), "2"),
-        ((3, 0, 0), "3"),
-        ((4, 0, 0), "4"),
-        ((5, 0, 0), "5"),
-        ((5, 1, 1), "n"),
-        ((5, 2, 1), "2n"),
-        ((5, 3, 1), "3n"),
-        ((5, 4, 1), "4n"),
-        ((5, 5, 1), "5n"),
-        ((5, 5, 2), "n^2"),
-        ((5, 5, 3), "n^3"),
-        ((5, 5, 5), "n^5"),
-        ((5, 5, 10), "n^10"),
+        (1, "1"),
+        (2, "2"),
+        (3, "3"),
+        (5, "5"),
+        (10, "10"),
     ],
     costs=[[
         Resources::from_silver(50e3),
         Resources::from_silver(50e3),
         Resources::from_silver(50e3),
         Resources::from_silver(50e3),
-        Resources::from_silver(50e3),
-        Resources::from_silver(50e3),
-        Resources::from_silver(500e3),
-        Resources::from_silver(500e3),
-        Resources::from_silver(500e3),
-        Resources::from_gold(1.),
-        Resources::zero(),
-        Resources::zero(),
-        Resources::zero(),
         Resources::zero(),
     ]]
 );
@@ -817,17 +799,19 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    GoldPerSleepSecond,
-    type=f32,
+    GoldPerPrintCharacter,
+    type=u8,
     level=4,
     values=[
-        (1.0, "1"),
-        (5.0, "5"),
-        (25.0, "25"),
+        (100, "1"),
+        (3, "log(log(log(n)))"),
+        (2, "log(log(n))"),
+        (1, "log(n)"),
     ],
     costs=[[
         Resources::from_gold(500.),
         Resources::from_gold(5e3),
+        Resources::zero(),
         Resources::zero(),
     ]]
 );

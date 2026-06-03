@@ -1,16 +1,17 @@
 use crate::game_state::{Resources, with_game_state};
 use language::CompilingMetadata;
 use serde::{Deserialize, Serialize};
+use std::cmp::min;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CompiledProgram {
     /// Number of instructions that were executed, separated by each call to `sleep`.
     pub instruction_counts: Vec<u64>,
-    /// Calls to `print`, with their respective String lengths.
-    pub print_calls: Vec<u64>,
     /// Calls to `sleep`, with their respective duration.
     pub sleep_calls: Vec<f64>,
+    /// Calls to `print`, with their respective String lengths.
+    pub print_calls: Vec<u64>,
     /// Calls to `brk`.
     pub brk_calls: u64,
 }
@@ -45,14 +46,14 @@ impl CompiledProgram {
         // TODO: silver=sleep, gold=print, diamond=brk
         struct ResourceUpgrades {
             bronze_per_instruction: (u8, f32),
-            silver_per_print_character: (u8, u8, u8),
-            gold_per_sleep_second: f32,
+            silver_per_sleep_second: u8,
+            gold_per_print_character: u8,
             diamond_per_break: f32,
         }
         let upgrades = with_game_state(|game_state| ResourceUpgrades {
             bronze_per_instruction: game_state.upgrades.bronze_per_instruction.value(),
-            silver_per_print_character: game_state.upgrades.silver_per_print_character.value(),
-            gold_per_sleep_second: game_state.upgrades.gold_per_sleep_second.value(),
+            silver_per_sleep_second: game_state.upgrades.silver_per_sleep_second.value(),
+            gold_per_print_character: game_state.upgrades.gold_per_print_character.value(),
             diamond_per_break: game_state.upgrades.diamond_per_break.value(),
         });
         let (bronze_const, bronze_exp) = upgrades.bronze_per_instruction;
@@ -61,15 +62,22 @@ impl CompiledProgram {
             .iter()
             .map(|count| hurwitz(*count as f64, bronze_exp as f64) * bronze_const as f64)
             .sum();
-        let (silver_const, silver_lin, silver_exp) = upgrades.silver_per_print_character;
         let silver = self
+            .sleep_calls
+            .iter()
+            .map(|secs| secs * upgrades.silver_per_sleep_second as f64)
+            .sum();
+        let gold = self
             .print_calls
             .iter()
             .map(|len| {
-                silver_const as f64 + silver_lin as f64 * (*len as f64).powi(silver_exp as i32)
+                let mut x = *len as f64;
+                for _ in 0..upgrades.gold_per_print_character {
+                    x = x.log2().min(1.);
+                }
+                x
             })
             .sum();
-        let gold = todo!();
         let diamond = todo!();
         Resources::new(bronze, silver, gold, diamond, 0.)
     }
