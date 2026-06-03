@@ -98,7 +98,7 @@ pub struct Upgrades {
     pub auto_run: AutoRun,
     pub unlock_brk: UnlockBrk,
     pub break_slowdown: BreakSlowdown,
-    pub diamond_per_break: DiamondPerBreakPoint,
+    pub diamond_per_brk: DiamondPerBrk,
     pub unlock_level6: UnlockLevel6,
     // Level 6
     pub gain_currency_function: GainCurrencyFunction,
@@ -859,16 +859,20 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    DiamondPerBreakPoint,
-    type=f32,
+    DiamondPerBrk,
+    type=u16,  // linear
     level=5,
     values=[
-        (1.0, "1"),
-        (5.0, "5"),
-        (25.0, "25"),
+        (1, "1"),
+        (3, "3"),
+        (5, "5"),
+        (25, "25"),
+        (1000, "1000"),
     ],
     costs=[[
         Resources::from_gold(1e6),
+        Resources::from_gold(10e6),
+        Resources::from_gold(10e6),
         Resources::from_gold(10e6),
         Resources::zero(),
     ]]

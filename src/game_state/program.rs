@@ -43,31 +43,30 @@ impl CompiledProgram {
     }
 
     pub fn resource_gain(&self) -> Resources {
-        // TODO: silver=sleep, gold=print, diamond=brk
         struct ResourceUpgrades {
             bronze_per_instruction: (u8, f32),
             silver_per_sleep_second: u8,
             gold_per_print_character: u8,
-            diamond_per_break: f32,
+            diamond_per_brk: u16,
         }
         let upgrades = with_game_state(|game_state| ResourceUpgrades {
             bronze_per_instruction: game_state.upgrades.bronze_per_instruction.value(),
             silver_per_sleep_second: game_state.upgrades.silver_per_sleep_second.value(),
             gold_per_print_character: game_state.upgrades.gold_per_print_character.value(),
-            diamond_per_break: game_state.upgrades.diamond_per_break.value(),
+            diamond_per_brk: game_state.upgrades.diamond_per_brk.value(),
         });
         let (bronze_const, bronze_exp) = upgrades.bronze_per_instruction;
-        let bronze = self
+        let bronze: f64 = self
             .instruction_counts
             .iter()
             .map(|count| hurwitz(*count as f64, bronze_exp as f64) * bronze_const as f64)
             .sum();
-        let silver = self
+        let silver: f64 = self
             .sleep_calls
             .iter()
             .map(|secs| secs * upgrades.silver_per_sleep_second as f64)
             .sum();
-        let gold = self
+        let gold: f64 = self
             .print_calls
             .iter()
             .map(|len| {
@@ -78,7 +77,7 @@ impl CompiledProgram {
                 x
             })
             .sum();
-        let diamond = todo!();
+        let diamond = bronze.min(silver.min(gold)).log2() * upgrades.diamond_per_brk as f64;
         Resources::new(bronze, silver, gold, diamond, 0.)
     }
 }
