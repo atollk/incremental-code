@@ -1,4 +1,5 @@
 use crate::game_state::Resources;
+use bitflags::bitflags;
 use helper_macros::FieldsAs;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -575,16 +576,16 @@ impl_upgrade!(
 
 impl_upgrade!(
     CodeExpressionLiterals,
-    type=(),
+    type=(bool, u8),  // strings unlocked ; max int
     level=2,
     values=[
-        ((), "0, 1"),
-        ((), "2"),
-        ((), "3, 4, 5"),
-        ((), "6-10"),
-        ((), "numbers to 100"),
-        ((), "numbers to 255"),
-        ((), "empty strings"),
+        ((false, 1), "0, 1"),
+        ((false, 2), "2"),
+        ((false, 5), "3, 4, 5"),
+        ((false, 10), "6-10"),
+        ((true, 10), "empty strings"),
+        ((true, 100), "numbers to 100"),
+        ((true, 255), "numbers to 255"),
     ],
     costs=[[
         Resources::from_bronze(200.),
