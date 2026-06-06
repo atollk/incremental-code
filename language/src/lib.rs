@@ -7,4 +7,4 @@ pub use compile::{
     compile_with_meta,
 };
 pub use lexer::NotPythonLangToken;
-pub use parser::{NotPythonProgram, parse_program};
+pub use parser::{NotPythonExpr, NotPythonExprOp, NotPythonProgram, NotPythonStmt, parse_program};

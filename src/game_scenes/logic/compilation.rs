@@ -1,9 +1,9 @@
-use crate::game_state::{CompiledProgram, with_game_state};
+use crate::game_state::{CodeStatementLevels, CompiledProgram, with_game_state};
 use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use language::{
-    CompilingMetadata, HashableProgramValue, PredefinedFunction, ProgramValue, compile_with_meta,
-    parse_program,
+    CompilingMetadata, HashableProgramValue, NotPythonExpr, NotPythonExprOp, NotPythonProgram,
+    NotPythonStmt, PredefinedFunction, ProgramValue, compile_with_meta,
 };
 use std::collections::HashMap;
 
@@ -127,26 +127,9 @@ impl CompilingMetadata for WipCompilingProgram {
     }
 }
 
-/// Compiles the given code and returns compile errors in the outer result, or runtime errors in the inner result.
-fn compile_code(
-    program_code: &str,
-    is_cancelled: impl FnMut() -> bool + 'static,
-) -> anyhow::Result<Result<CompiledProgram, (String, Vec<u64>)>> {
-    let parsed = parse_program(program_code);
-    match parsed {
-        Ok(parsed) => {
-            let mut compiling_program = WipCompilingProgram::new(is_cancelled);
-            let run_result =
-                compile_with_meta(&parsed, predefined_functions(), &mut compiling_program);
-            if (compiling_program.is_cancelled)() {
-                bail!("Compilation was cancelled")
-            } else {
-                Ok(match run_result {
-                    Ok(()) => Ok(compiling_program.program),
-                    Err(e) => Err((e.to_string(), compiling_program.program.instruction_counts)),
-                })
-            }
-        }
+fn parse_code(program_code: &str) -> anyhow::Result<NotPythonProgram> {
+    match language::parse_program(program_code) {
+        Ok(parsed) => Ok(parsed),
         Err(richs) => Err(anyhow!(
             richs
                 .into_iter()
@@ -157,8 +140,30 @@ fn compile_code(
     }
 }
 
+/// Compiles the given code and returns compile errors in the outer result, or runtime errors in the inner result.
+fn compile_code(
+    parsed_program: &NotPythonProgram,
+    is_cancelled: impl FnMut() -> bool + 'static,
+) -> anyhow::Result<Result<CompiledProgram, (String, Vec<u64>)>> {
+    let mut compiling_program = WipCompilingProgram::new(is_cancelled);
+    let run_result = compile_with_meta(
+        &parsed_program,
+        predefined_functions(),
+        &mut compiling_program,
+    );
+    if (compiling_program.is_cancelled)() {
+        bail!("Compilation was cancelled")
+    } else {
+        Ok(match run_result {
+            Ok(()) => Ok(compiling_program.program),
+            Err(e) => Err((e.to_string(), compiling_program.program.instruction_counts)),
+        })
+    }
+}
+
 pub mod compile_thread {
-    use crate::game_scenes::logic::compilation::compile_code;
+    use crate::game_scenes::logic::compilation::{compile_code, parse_code};
+    use crate::game_scenes::logic::verification::verify_unlocks;
     use crate::game_state::{with_game_state, with_game_state_mut};
     use crate::global_variable;
     use std::sync::{Arc, Mutex};
@@ -205,21 +210,23 @@ pub mod compile_thread {
                 };
 
                 // Compile
-                let program_code = with_game_state(|game_state| game_state.program_code.clone());
-                let parse_result_run_result = compile_code(&program_code, is_cancelled);
-
-                // Extract result from compilation and set the necessary fields.
-                let result = match parse_result_run_result {
-                    Err(parse_err) => Err(parse_err),
-                    Ok(run_result) => {
+                let get_compile_result = || -> anyhow::Result<_> {
+                    let program_code =
+                        with_game_state(|game_state| game_state.program_code.clone());
+                    let parsed_code = parse_code(&program_code)?;
+                    verify_unlocks(&program_code, &parsed_code)?;
+                    compile_code(&parsed_code, is_cancelled)
+                };
+                let thread_result = match get_compile_result() {
+                    Ok(compile_result) => {
                         with_game_state_mut(|game_state| {
-                            game_state.compiled_program = Some(run_result);
+                            game_state.compiled_program = Some(compile_result);
                         });
                         Ok(())
                     }
+                    Err(e) => Err(e.to_string()),
                 };
-                *status.lock().unwrap() =
-                    CompileThreadStatus::Idle(result.map_err(|e| e.to_string()));
+                *status.lock().unwrap() = CompileThreadStatus::Idle(thread_result);
             };
             let t = thread::spawn(f);
             self.join_handle = Some(t);

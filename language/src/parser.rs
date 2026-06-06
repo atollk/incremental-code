@@ -6,7 +6,7 @@ use chumsky::{
 use logos::Logos;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(super) enum NotPythonExprOp {
+pub enum NotPythonExprOp {
     // Arithmetic
     Add(Box<NotPythonExpr>, Box<NotPythonExpr>),
     Sub(Box<NotPythonExpr>, Box<NotPythonExpr>),
@@ -30,7 +30,7 @@ pub(super) enum NotPythonExprOp {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(super) enum NotPythonExpr {
+pub enum NotPythonExpr {
     // Atoms
     Int(i64),
     Float(f64),
@@ -48,7 +48,7 @@ pub(super) enum NotPythonExpr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(super) enum NotPythonStmt {
+pub enum NotPythonStmt {
     // Basic
     Call(String, Vec<NotPythonExpr>),
     Pass,
@@ -435,7 +435,7 @@ fn parse<'a>(src: &'a str) -> Result<NotPythonStmt, Vec<Rich<'a, NotPythonLangTo
 
 /// The root AST node produced by [`parse_program`].
 pub struct NotPythonProgram {
-    pub(super) statement: NotPythonStmt,
+    pub statement: NotPythonStmt,
 }
 
 /// Parses NotPython source `src` into a [`NotPythonProgram`].
