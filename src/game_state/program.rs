@@ -1,7 +1,6 @@
 use crate::game_state::{Resources, with_game_state};
 use language::CompilingMetadata;
 use serde::{Deserialize, Serialize};
-use std::cmp::min;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

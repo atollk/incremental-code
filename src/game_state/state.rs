@@ -1,4 +1,4 @@
-use crate::game_state::upgrades::Upgrades;
+use crate::game_state::upgrades::{Upgrade, Upgrades};
 use crate::game_state::{CompiledProgram, Resources};
 use crate::global_variable;
 use anyhow::bail;
@@ -80,7 +80,8 @@ impl GameState {
         self.carryover_resources += resources;
     }
 
-    pub fn prestige(&mut self) {
+    fn prestige_currency(&mut self) {
+        // Convert currency
         let convert = |x| std::cmp::min_by(x - 1e6, 0.0, f64::total_cmp).log10();
         let current_stars = self.current_resources.stars + self.carryover_resources.stars;
 
@@ -94,5 +95,47 @@ impl GameState {
 
         self.current_resources = Resources::zero();
         self.current_resources.stars = current_stars;
+
+        // Add currency from upgrades
+        self.current_resources += self.upgrades.resources_after_reboot.value();
+    }
+
+    fn prestige_upgrades(&mut self) {
+        // Reset upgrades
+        let old_upgrades = self.upgrades.clone();
+        let mut prestiged_upgrades = Upgrades::default();
+
+        // Restore upgrades based on "keep upgrade"
+        macro_rules! restore_upgrade {
+            ($old:expr, $new:expr) => {
+                for track_i in 0..$new.count_tracks() {
+                    while $old.track_get_level(track_i) > $new.track_get_level(track_i) {
+                        $new.track_level_up(track_i);
+                    }
+                }
+            };
+        }
+        let keep_upgrades_until_group = old_upgrades.keep_prestige_upgrades.value();
+        for upgrade_i in 0..Upgrades::UPGRADES_LEN {
+            let upgrade = prestiged_upgrades.upgrade_at_mut(upgrade_i);
+            let keep_upgrade = upgrade.group() <= keep_upgrades_until_group as usize;
+            if keep_upgrade {
+                let old_upgrade = old_upgrades.upgrades()[upgrade_i];
+                restore_upgrade!(old_upgrade, upgrade);
+            }
+        }
+
+        // Restore group unlocks
+        restore_upgrade!(old_upgrades.unlock_level1, prestiged_upgrades.unlock_level1);
+        restore_upgrade!(old_upgrades.unlock_level2, prestiged_upgrades.unlock_level2);
+        restore_upgrade!(old_upgrades.unlock_level3, prestiged_upgrades.unlock_level3);
+        restore_upgrade!(old_upgrades.unlock_level4, prestiged_upgrades.unlock_level4);
+        restore_upgrade!(old_upgrades.unlock_level5, prestiged_upgrades.unlock_level5);
+        restore_upgrade!(old_upgrades.unlock_level6, prestiged_upgrades.unlock_level6);
+    }
+
+    pub fn prestige(&mut self) {
+        self.prestige_currency();
+        self.prestige_upgrades();
     }
 }

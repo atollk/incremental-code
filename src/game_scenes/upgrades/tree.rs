@@ -61,7 +61,7 @@ fn cost_style(cost: Option<Resources>) -> Style {
 }
 
 fn render_track_items(upgrade: &dyn Upgrade) -> Vec<TreeItem<'static, usize>> {
-    (0..upgrade.num_cost_tracks())
+    (0..upgrade.count_tracks())
         .filter(|&track| upgrade.track_next_cost(track).is_some())
         .map(|track| {
             let track_level = upgrade.track_get_level(track);

@@ -1,5 +1,4 @@
 use crate::game_state::Resources;
-use bitflags::bitflags;
 use helper_macros::FieldsAs;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -23,7 +22,7 @@ pub trait Upgrade: dyn_clone::DynClone {
     /// Reduce this upgrade by one level, clamping at zero.
     fn level_down(&mut self);
 
-    fn num_cost_tracks(&self) -> usize;
+    fn count_tracks(&self) -> usize;
     fn track_get_level(&self, track: usize) -> u8;
     fn track_next_cost(&self, track: usize) -> Option<Resources>;
     fn track_level_up(&mut self, track: usize);
@@ -107,8 +106,10 @@ pub struct Upgrades {
 }
 
 impl Upgrades {
+    pub(crate) const UPGRADES_LEN: usize = 34;
+
     /// Returns all upgrades as an array of trait-object references.
-    pub fn upgrades(&self) -> [&dyn Upgrade; 34] {
+    pub fn upgrades(&self) -> [&dyn Upgrade; Self::UPGRADES_LEN] {
         self.fields_as()
     }
 
@@ -221,7 +222,7 @@ macro_rules! impl_upgrade {
                 self.0 = self.0.saturating_sub(1);
             }
 
-            fn num_cost_tracks(&self) -> usize {
+            fn count_tracks(&self) -> usize {
                 [ $( impl_upgrade!(@unit_track [ $( $cost ),+ ]) ),+ ].len()
             }
 
@@ -600,16 +601,16 @@ impl_upgrade!(
 
 impl_upgrade!(
     KeepPrestigeUpgrades,
-    type=bool,
+    type=u8,
     level=2,
     values=[
-        (false, "keep L0"),
-        (false, "keep L1"),
-        (false, "keep L2"),
-        (false, "keep L3"),
-        (false, "keep L4"),
-        (false, "keep L5"),
-        (false, "keep L6"),
+        (0, "keep L0"),
+        (1, "keep L1"),
+        (2, "keep L2"),
+        (3, "keep L3"),
+        (4, "keep L4"),
+        (5, "keep L5"),
+        (6, "keep L6"),
     ],
     costs=[[
         Resources::from_bronze(500.),

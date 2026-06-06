@@ -61,9 +61,12 @@ impl CompileCmd {
             .get_mut()
             .calc_step(rand::random_range(0..Self::THROBBER_SET.symbols.len()) as i8);
         compile_thread::with_compile_thread_mut(|compile_thread| compile_thread.compile());
+        let compile_duration = Duration::from_secs_f32(with_game_state(|game_state| {
+            game_state.upgrades.compile_time.value()
+        }));
         CompileCmd {
             running_duration: Duration::from_millis(0),
-            compile_duration: Duration::from_millis(500),
+            compile_duration,
             throbber_state,
             result: None,
         }
