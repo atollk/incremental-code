@@ -123,13 +123,13 @@ impl<Meta: Default> RunningCommand<Meta> for ParagraphCmd<'_> {
 }
 
 /// Chains two commands sequentially.
-pub struct ChainCmd<C1, C2> {
+pub struct ChainCmd<C1: ?Sized, C2: ?Sized> {
     first_command: Box<C1>,
     second_command: ChainCmd2nd<C1, C2>,
     keep_rendering_first_command: bool,
 }
 
-impl<C1, C2> ChainCmd<C1, C2> {
+impl<C1: ?Sized, C2: ?Sized> ChainCmd<C1, C2> {
     /// Creates a `ChainCmd` that runs `first_command`, then uses `second_command_constructor` to
     /// build the second command once the first is done.
     ///
@@ -148,8 +148,8 @@ impl<C1, C2> ChainCmd<C1, C2> {
     }
 }
 
-impl<Meta, C1: RunningCommand<Meta>, C2: RunningCommand<Meta>> RunningCommand<Meta>
-    for ChainCmd<C1, C2>
+impl<Meta, C1: RunningCommand<Meta> + ?Sized, C2: RunningCommand<Meta> + ?Sized>
+    RunningCommand<Meta> for ChainCmd<C1, C2>
 {
     fn is_done(&self) -> bool {
         if let ChainCmd2nd::Constructed(second_command) = &self.second_command {
@@ -219,12 +219,12 @@ impl<Meta, C1: RunningCommand<Meta>, C2: RunningCommand<Meta>> RunningCommand<Me
     }
 }
 
-enum ChainCmd2nd<C1, C2> {
+enum ChainCmd2nd<C1: ?Sized, C2: ?Sized> {
     Constructor(Box<dyn FnOnce(&C1) -> Box<C2>>),
     Constructed(Box<C2>),
 }
 
-impl<C1, C2> ChainCmd2nd<C1, C2> {
+impl<C1: ?Sized, C2: ?Sized> ChainCmd2nd<C1, C2> {
     fn construct(&mut self, other_command: &C1) {
         if matches!(self, ChainCmd2nd::Constructor(_)) {
             struct AbortOnDrop;
@@ -253,5 +253,40 @@ impl<C1, C2> ChainCmd2nd<C1, C2> {
                 std::ptr::write(self, ChainCmd2nd::Constructed(cmd));
             }
         }
+    }
+}
+
+/// A command that calls a function once and finishes immediately.
+pub struct FnCmd<T, F: FnOnce() -> T> {
+    f: Option<F>,
+    result: Option<T>,
+}
+
+impl<T, F: FnOnce() -> T> FnCmd<T, F> {
+    fn new(f: F) -> FnCmd<T, F> {
+        FnCmd {
+            f: Some(f),
+            result: None,
+        }
+    }
+}
+
+impl<Meta: Default, T, F: FnOnce() -> T> RunningCommand<Meta> for FnCmd<T, F> {
+    fn is_done(&self) -> bool {
+        true
+    }
+
+    fn update(&mut self, _events: &[Event], _time_delta: Duration) {
+        self.result.get_or_insert_with(|| self.f.take().unwrap()());
+    }
+
+    fn render(&self, _area: Rect, _buf: &mut Buffer) {}
+
+    fn height(&self, _columns: u16) -> u16 {
+        0
+    }
+
+    fn get_metadata(&self) -> Meta {
+        Meta::default()
     }
 }

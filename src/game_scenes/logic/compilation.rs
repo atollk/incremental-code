@@ -1,9 +1,9 @@
-use crate::game_state::{CodeStatementLevels, CompiledProgram, with_game_state};
+use crate::game_state::{CompiledProgram, with_game_state};
 use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use language::{
-    CompilingMetadata, HashableProgramValue, NotPythonExpr, NotPythonExprOp, NotPythonProgram,
-    NotPythonStmt, PredefinedFunction, ProgramValue, compile_with_meta,
+    CompilingMetadata, HashableProgramValue, NotPythonProgram, PredefinedFunction, ProgramValue,
+    compile_with_meta,
 };
 use std::collections::HashMap;
 

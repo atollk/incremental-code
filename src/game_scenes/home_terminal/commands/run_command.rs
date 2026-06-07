@@ -1,5 +1,6 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
+use crate::game_scenes::home_terminal::commands::compile_command::compile_cmd;
 use crate::game_state::{CompiledProgram, with_game_state, with_game_state_mut};
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
 use ratatui_core::buffer::Buffer;
@@ -11,31 +12,54 @@ use std::cell::RefCell;
 use std::time::Duration;
 
 pub(super) fn run_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    match with_game_state(|game_state| game_state.compiled_program.clone()) {
-        None => Box::new(ParagraphCmd::new(Paragraph::new(Text::from(
+    if with_game_state(|game_state| {
+        game_state.compiled_program.is_none() && game_state.upgrades.auto_compile.value()
+    }) {
+        Box::new(ChainCmd::new(
+            compile_cmd(),
+            Box::new(|_| run_cmd_without_auto_compile()),
+            true,
+        ))
+    } else {
+        run_cmd_without_auto_compile()
+    }
+}
+
+fn run_cmd_without_auto_compile() -> Box<dyn RunningCommand<SceneSwitch>> {
+    let compiled_program = with_game_state(|game_state| game_state.compiled_program.clone());
+    if let Some(compiled_program) = compiled_program {
+        match compiled_program {
+            Ok(compiled_program) => {
+                // Successful run
+                Box::new(ChainCmd::new(
+                    Box::new(RunCmd::new(compiled_program.execution_time())),
+                    Box::new(move |_| {
+                        let resource_gain = compiled_program.resource_gain();
+                        with_game_state_mut(|game_state| {
+                            game_state.current_resources += resource_gain.clone()
+                        });
+                        let text = Text::from(format!("Gained {}", resource_gain.fmt_oneline()));
+                        Box::new(ParagraphCmd::new(Paragraph::new(text)))
+                    }),
+                    false,
+                ))
+            }
+            Err((err, instructions)) => {
+                // Display error
+                Box::new(ChainCmd::new(
+                    Box::new(RunCmd::new(CompiledProgram::instr_to_execution_time(
+                        &instructions,
+                    ))),
+                    Box::new(move |_| Box::new(ParagraphCmd::new(Paragraph::new(Text::from(err))))),
+                    false,
+                ))
+            }
+        }
+    } else {
+        // Not compiled yet
+        Box::new(ParagraphCmd::new(Paragraph::new(Text::from(
             "The current code has not been compiled yet.",
-        )))),
-        Some(result) => match result {
-            Err((err, instructions)) => Box::new(ChainCmd::new(
-                Box::new(RunCmd::new(CompiledProgram::instr_to_execution_time(
-                    &instructions,
-                ))),
-                Box::new(move |_| Box::new(ParagraphCmd::new(Paragraph::new(Text::from(err))))),
-                false,
-            )),
-            Ok(compiled_program) => Box::new(ChainCmd::new(
-                Box::new(RunCmd::new(compiled_program.execution_time())),
-                Box::new(move |_| {
-                    let resource_gain = compiled_program.resource_gain();
-                    with_game_state_mut(|game_state| {
-                        game_state.current_resources += resource_gain.clone()
-                    });
-                    let text = Text::from(format!("Gained {}", resource_gain.fmt_oneline()));
-                    Box::new(ParagraphCmd::new(Paragraph::new(text)))
-                }),
-                false,
-            )),
-        },
+        ))))
     }
 }
 
