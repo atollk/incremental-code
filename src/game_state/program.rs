@@ -5,12 +5,12 @@ use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CompiledProgram {
-    /// Number of instructions that were executed, separated by each call to `sleep`.
-    pub instruction_counts: Vec<u64>,
+    /// Number of instructions that were executed, separated by each call to `sleep`, respectively seperated by each call to `brk`.
+    pub instruction_counts: Vec<Vec<u64>>,
     /// Calls to `sleep`, with their respective duration.
     pub sleep_calls: Vec<f64>,
-    /// Calls to `print`, with their respective String lengths.
-    pub print_calls: Vec<u64>,
+    /// Last call to `print` with its string length.
+    pub print_len: u64,
     /// Calls to `brk`.
     pub brk_calls: u64,
 }
@@ -20,21 +20,38 @@ const INSTRUCTION_BASIC_DURATION: Duration = Duration::from_millis(1000);
 impl CompiledProgram {
     pub fn new() -> CompiledProgram {
         CompiledProgram {
-            instruction_counts: vec![0],
-            print_calls: vec![],
+            instruction_counts: vec![vec![0]],
             sleep_calls: vec![],
+            print_len: 0,
             brk_calls: 0,
         }
     }
 
-    pub fn instr_to_execution_time(instruction_counts: &[u64]) -> Duration {
-        let constant_speed_up =
-            with_game_state(|game_state| game_state.upgrades.instruction_execution_speed.value());
-        instruction_counts
-            .iter()
-            .map(|&count| INSTRUCTION_BASIC_DURATION * count as u32)
-            .map(|duration| duration / constant_speed_up)
-            .sum()
+    pub fn instr_to_execution_time(instruction_counts: &Vec<Vec<u64>>) -> Duration {
+        struct Upgrades {
+            instruction_execution_speed: (f32, f32),
+            sleep_speed_reset: f32,
+            min_instruction_duration: f32,
+            break_slowdown: f32,
+        }
+        let upgrades = with_game_state(|game_state| Upgrades {
+            instruction_execution_speed: game_state.upgrades.instruction_execution_speed.value(),
+            sleep_speed_reset: game_state.upgrades.sleep_speed_reset.value(),
+            min_instruction_duration: game_state.upgrades.min_instruction_duration.value(),
+            break_slowdown: game_state.upgrades.break_slowdown.value(),
+        });
+        let (instruction_speed_const, instruction_speed_exp) = upgrades.instruction_execution_speed;
+        let mut speed = 1.0;
+        for brk_split in instruction_counts {
+            let mut instruction_sum = 0;
+            for sleep_split in brk_split {
+                // TODO: use binary search to find the point between n=instruction_sum and n=(instruction_sum+sleep_split) at which the min_instruction_duration is reached
+                let min_duration_reached_at = todo!();
+                instruction_sum += sleep_split;
+            }
+        }
+        // TODO
+        todo!()
     }
 
     pub fn execution_time(&self) -> Duration {
@@ -55,27 +72,21 @@ impl CompiledProgram {
             diamond_per_brk: game_state.upgrades.diamond_per_brk.value(),
         });
         let (bronze_const, bronze_exp) = upgrades.bronze_per_instruction;
-        let bronze: f64 = self
-            .instruction_counts
-            .iter()
-            .map(|count| hurwitz(*count as f64, bronze_exp as f64) * bronze_const as f64)
-            .sum();
+        let bronze: f64 = {
+            let counts = self
+                .instruction_counts
+                .iter()
+                .map(|inner| inner.iter().map(|x| *x as f64).sum::<f64>())
+                .sum();
+            hurwitz(counts, bronze_exp as f64) * bronze_const as f64
+        };
         let silver: f64 = self
             .sleep_calls
             .iter()
             .map(|secs| secs * upgrades.silver_per_sleep_second as f64)
             .sum();
-        let gold: f64 = self
-            .print_calls
-            .iter()
-            .map(|len| {
-                let mut x = *len as f64;
-                for _ in 0..upgrades.gold_per_print_character {
-                    x = x.log2().min(1.);
-                }
-                x
-            })
-            .sum();
+        let gold: f64 = (0..upgrades.gold_per_print_character)
+            .fold(self.print_len as f64, |acc, _| acc.log2().min(1.));
         let diamond = bronze.min(silver.min(gold)).log2() * upgrades.diamond_per_brk as f64;
         Resources::new(bronze, silver, gold, diamond, 0.)
     }
@@ -93,7 +104,12 @@ impl CompilingMetadata for CompiledProgram {
     }
 
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
-        *self.instruction_counts.last_mut().unwrap() += 1;
+        *self
+            .instruction_counts
+            .last_mut()
+            .unwrap()
+            .last_mut()
+            .unwrap() += 1;
         Ok(())
     }
 }

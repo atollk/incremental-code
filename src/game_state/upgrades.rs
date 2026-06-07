@@ -83,15 +83,14 @@ pub struct Upgrades {
     pub unlock_level3: UnlockLevel3,
     // Level 3
     pub auto_compile: AutoCompile,
-    pub unlock_print: UnlockPrint,
-    pub print_speed_reset: PrintSpeedReset,
+    pub unlock_sleep: UnlockSleep,
+    pub sleep_speed_reset: SleepSpeedReset,
     pub silver_per_sleep_second: SilverPerSleepSecond,
     pub resources_after_reboot: RessourcesAfterReboot,
     pub unlock_level4: UnlockLevel4,
     // Level 4
-    pub unlock_sleep: UnlockSleep,
+    pub unlock_print: UnlockPrint,
     pub min_instruction_duration: MinInstructionDuration,
-    pub instruction_speed_to_sleep: InstructionSpeedToSleep,
     pub gold_per_print_character: GoldPerPrintCharacter,
     pub unlock_level5: UnlockLevel5,
     // Level 5
@@ -106,7 +105,7 @@ pub struct Upgrades {
 }
 
 impl Upgrades {
-    pub(crate) const UPGRADES_LEN: usize = 34;
+    pub(crate) const UPGRADES_LEN: usize = 33;
 
     /// Returns all upgrades as an array of trait-object references.
     pub fn upgrades(&self) -> [&dyn Upgrade; Self::UPGRADES_LEN] {
@@ -315,37 +314,37 @@ impl_upgrade!(
 
 impl_upgrade!(
     InstructionExecutionSpeed,
-    type=u32,
+    type=(f32, f32),  // constant, exponent
     level=1,
     values=[
-        (1, "100 %"),
-        (1, "90 %"),
-        (1, "80 %"),
-        (1, "70 %"),
-        (1, "60 %"),
-        (1, "50 %"),
-        (2, "40 %"),
-        (2, "30 %"),
-        (4, "25 %"),
-        (4, "20 %"),
-        (4, "15 %"),
-        (10, "10 %"),
-        (10, "5 %"),
-        (10, "2.5 %"),
-        (10, "1 %"),
-        (10, "0.5 %"),
-        (10, "0.25 %"),
-        (10, "0.1 %"),
-        (10, "n ^ -0.1"),
-        (10, "n ^ -0.2"),
-        (10, "n ^ -0.3"),
-        (10, "n ^ -0.4"),
-        (10, "n ^ -0.5"),
-        (10, "n ^ -0.6"),
-        (10, "n ^ -0.7"),
-        (10, "n ^ -0.8"),
-        (10, "n ^ -0.9"),
-        (10, "n ^ -1"),
+        ((1., 0.), "100 %"),
+        ((0.9, 0.), "90 %"),
+        ((0.8, 0.), "80 %"),
+        ((0.7, 0.), "70 %"),
+        ((0.6, 0.), "60 %"),
+        ((0.5, 0.), "50 %"),
+        ((0.4, 0.), "40 %"),
+        ((0.3, 0.), "30 %"),
+        ((0.25, 0.), "25 %"),
+        ((0.2, 0.), "20 %"),
+        ((0.15, 0.), "15 %"),
+        ((0.1, 0.), "10 %"),
+        ((0.05, 0.), "5 %"),
+        ((0.025, 0.), "2.5 %"),
+        ((0.01, 0.), "1 %"),
+        ((0.005, 0.), "0.5 %"),
+        ((0.0025, 0.), "0.25 %"),
+        ((0.001, 0.), "0.1 %"),
+        ((0.001, 0.1), "n ^ -0.1"),
+        ((0.001, 0.2), "n ^ -0.2"),
+        ((0.001, 0.3), "n ^ -0.3"),
+        ((0.001, 0.4), "n ^ -0.4"),
+        ((0.001, 0.5), "n ^ -0.5"),
+        ((0.001, 0.6), "n ^ -0.6"),
+        ((0.001, 0.7), "n ^ -0.7"),
+        ((0.001, 0.8), "n ^ -0.8"),
+        ((0.001, 0.9), "n ^ -0.9"),
+        ((0.001, 1.), "n ^ -1"),
     ],
     costs=[[
         Resources::from_bronze(50.),
@@ -673,29 +672,45 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    UnlockPrint,
+    UnlockSleep,
     type=bool,
     level=3,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_silver(10e3), Resources::zero()]]
+    costs=[[Resources::from_gold(50.), Resources::zero()]]
 );
 
 impl_upgrade!(
-    PrintSpeedReset,
+    InstructionSpeedToSleep,
     type=f32,
     level=3,
     values=[
-        (1.0, "^0"),
-        (0.5, "^0.1"),
-        (0.5, "^0.2"),
-        (0.5, "^0.3"),
-        (0.5, "^0.4"),
+        (1.0, "1x"),
+        (2.0, "2x"),
+        (5.0, "5x"),
+    ],
+    costs=[[
+        Resources::from_gold(200.),
+        Resources::from_gold(2e3),
+        Resources::zero(),
+    ]]
+);
+
+impl_upgrade!(
+    SleepSpeedReset,
+    type=f32,
+    level=3,
+    values=[
+        (0., "^0"),
+        (0.1, "^0.1"),
+        (0.2, "^0.2"),
+        (0.3, "^0.3"),
+        (0.4, "^0.4"),
         (0.5, "^0.5"),
-        (0.5, "^0.6"),
-        (0.5, "^0.7"),
-        (0.5, "^0.8"),
-        (0.5, "^0.9"),
-        (0.5, "none"),
+        (0.6, "^0.6"),
+        (0.7, "^0.7"),
+        (0.8, "^0.8"),
+        (0.9, "^0.9"),
+        (1.0, "none"),
     ],
     costs=[[
         Resources::from_silver(20e3),
@@ -761,11 +776,11 @@ impl_upgrade!(
 // Level 4
 
 impl_upgrade!(
-    UnlockSleep,
+    UnlockPrint,
     type=bool,
     level=4,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_gold(50.), Resources::zero()]]
+    costs=[[Resources::from_silver(10e3), Resources::zero()]]
 );
 
 impl_upgrade!(
@@ -780,22 +795,6 @@ impl_upgrade!(
     costs=[[
         Resources::from_gold(100.),
         Resources::from_gold(1e3),
-        Resources::zero(),
-    ]]
-);
-
-impl_upgrade!(
-    InstructionSpeedToSleep,
-    type=f32,
-    level=4,
-    values=[
-        (1.0, "1x"),
-        (2.0, "2x"),
-        (5.0, "5x"),
-    ],
-    costs=[[
-        Resources::from_gold(200.),
-        Resources::from_gold(2e3),
         Resources::zero(),
     ]]
 );

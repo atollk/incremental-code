@@ -13,7 +13,7 @@ global_variable!(game_state, GameState);
 pub struct GameState {
     // Program
     pub program_code: String,
-    pub compiled_program: Option<Result<CompiledProgram, (String, Vec<u64>)>>,
+    pub compiled_program: Option<Result<CompiledProgram, (String, Vec<Vec<u64>>)>>,
     // Resources
     pub current_resources: Resources,
     pub carryover_resources: Resources,

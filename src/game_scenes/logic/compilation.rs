@@ -18,7 +18,7 @@ fn predefined_function_print(
     let ProgramValue::Hashable(HashableProgramValue::String(s)) = arg else {
         bail!("print requires a string argument")
     };
-    meta.program.print_calls.push(s.len() as u64);
+    meta.program.print_len = s.len() as u64;
     Ok(ProgramValue::None)
 }
 
@@ -38,6 +38,11 @@ fn predefined_function_sleep(
         bail!("sleep requires a numeric argument")
     };
     meta.program.sleep_calls.push(t);
+    meta.program
+        .instruction_counts
+        .last_mut()
+        .expect("instruction vectors to never be empty")
+        .push(0);
     Ok(ProgramValue::None)
 }
 
@@ -49,6 +54,7 @@ fn predefined_function_brk(
         bail!("brk takes no arguments")
     }
     meta.program.brk_calls += 1;
+    meta.program.instruction_counts.push(vec![0]);
     Ok(ProgramValue::None)
 }
 
@@ -144,7 +150,7 @@ fn parse_code(program_code: &str) -> anyhow::Result<NotPythonProgram> {
 fn compile_code(
     parsed_program: &NotPythonProgram,
     is_cancelled: impl FnMut() -> bool + 'static,
-) -> anyhow::Result<Result<CompiledProgram, (String, Vec<u64>)>> {
+) -> anyhow::Result<Result<CompiledProgram, (String, Vec<Vec<u64>>)>> {
     let mut compiling_program = WipCompilingProgram::new(is_cancelled);
     let run_result = compile_with_meta(
         &parsed_program,
