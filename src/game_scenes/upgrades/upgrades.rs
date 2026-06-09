@@ -268,4 +268,9 @@ fn on_upgrades_commit() {
         // TODO: for the moment, we just force the user to recompile manually
         with_game_state_mut(|game_state| game_state.compiled_program = None);
     }
+
+    // If the win condition was bought, win
+    if with_game_state(|game_state| game_state.upgrades.win_condition.value()) {
+        todo!()
+    }
 }

@@ -100,12 +100,11 @@ pub struct Upgrades {
     pub diamond_per_brk: DiamondPerBrk,
     pub unlock_level6: UnlockLevel6,
     // Level 6
-    pub gain_currency_function: GainCurrencyFunction,
     pub win_condition: WinCondition,
 }
 
 impl Upgrades {
-    pub(crate) const UPGRADES_LEN: usize = 33;
+    pub(crate) const UPGRADES_LEN: usize = 32;
 
     /// Returns all upgrades as an array of trait-object references.
     pub fn upgrades(&self) -> [&dyn Upgrade; Self::UPGRADES_LEN] {
@@ -679,6 +678,7 @@ impl_upgrade!(
     costs=[[Resources::from_gold(50.), Resources::zero()]]
 );
 
+/*
 impl_upgrade!(
     InstructionSpeedToSleep,
     type=f32,
@@ -694,6 +694,7 @@ impl_upgrade!(
         Resources::zero(),
     ]]
 );
+ */
 
 impl_upgrade!(
     SleepSpeedReset,
@@ -889,6 +890,7 @@ impl_upgrade!(
 
 // Level 6
 
+/*
 impl_upgrade!(
     GainCurrencyFunction,
     type=bool,
@@ -896,6 +898,7 @@ impl_upgrade!(
     values=[(false, LOCKED), (true, UNLOCKED)],
     costs=[[Resources::from_gold(1e9), Resources::zero()]]
 );
+ */
 
 impl_upgrade!(
     WinCondition,
