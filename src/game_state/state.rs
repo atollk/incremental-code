@@ -1,3 +1,4 @@
+use crate::game_scenes::upgrades::on_upgrades_commit;
 use crate::game_state::upgrades::{Upgrade, Upgrades};
 use crate::game_state::{CompiledProgram, Resources};
 use crate::global_variable;
@@ -137,5 +138,6 @@ impl GameState {
     pub fn prestige(&mut self) {
         self.prestige_currency();
         self.prestige_upgrades();
+        on_upgrades_commit();
     }
 }

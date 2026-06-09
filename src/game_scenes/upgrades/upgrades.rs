@@ -2,7 +2,7 @@ use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind, MouseEventKind};
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
-use crate::game_scenes::logic::audio::with_audio_backend_mut;
+use crate::game_scenes::logic::audio::{with_audio_backend, with_audio_backend_mut};
 use crate::game_scenes::logic::auto_run::with_auto_run_mut;
 use crate::game_scenes::upgrades::tree::{TreeWidget, create_tree_widget, open_all_upgrade_nodes};
 use crate::game_state::{Resources, Upgrades, with_game_state, with_game_state_mut};
@@ -251,19 +251,20 @@ impl<'a> Scene for UpgradesScene<'a> {
     }
 }
 
-// TODO: reset these on prestige
-fn on_upgrades_commit() {
+pub fn on_upgrades_commit() {
     // If music was unlocked, start the music.
     let unlock_music = with_game_state(|game_state| game_state.upgrades.unlock_music.value());
-    if unlock_music {
-        with_audio_backend_mut(|audio| {
-            audio.as_mut().map(|audio| {
-                audio
+    with_audio_backend_mut(|audio| {
+        if let Some(audio) = audio {
+            if unlock_music {
+                let _ = audio
                     .start_bgm_loop()
-                    .map_err(|e| log::warn!("Error starting bgm: {}", e))
-            })
-        });
-    }
+                    .map_err(|e| log::warn!("Error starting bgm: {}", e));
+            } else {
+                audio.stop_bgm();
+            }
+        }
+    });
 
     // If the instruction limit changed and the program was compiled already, re-compile it to recount the instructions
     if with_game_state(|game_state| matches!(game_state.compiled_program, Some(Err(_)))) {
@@ -272,11 +273,14 @@ fn on_upgrades_commit() {
     }
 
     // Update the auto runner
-    if let Some(auto_run_duration) =
-        with_game_state(|game_state| game_state.upgrades.auto_run.value())
-    {
-        with_auto_run_mut(|auto_run| auto_run.set_period(auto_run_duration));
-    }
+    let auto_run_duration = with_game_state(|game_state| game_state.upgrades.auto_run.value());
+    with_auto_run_mut(|auto_run| {
+        if let Some(auto_run_duration) = auto_run_duration {
+            auto_run.set_period(auto_run_duration);
+        } else {
+            auto_run.stop();
+        }
+    });
 
     // If the win condition was bought, win
     if with_game_state(|game_state| game_state.upgrades.win_condition.value()) {

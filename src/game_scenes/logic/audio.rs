@@ -52,6 +52,10 @@ impl AudioBackend {
         Ok(())
     }
 
+    pub fn stop_bgm(&mut self) {
+        self.player.clear();
+    }
+
     pub fn get_volume(&self) -> f32 {
         self.player.volume()
     }
