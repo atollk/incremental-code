@@ -1,8 +1,12 @@
 use crate::backend::events::{Event, MetaEvent};
 use crate::basic_terminal_app::App;
-use crate::game_scenes::logic::audio::with_audio_backend_mut;
-use crate::game_state::AUTO_SAVER;
+use crate::game_scenes::logic::audio::GLOBAL_AUDIO_BACKEND;
+use crate::game_scenes::logic::auto_run::GLOBAL_AUTO_RUN;
+use crate::game_state::GLOBAL_AUTO_SAVER;
+use parking_lot::ReentrantMutex;
+use std::cell::RefCell;
 use std::ops::{ControlFlow, FromResidual, Residual, Try};
+use std::time::Duration;
 
 /// A game scene that renders itself and handles input each frame.
 pub trait Scene {
@@ -63,15 +67,45 @@ impl Default for SceneSwitch {
 pub struct SceneGame {
     active_scene: Box<dyn Scene>,
     last_frame: web_time::Instant,
+    tickers: Vec<&'static dyn Ticker>,
+}
+
+pub trait Ticker {
+    fn tick(&self, elapsed: Duration);
+}
+
+pub trait TickerMut {
+    fn tick(&mut self, elapsed: Duration);
+}
+
+impl<T: Ticker> TickerMut for T {
+    fn tick(&mut self, elapsed: Duration) {
+        Ticker::tick(self, elapsed);
+    }
+}
+
+impl<T: TickerMut> Ticker for ReentrantMutex<RefCell<T>> {
+    fn tick(&self, elapsed: Duration) {
+        self.lock().borrow_mut().tick(elapsed);
+    }
 }
 
 impl SceneGame {
     /// Creates a `SceneGame` starting with the given initial scene.
     pub fn new(scene: Box<dyn Scene>) -> Self {
-        SceneGame {
+        let mut scene_game = SceneGame {
             active_scene: scene,
             last_frame: web_time::Instant::now(),
-        }
+            tickers: Vec::new(),
+        };
+        scene_game.add_ticker(&*GLOBAL_AUTO_SAVER);
+        scene_game.add_ticker(&*GLOBAL_AUDIO_BACKEND);
+        scene_game.add_ticker(&*GLOBAL_AUTO_RUN);
+        scene_game
+    }
+
+    fn add_ticker(&mut self, ticker: &'static dyn Ticker) {
+        self.tickers.push(ticker);
     }
 }
 
@@ -83,7 +117,9 @@ impl App for SceneGame {
     ) -> anyhow::Result<bool> {
         let elapsed = web_time::Instant::now() - self.last_frame;
 
-        AUTO_SAVER.lock().unwrap().tick();
+        for ticker in &self.tickers {
+            ticker.tick(elapsed);
+        }
 
         for event in events {
             if let Event::MetaEvent(MetaEvent::SigTerm) = event {
@@ -91,7 +127,6 @@ impl App for SceneGame {
             }
         }
 
-        with_audio_backend_mut(|audio| audio.as_mut().map(|audio| audio.tick(elapsed)));
         self.last_frame = web_time::Instant::now();
         let scene_switch = self.active_scene.frame(events, frame, elapsed);
         match scene_switch {

@@ -1,43 +1,39 @@
 use crate::backend::backend::StorageBackend;
 use crate::backend::with_backend;
+use crate::game_scenes::base::TickerMut;
 use crate::game_state::{with_game_state, with_game_state_mut};
-use std::sync::{LazyLock, Mutex};
-use web_time::{Duration, Instant};
+use crate::global_variable;
+use web_time::Duration;
 
 pub struct AutoSaver {
-    last_save_time: Instant,
+    since_last_save: Duration,
     save_period: Option<Duration>,
 }
 
-impl AutoSaver {
-    fn new() -> Self {
+impl Default for AutoSaver {
+    fn default() -> AutoSaver {
         Self {
-            last_save_time: Instant::now(),
+            since_last_save: Duration::from_millis(0),
             save_period: None,
         }
     }
+}
 
+impl AutoSaver {
     fn save(&mut self) {
-        self.last_save_time = Instant::now();
+        self.since_last_save = Duration::from_millis(0);
         if let Err(e) = save_game_state() {
             log::error!("Auto-save failed: {e}");
         }
     }
 
-    pub fn tick(&mut self) {
-        if let Some(save_period) = &self.save_period {
-            if (Instant::now() - self.last_save_time).ge(save_period) {
-                self.save();
-            }
-        }
-    }
-
-    pub fn get_last_save_time(&self) -> Instant {
-        self.last_save_time
+    pub fn since_last_save(&self) -> Duration {
+        self.since_last_save
     }
 
     pub fn start(&mut self, period: Duration) {
         self.save_period = Some(period);
+        self.since_last_save = Duration::from_millis(0);
     }
 
     pub fn stop(&mut self) {
@@ -45,7 +41,18 @@ impl AutoSaver {
     }
 }
 
-pub static AUTO_SAVER: LazyLock<Mutex<AutoSaver>> = LazyLock::new(|| Mutex::new(AutoSaver::new()));
+global_variable!(auto_saver, AutoSaver);
+
+impl TickerMut for AutoSaver {
+    fn tick(&mut self, elapsed: Duration) {
+        if let Some(save_period) = &self.save_period {
+            self.since_last_save += elapsed;
+            if self.since_last_save >= *save_period {
+                self.save();
+            }
+        }
+    }
+}
 
 const KEY: &'static str = "game_state";
 

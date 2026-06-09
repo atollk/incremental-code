@@ -255,38 +255,3 @@ impl<C1: ?Sized, C2: ?Sized> ChainCmd2nd<C1, C2> {
         }
     }
 }
-
-/// A command that calls a function once and finishes immediately.
-pub struct FnCmd<T, F: FnOnce() -> T> {
-    f: Option<F>,
-    result: Option<T>,
-}
-
-impl<T, F: FnOnce() -> T> FnCmd<T, F> {
-    fn new(f: F) -> FnCmd<T, F> {
-        FnCmd {
-            f: Some(f),
-            result: None,
-        }
-    }
-}
-
-impl<Meta: Default, T, F: FnOnce() -> T> RunningCommand<Meta> for FnCmd<T, F> {
-    fn is_done(&self) -> bool {
-        true
-    }
-
-    fn update(&mut self, _events: &[Event], _time_delta: Duration) {
-        self.result.get_or_insert_with(|| self.f.take().unwrap()());
-    }
-
-    fn render(&self, _area: Rect, _buf: &mut Buffer) {}
-
-    fn height(&self, _columns: u16) -> u16 {
-        0
-    }
-
-    fn get_metadata(&self) -> Meta {
-        Meta::default()
-    }
-}

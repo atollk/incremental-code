@@ -1,3 +1,4 @@
+use crate::game_scenes::base::TickerMut;
 use crate::game_state::{with_settings, with_settings_mut};
 use crate::global_variable;
 use include_dir::{Dir, include_dir};
@@ -30,31 +31,6 @@ impl AudioBackend {
         })
     }
 
-    pub fn tick(&mut self, time_delta: Duration) {
-        match (self.player.empty(), self.bgm_silence) {
-            (true, None) => {
-                let silence = Duration::from_secs(random_range(10..20));
-                self.bgm_silence = Some(silence);
-            }
-            (false, None) => {}
-            (true, Some(_)) => {
-                self.bgm_silence = if let Some(bgm_silence) = &mut self.bgm_silence {
-                    bgm_silence.checked_sub(time_delta)
-                } else {
-                    None
-                };
-                if self.bgm_silence.is_none() {
-                    if let Err(e) = self.start_bgm() {
-                        log::error!("Error starting bgm: {:?}", e);
-                    }
-                }
-            }
-            (false, Some(_)) => {
-                unreachable!()
-            }
-        }
-    }
-
     pub fn start_bgm_loop(&mut self) -> anyhow::Result<()> {
         with_settings(|settings| self.player.set_volume(settings.bgm_volume));
         if self.bgm_silence.is_none() && self.player.empty() {
@@ -83,6 +59,34 @@ impl AudioBackend {
     pub fn set_volume(&mut self, volume: f32) {
         self.player.set_volume(volume);
         with_settings_mut(|settings| settings.bgm_volume = volume);
+    }
+}
+
+impl TickerMut for Option<AudioBackend> {
+    fn tick(&mut self, elapsed: Duration) {
+        let Some(s) = self else { return };
+        match (s.player.empty(), s.bgm_silence) {
+            (true, None) => {
+                let silence = Duration::from_secs(random_range(10..20));
+                s.bgm_silence = Some(silence);
+            }
+            (false, None) => {}
+            (true, Some(_)) => {
+                s.bgm_silence = if let Some(bgm_silence) = &mut s.bgm_silence {
+                    bgm_silence.checked_sub(elapsed)
+                } else {
+                    None
+                };
+                if s.bgm_silence.is_none() {
+                    if let Err(e) = s.start_bgm() {
+                        log::error!("Error starting bgm: {:?}", e);
+                    }
+                }
+            }
+            (false, Some(_)) => {
+                unreachable!()
+            }
+        }
     }
 }
 

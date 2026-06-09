@@ -1,11 +1,10 @@
-use crate::game_state::{AUTO_SAVER, with_game_state};
+use crate::game_state::{with_auto_saver_mut, with_game_state};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::{Constraint, Layout, Rect};
 use ratatui_core::terminal::Frame;
 use ratatui_core::text::Text;
 use ratatui_core::widgets::Widget;
-use std::time::Instant;
 
 /// Fixed width (in terminal columns) reserved for the HUD panel.
 pub const HUD_WIDTH: u16 = 22;
@@ -20,8 +19,7 @@ impl Widget for HudWidget {
         let resources = with_game_state(|s| format!("{}", s.total_resources().fmt_multiline()));
         text.extend(Some(resources));
 
-        let last_save = AUTO_SAVER.lock().unwrap().get_last_save_time();
-        let time_since_last_save = Instant::now() - last_save;
+        let time_since_last_save = with_auto_saver_mut(|auto_saver| auto_saver.since_last_save());
         text.extend(Some(format!(
             "Time since last save: {}s",
             time_since_last_save.as_secs()

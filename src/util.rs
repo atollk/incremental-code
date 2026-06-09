@@ -2,9 +2,10 @@
 macro_rules! global_variable {
     ( $variable:ident, $variable_type:ty ) => {
         paste::paste! {
-            static [<GLOBAL_ $variable:upper>]: std::sync::LazyLock<parking_lot::ReentrantMutex<std::cell::RefCell<$variable_type>>> =
+            pub static [<GLOBAL_ $variable:upper>]: std::sync::LazyLock<parking_lot::ReentrantMutex<std::cell::RefCell<$variable_type>>> =
                 std::sync::LazyLock::new(|| parking_lot::ReentrantMutex::new(std::cell::RefCell::new(Default::default())));
 
+            #[allow(dead_code)]
             #[doc = "Lock the global "]
             #[doc = stringify!($variable)]
             #[doc = "and run `f` with a reference to it.\n"]
@@ -17,6 +18,7 @@ macro_rules! global_variable {
                 f(lock.deref().borrow().deref())
             }
 
+            #[allow(dead_code)]
             #[doc = "Lock the global "]
             #[doc = stringify!($variable)]
             #[doc = "and run `f` with a mutable reference to it.\n"]

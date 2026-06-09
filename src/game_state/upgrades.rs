@@ -2,6 +2,7 @@ use crate::game_state::Resources;
 use helper_macros::FieldsAs;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::time::Duration;
 
 /// Common interface for all purchasable upgrades.
 pub trait Upgrade: dyn_clone::DynClone {
@@ -830,10 +831,22 @@ impl_upgrade!(
 
 impl_upgrade!(
     AutoRun,
-    type=bool,
+    type=Option<Duration>,
     level=5,
-    values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_gold(50e3), Resources::zero()]]
+    values=[
+        (None, LOCKED),
+        (Some(Duration::from_secs(18)), "18s"),
+        (Some(Duration::from_secs(6)), "6s"),
+        (Some(Duration::from_secs(2)), "2s"),
+        (Some(Duration::from_secs(1)), "0s"),
+    ],
+    costs=[[
+        Resources::from_gold(50e3),
+        Resources::zero(),
+        Resources::zero(),
+        Resources::zero(),
+        Resources::zero(),
+    ]]
 );
 
 impl_upgrade!(

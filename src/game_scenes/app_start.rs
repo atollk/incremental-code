@@ -2,7 +2,7 @@ use crate::backend::events::Event;
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
 use crate::game_scenes::logic::audio::with_audio_backend_mut;
-use crate::game_state::{AUTO_SAVER, load_game_state, load_settings, with_game_state};
+use crate::game_state::{load_game_state, load_settings, with_auto_saver_mut, with_game_state};
 use ratatui_core::terminal::Frame;
 use web_time::Duration;
 
@@ -30,7 +30,7 @@ impl AppStartScene {
                 })
             });
         }
-        AUTO_SAVER.lock().unwrap().start(Duration::from_secs(60));
+        with_auto_saver_mut(|auto_saver| auto_saver.start(Duration::from_secs(60)));
         let scene: Box<dyn Scene> = if loaded_state {
             Box::new(HomeTerminalScene::new())
         } else {
