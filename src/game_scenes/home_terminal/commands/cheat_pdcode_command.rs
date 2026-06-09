@@ -16,7 +16,7 @@ pub(super) fn cheat_pdcode_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
 fn get_predefined_code(current_upgrades: &Upgrades) -> String {
     let width = current_upgrades.code_line_width.value() as usize;
     let lines = current_upgrades.code_line_count.value() as usize;
-    let max_int_lit = current_upgrades.literals.get_max_int_literal();
+    let max_int_lit = current_upgrades.literals.value().1;
 
     match current_upgrades.statements.value() {
         CodeStatementLevels::None => {

@@ -30,8 +30,8 @@ struct TreeColumns<T> {
 fn render_column_texts(upgrade: &dyn Upgrade) -> TreeColumns<String> {
     let current_value_str = upgrade.value_text();
     let next_value_str = upgrade
-        .next_level()
-        .map(|u| u.value_text().to_string())
+        .next_level_value_text()
+        .map(|s| s.to_string())
         .unwrap_or_default();
 
     TreeColumns {

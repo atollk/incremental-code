@@ -15,48 +15,14 @@ pub trait Upgrade: dyn_clone::DynClone {
     fn max_level(&self) -> u8;
     /// Human-readable description of the current effect value.
     fn value_text(&self) -> Cow<'static, str>;
-    /// Cost to advance from the current level to the next, or `None` if already maxed.
-    fn next_level_cost(&self) -> Option<Resources>;
-
-    /// Advance this upgrade by one level, capping at [`max_level`](Self::max_level).
-    fn level_up(&mut self);
-    /// Reduce this upgrade by one level, clamping at zero.
-    fn level_down(&mut self);
+    /// Human-readable description of the next level effect value.
+    fn next_level_value_text(&self) -> Option<Cow<'static, str>>;
 
     fn count_tracks(&self) -> usize;
     fn track_get_level(&self, track: usize) -> u8;
     fn track_next_cost(&self, track: usize) -> Option<Resources>;
     fn track_level_up(&mut self, track: usize);
     fn track_level_down(&mut self, track: usize);
-
-    /// Renders the upgrade level as a string of box characters.
-    fn format_level_str(&self) -> String {
-        match self.max_level() {
-            0 => unreachable!(),
-            1 => (if self.get_level() == 0 { "[ ]" } else { "[x]" }).to_string(),
-            n => format!("{} / {}", self.get_level(), n),
-        }
-    }
-
-    /// Returns a display string for the next-level cost, or `"maxed"` if at max level.
-    fn format_cost_str(&self) -> String {
-        match self.next_level_cost() {
-            Some(r) => r.fmt_oneline().to_string(),
-            None => "maxed".to_string(),
-        }
-    }
-}
-
-impl dyn Upgrade + '_ {
-    pub fn next_level(&self) -> Option<Box<dyn Upgrade + '_>> {
-        if self.get_level() == self.max_level() {
-            None
-        } else {
-            let mut other = dyn_clone::clone_box(self);
-            other.level_up();
-            Some(other)
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, FieldsAs)]
@@ -126,15 +92,27 @@ macro_rules! impl_upgrade {
         values=[ $( ($value:expr, $text:expr) ),+ $(,)? ],
         costs=[ $( [ $( $cost:expr ),+ $(,)? ] ),+ $(,)? ]
     ) => {
-        #[derive(Debug, Default, Clone, PartialEq, std::hash::Hash, serde::Serialize, serde::Deserialize)]
-        pub(crate) struct $struct (u8);
+        #[derive(Debug, Clone, PartialEq, std::hash::Hash, serde::Serialize, serde::Deserialize)]
+        pub(crate) struct $struct(
+            [u8; { [ $( impl_upgrade!(@unit_track [ $( $cost ),+ ]) ),+ ].len() }]
+        );
+
+        impl Default for $struct {
+            fn default() -> Self {
+                Self([0u8; _])
+            }
+        }
 
         impl $struct {
             fn fail_oob(&self) -> ! {
                 panic!(
                     concat!(stringify!($struct), ": level {} out of bounds"),
-                    self.0
+                    self.total_level()
                 )
+            }
+
+            fn total_level(&self) -> u8 {
+                self.0.iter().copied().map(u16::from).sum::<u16>() as u8
             }
 
             pub(crate) fn value_at(level: u8) -> Option<$val> {
@@ -172,7 +150,7 @@ macro_rules! impl_upgrade {
             }
 
             pub(crate) fn value(&self) -> $val {
-                Self::value_at(self.0).unwrap_or_else(|| self.fail_oob())
+                Self::value_at(self.total_level()).unwrap_or_else(|| self.fail_oob())
             }
         }
 
@@ -198,7 +176,7 @@ macro_rules! impl_upgrade {
             }
 
             fn get_level(&self) -> u8 {
-                self.0
+                self.total_level()
             }
 
             fn max_level(&self) -> u8 {
@@ -206,42 +184,37 @@ macro_rules! impl_upgrade {
             }
 
             fn value_text(&self) -> Cow<'static, str> {
-                Self::value_text_at(self.0).unwrap_or_else(|| self.fail_oob())
+                Self::value_text_at(self.total_level()).unwrap_or_else(|| self.fail_oob())
             }
 
-            fn next_level_cost(&self) -> Option<Resources> {
-                self.track_next_cost(0)
-            }
-
-            fn level_up(&mut self) {
-                self.0 = std::cmp::min(self.0 + 1, self.max_level());
-            }
-
-            fn level_down(&mut self) {
-                self.0 = self.0.saturating_sub(1);
+            fn next_level_value_text(&self) -> Option<Cow<'static, str>> {
+                Self::value_text_at(self.total_level() + 1)
             }
 
             fn count_tracks(&self) -> usize {
-                [ $( impl_upgrade!(@unit_track [ $( $cost ),+ ]) ),+ ].len()
+                self.0.len()
             }
 
-            fn track_get_level(&self, _track: usize) -> u8 {
-                self.0
+            fn track_get_level(&self, track: usize) -> u8 {
+                self.0[track]
             }
 
             fn track_next_cost(&self, track: usize) -> Option<Resources> {
-                if self.0 >= self.max_level() {
+                let total = self.total_level();
+                if total >= self.max_level() {
                     return None;
                 }
-                Self::cost_at_track(track, self.0)
+                Self::cost_at_track(track, total)
             }
 
-            fn track_level_up(&mut self, _track: usize) {
-                self.level_up()
+            fn track_level_up(&mut self, track: usize) {
+                if self.total_level() < self.max_level() {
+                    self.0[track] += 1;
+                }
             }
 
-            fn track_level_down(&mut self, _track: usize) {
-                self.level_down()
+            fn track_level_down(&mut self, track: usize) {
+                self.0[track] = self.0[track].saturating_sub(1);
             }
         }
     };
@@ -920,16 +893,3 @@ impl_upgrade!(
     values=[(false, "not won"), (true, "won")],
     costs=[[Resources::from_gold(1e12), Resources::zero()]]
 );
-
-impl CodeExpressionLiterals {
-    pub(crate) fn get_max_int_literal(&self) -> u8 {
-        match self.0 {
-            0 => 1,
-            1 => 2,
-            2 => 5,
-            3 => 10,
-            4 => 100,
-            _ => 255,
-        }
-    }
-}
