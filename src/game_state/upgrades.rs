@@ -96,7 +96,7 @@ pub struct Upgrades {
     // Level 5
     pub auto_run: AutoRun,
     pub unlock_brk: UnlockBrk,
-    pub break_slowdown: BreakSlowdown,
+    pub brk_slowdown: BrkSlowdown,
     pub diamond_per_brk: DiamondPerBrk,
     pub unlock_level6: UnlockLevel6,
     // Level 6
@@ -314,7 +314,7 @@ impl_upgrade!(
 
 impl_upgrade!(
     InstructionExecutionSpeed,
-    type=(f32, f32),  // constant, exponent
+    type=(f64, f64),  // constant, exponent
     level=1,
     values=[
         ((1., 0.), "100 %"),
@@ -335,16 +335,16 @@ impl_upgrade!(
         ((0.005, 0.), "0.5 %"),
         ((0.0025, 0.), "0.25 %"),
         ((0.001, 0.), "0.1 %"),
-        ((0.001, 0.1), "n ^ -0.1"),
-        ((0.001, 0.2), "n ^ -0.2"),
-        ((0.001, 0.3), "n ^ -0.3"),
-        ((0.001, 0.4), "n ^ -0.4"),
-        ((0.001, 0.5), "n ^ -0.5"),
-        ((0.001, 0.6), "n ^ -0.6"),
-        ((0.001, 0.7), "n ^ -0.7"),
-        ((0.001, 0.8), "n ^ -0.8"),
-        ((0.001, 0.9), "n ^ -0.9"),
-        ((0.001, 1.), "n ^ -1"),
+        ((0.001, -0.1), "n ^ -0.1"),
+        ((0.001, -0.2), "n ^ -0.2"),
+        ((0.001, -0.3), "n ^ -0.3"),
+        ((0.001, -0.4), "n ^ -0.4"),
+        ((0.001, -0.5), "n ^ -0.5"),
+        ((0.001, -0.6), "n ^ -0.6"),
+        ((0.001, -0.7), "n ^ -0.7"),
+        ((0.001, -0.8), "n ^ -0.8"),
+        ((0.001, -0.9), "n ^ -0.9"),
+        ((0.001, -1.), "n ^ -1"),
     ],
     costs=[[
         Resources::from_bronze(50.),
@@ -697,7 +697,7 @@ impl_upgrade!(
 
 impl_upgrade!(
     SleepSpeedReset,
-    type=f32,
+    type=f64,
     level=3,
     values=[
         (0., "^0"),
@@ -785,7 +785,7 @@ impl_upgrade!(
 
 impl_upgrade!(
     MinInstructionDuration,
-    type=f32,
+    type=f64,
     level=4,
     values=[
         (1.0, "1ms"),
@@ -844,8 +844,8 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    BreakSlowdown,
-    type=f32,
+    BrkSlowdown,
+    type=f64,
     level=5,
     values=[
         (2.0, "2x"),
