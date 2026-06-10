@@ -2,6 +2,9 @@
 #![feature(try_trait_v2_residual)]
 #![feature(impl_trait_in_bindings)]
 #![feature(iter_intersperse)]
+#![feature(const_convert)]
+#![feature(const_trait_impl)]
+
 mod backend;
 mod basic_terminal_app;
 pub mod demos;
