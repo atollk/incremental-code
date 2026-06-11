@@ -53,13 +53,19 @@ pub struct Resources {
 
 impl Resources {
     /// Creates a `Resources` with explicit amounts for each denomination.
-    pub const fn new(bronze: f64, silver: f64, gold: f64, diamond: f64, stars: f64) -> Self {
+    pub const fn new(
+        bronze: impl [const] Into<f64>,
+        silver: impl [const] Into<f64>,
+        gold: impl [const] Into<f64>,
+        diamond: impl [const] Into<f64>,
+        stars: impl [const] Into<f64>,
+    ) -> Self {
         Resources {
-            bronze: Currency(bronze),
-            silver: Currency(silver),
-            gold: Currency(gold),
-            diamond: Currency(diamond),
-            stars: Currency(stars),
+            bronze: Currency(bronze.into()),
+            silver: Currency(silver.into()),
+            gold: Currency(gold.into()),
+            diamond: Currency(diamond.into()),
+            stars: Currency(stars.into()),
         }
     }
 
@@ -69,22 +75,22 @@ impl Resources {
     }
 
     /// Creates a `Resources` with only the bronze denomination set.
-    pub const fn from_bronze<T: [const] Into<f64>>(bronze: T) -> Self {
-        Resources::new(bronze.into(), 0.0, 0.0, 0.0, 0.0)
+    pub const fn from_bronze(bronze: impl [const] Into<f64>) -> Self {
+        Resources::new(bronze, 0.0, 0.0, 0.0, 0.0)
     }
 
     /// Creates a `Resources` with only the silver denomination set.
-    pub const fn from_silver<T: [const] Into<f64>>(silver: T) -> Self {
-        Resources::new(0.0, silver.into(), 0.0, 0.0, 0.0)
+    pub const fn from_silver(silver: impl [const] Into<f64>) -> Self {
+        Resources::new(0.0, silver, 0.0, 0.0, 0.0)
     }
 
     /// Creates a `Resources` with only the gold denomination set.
-    pub const fn from_gold<T: [const] Into<f64>>(gold: T) -> Self {
-        Resources::new(0.0, 0.0, gold.into(), 0.0, 0.0)
+    pub const fn from_gold(gold: impl [const] Into<f64>) -> Self {
+        Resources::new(0.0, 0.0, gold, 0.0, 0.0)
     }
 
-    pub const fn from_diamond<T: [const] Into<f64>>(diamond: T) -> Self {
-        Resources::new(0.0, 0.0, 0.0, diamond.into(), 0.0)
+    pub const fn from_diamond(diamond: impl [const] Into<f64>) -> Self {
+        Resources::new(0.0, 0.0, 0.0, diamond, 0.0)
     }
 
     /// Returns a single-line display of all non-zero denominations.
