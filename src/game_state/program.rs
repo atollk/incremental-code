@@ -152,6 +152,8 @@ fn hurwitz(n: f64, k: f64) -> f64 {
 }
 
 impl CompilingMetadata for CompiledProgram {
+    type Diff = CompiledProgram;
+
     fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
         Ok(())
     }
@@ -166,9 +168,13 @@ impl CompilingMetadata for CompiledProgram {
         Ok(())
     }
 
-    fn merge(mut self, mut other: Self) -> anyhow::Result<Self> {
+    fn diff(&self, other: &Self) -> Self::Diff {
+        todo!()
+    }
+
+    fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()> {
         {
-            let (head, tail) = other.instruction_counts.split_at(1);
+            let (head, tail) = diff.instruction_counts.split_at(1);
             let head = head.iter().exactly_one().unwrap();
             let (h, t) = head.split_at(1);
             let h = *h.iter().exactly_one().unwrap();
@@ -184,15 +190,11 @@ impl CompilingMetadata for CompiledProgram {
                 .extend_from_slice(t);
             self.instruction_counts.extend_from_slice(tail);
         };
-        self.sleep_calls.append(&mut other.sleep_calls);
+        self.sleep_calls.extend(diff.sleep_calls.iter());
         self.print_len = self
             .print_len
-            .map(|l| l.max(other.print_len.unwrap_or(0)))
-            .or(other.print_len);
-        Ok(self)
-    }
-
-    fn reset(&mut self) {
-        *self = CompiledProgram::new();
+            .map(|l| l.max(diff.print_len.unwrap_or(0)))
+            .or(diff.print_len);
+        Ok(())
     }
 }

@@ -2,26 +2,34 @@ use crate::parser::{NotPythonExpr, NotPythonExprOp, NotPythonProgram, NotPythonS
 use anyhow::{anyhow, bail};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
-use std::ops::{Add, Deref};
+use std::ops::Deref;
 
 pub trait CompilingMetadata: Clone {
+    type Diff;
     fn log_zero_instruction(&mut self) -> anyhow::Result<()>;
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()>;
-    fn merge(self, other: Self) -> anyhow::Result<Self>;
-    fn reset(&mut self);
+    fn diff(&self, other: &Self) -> Self::Diff;
+    fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()>;
 }
 
 impl CompilingMetadata for () {
+    type Diff = ();
+
     fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
         Ok(())
     }
+
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
         Ok(())
     }
-    fn merge(self, _other: Self) -> anyhow::Result<()> {
+
+    fn diff(&self, _other: &Self) -> Self::Diff {
+        ()
+    }
+
+    fn add_assign(&mut self, _diff: &Self::Diff) -> anyhow::Result<()> {
         Ok(())
     }
-    fn reset(&mut self) {}
 }
 
 /// Validates and executes a parsed [`NotPythonProgram`], returning an error if execution fails.
@@ -129,11 +137,11 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                         .collect::<anyhow::Result<_>>()?;
 
                     // Cache hit: return immediately without executing the body.
-                    if let Some((value, other_meta)) = state
+                    if let Some((value, diff)) = state
                         .pure_caches
                         .get(&(fn_name.as_str(), cache_key.clone()))
                     {
-                        *meta = meta.merge(other_meta)?;
+                        meta.add_assign(diff)?;
                         return Ok(value.clone());
                     }
 
@@ -150,11 +158,10 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                 for (param, val) in params.iter().zip(arg_values) {
                     frame.variables.insert(param.as_str(), val);
                 }
+                let meta_clone = meta.clone();
                 state.call_stack.push(frame);
-                let mut fresh_meta = Meta::default();
-                compile_stmt(body, state, &mut fresh_meta)?;
+                compile_stmt(body, state, meta)?;
                 state.call_stack.pop();
-                *meta = meta.merge(fresh_meta)?;
                 let return_value = match std::mem::replace(
                     &mut state.control_flow,
                     ProgramExecutionControlFlow::Normal,
@@ -167,7 +174,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     // Store in cache.
                     state.pure_caches.insert(
                         (fn_name.as_str(), cache_key.unwrap()),
-                        (return_value, fresh_meta),
+                        (return_value.clone(), meta.diff(&meta_clone)),
                     );
                 }
 
@@ -182,7 +189,7 @@ struct ProgramExecutionState<'a, Meta: CompilingMetadata> {
     control_flow: ProgramExecutionControlFlow,
     call_stack: Vec<ProgramExecutionCallState<'a>>,
     predefined_functions: HashMap<&'a str, PredefinedFunction<Meta>>,
-    pure_caches: HashMap<(&'a str, Vec<HashableProgramValue>), (ProgramValue, Meta)>,
+    pure_caches: HashMap<(&'a str, Vec<HashableProgramValue>), (ProgramValue, Meta::Diff)>,
 }
 
 impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
@@ -597,11 +604,22 @@ mod tests {
     use crate::parser::parse_program;
 
     impl CompilingMetadata for u32 {
+        type Diff = i32;
+
         fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
             Ok(())
         }
         fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
             *self += 1;
+            Ok(())
+        }
+
+        fn diff(&self, other: &Self) -> Self::Diff {
+            (*self as i32) - (*other as i32)
+        }
+
+        fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()> {
+            *self = self.checked_add_signed(*diff).unwrap();
             Ok(())
         }
     }

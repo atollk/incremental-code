@@ -5,8 +5,10 @@ use language::{
     CompilingMetadata, HashableProgramValue, NotPythonProgram, PredefinedFunction, ProgramValue,
     compile_with_meta,
 };
+use std::cell::RefCell;
 use std::cmp::max;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 fn predefined_function_print(
     meta: &mut WipCompilingProgram,
@@ -95,7 +97,7 @@ fn predefined_functions() -> HashMap<&'static str, PredefinedFunction<WipCompili
 #[derive(Clone)]
 struct WipCompilingProgram {
     program: CompiledProgram,
-    is_cancelled: Box<dyn FnMut() -> bool + 'static>,
+    is_cancelled: Rc<RefCell<dyn FnMut() -> bool + 'static>>,
     left_to_instruction_limit: u64,
 }
 
@@ -107,20 +109,27 @@ impl WipCompilingProgram {
     fn new(is_cancelled: impl FnMut() -> bool + 'static) -> Self {
         Self {
             program: CompiledProgram::new(),
-            is_cancelled: Box::new(is_cancelled),
+            is_cancelled: Rc::new(RefCell::new(is_cancelled)),
             left_to_instruction_limit: Self::instruction_limit(),
         }
     }
 
     fn check_cancel(&mut self) -> anyhow::Result<()> {
-        if (self.is_cancelled)() {
+        if (self.is_cancelled.borrow_mut())() {
             bail!("Cancelling logic program");
         }
         Ok(())
     }
 }
 
+struct WipCompilingProgramDiff {
+    program: <CompiledProgram as CompilingMetadata>::Diff,
+    instruction_count: i64,
+}
+
 impl CompilingMetadata for WipCompilingProgram {
+    type Diff = WipCompilingProgramDiff;
+
     fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
         self.check_cancel()?;
         self.program.log_zero_instruction()
@@ -135,20 +144,24 @@ impl CompilingMetadata for WipCompilingProgram {
         self.program.log_atomic_instruction()
     }
 
-    fn merge(mut self, other: Self) -> anyhow::Result<WipCompilingProgram> {
-        self.program = self.program.merge(other.program)?;
-        self.left_to_instruction_limit = self
-            .left_to_instruction_limit
-            .saturating_sub(other.left_to_instruction_limit);
-        if self.left_to_instruction_limit == 0 {
-            bail!("Reached instruction limit. Stopping execution to prevent overheating.")
+    fn diff(&self, other: &Self) -> Self::Diff {
+        WipCompilingProgramDiff {
+            program: self.program.diff(&other.program),
+            instruction_count: (other.left_to_instruction_limit - self.left_to_instruction_limit)
+                as i64,
         }
-        Ok(self)
     }
 
-    fn reset(&mut self) {
-        self.program = CompiledProgram::new();
-        self.left_to_instruction_limit = Self::instruction_limit();
+    fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()> {
+        self.program.add_assign(&diff.program)?;
+        self.left_to_instruction_limit = self
+            .left_to_instruction_limit
+            .saturating_sub_signed(diff.instruction_count);
+        if self.left_to_instruction_limit == 0 {
+            bail!("Reached instruction limit. Stopping execution to prevent overheating.")
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -176,7 +189,7 @@ fn compile_code(
         predefined_functions(),
         &mut compiling_program,
     );
-    if (compiling_program.is_cancelled)() {
+    if (compiling_program.is_cancelled.borrow_mut())() {
         bail!("Compilation was cancelled")
     } else {
         Ok(match run_result {
