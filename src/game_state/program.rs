@@ -135,7 +135,7 @@ impl CompiledProgram {
             let brk_relatives = instruction_counts_between_brk
                 .iter()
                 .scan(0., |acc, x| Some(*acc + x))
-                .map(|inst_cnt| inst_cnt / total_instruction_count)
+                .map(|inst_cnt| 1. - (inst_cnt / total_instruction_count))
                 .product::<f64>();
             bronze.min(silver.min(gold)).log2() * brk_relatives * upgrades.diamond_per_brk as f64
         };
