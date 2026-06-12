@@ -8,7 +8,7 @@ pub trait CompilingMetadata: Clone {
     type Diff;
     fn log_zero_instruction(&mut self) -> anyhow::Result<()>;
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()>;
-    fn diff(&self, other: &Self) -> Self::Diff;
+    fn diff(&self, other: &Self) -> anyhow::Result<Self::Diff>;
     fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()>;
 }
 
@@ -23,8 +23,8 @@ impl CompilingMetadata for () {
         Ok(())
     }
 
-    fn diff(&self, _other: &Self) -> Self::Diff {
-        ()
+    fn diff(&self, _other: &Self) -> anyhow::Result<Self::Diff> {
+        Ok(())
     }
 
     fn add_assign(&mut self, _diff: &Self::Diff) -> anyhow::Result<()> {
@@ -614,8 +614,8 @@ mod tests {
             Ok(())
         }
 
-        fn diff(&self, other: &Self) -> Self::Diff {
-            (*self as i32) - (*other as i32)
+        fn diff(&self, other: &Self) -> anyhow::Result<Self::Diff> {
+            Ok((*self as i32) - (*other as i32))
         }
 
         fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()> {

@@ -144,12 +144,12 @@ impl CompilingMetadata for WipCompilingProgram {
         self.program.log_atomic_instruction()
     }
 
-    fn diff(&self, other: &Self) -> Self::Diff {
-        WipCompilingProgramDiff {
+    fn diff(&self, other: &Self) -> anyhow::Result<Self::Diff> {
+        Ok(WipCompilingProgramDiff {
             program: self.program.diff(&other.program),
             instruction_count: (other.left_to_instruction_limit - self.left_to_instruction_limit)
                 as i64,
-        }
+        })
     }
 
     fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()> {

@@ -1,4 +1,5 @@
 use crate::game_state::{Resources, with_game_state};
+use anyhow::bail;
 use itertools::Itertools;
 use language::CompilingMetadata;
 use serde::{Deserialize, Serialize};
@@ -168,8 +169,33 @@ impl CompilingMetadata for CompiledProgram {
         Ok(())
     }
 
-    fn diff(&self, other: &Self) -> Self::Diff {
-        todo!()
+    fn diff(&self, other: &Self) -> anyhow::Result<Self::Diff> {
+        let instruction_counts = vec![]; // TODO
+        let sleep_calls = {
+            for (l, r) in self.sleep_calls.iter().zip(other.sleep_calls.iter()) {
+                if *l != *r {
+                    bail!("sleep_calls mismatch");
+                }
+            }
+            if self.sleep_calls.len() <= other.sleep_calls.len() {
+                other.sleep_calls[self.sleep_calls.len()..].to_vec()
+            } else {
+                self.sleep_calls[other.sleep_calls.len()..].to_vec()
+            }
+        };
+        let print_len = {
+            if let Some(l) = self.print_len
+                && other.print_len.map(|r| r < l).unwrap_or(true)
+            {
+                bail!("print_len mismatch");
+            }
+            other.print_len
+        };
+        Ok(CompiledProgram {
+            instruction_counts,
+            sleep_calls,
+            print_len,
+        })
     }
 
     fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()> {
