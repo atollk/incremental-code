@@ -51,6 +51,8 @@ pub enum NotPythonLangToken {
     KwContinue,
     #[token("def")]
     KwDef,
+    #[token("pure")]
+    KwPure,
     #[token("elif")]
     KwElif,
     #[token("else")]
@@ -196,6 +198,7 @@ mod tests {
         assert_eq!(lex("loop"), vec![NotPythonLangToken::KwLoop]);
         assert_eq!(lex("end"), vec![NotPythonLangToken::KwEnd]);
         assert_eq!(lex("def"), vec![NotPythonLangToken::KwDef]);
+        assert_eq!(lex("pure"), vec![NotPythonLangToken::KwPure]);
         assert_eq!(lex("True"), vec![NotPythonLangToken::KwTrue]);
         assert_eq!(lex("False"), vec![NotPythonLangToken::KwFalse]);
         assert_eq!(lex("None"), vec![NotPythonLangToken::KwNone]);
@@ -203,6 +206,10 @@ mod tests {
         assert_eq!(
             lex("iffy"),
             vec![NotPythonLangToken::Identifier("iffy".into())]
+        );
+        assert_eq!(
+            lex("purest"),
+            vec![NotPythonLangToken::Identifier("purest".into())]
         );
         assert_eq!(
             lex("end_game"),
@@ -320,6 +327,7 @@ impl fmt::Display for NotPythonLangToken {
                 NotPythonLangToken::KwBreak => "break",
                 NotPythonLangToken::KwContinue => "continue",
                 NotPythonLangToken::KwDef => "def",
+                NotPythonLangToken::KwPure => "pure",
                 NotPythonLangToken::KwElif => "elif",
                 NotPythonLangToken::KwElse => "else",
                 NotPythonLangToken::KwIf => "if",

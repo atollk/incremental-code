@@ -1,4 +1,1 @@
-- cancel commands in home terminal
-- caching pure functions
-- move "string literal" unlock earlier
 - variable memory limit to prevent oom

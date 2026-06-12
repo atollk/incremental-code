@@ -34,6 +34,7 @@ pub fn not_python_default_theme() -> HashMap<std::mem::Discriminant<NotPythonLan
         (NotPythonLangToken::KwBreak, "#c792ea"),
         (NotPythonLangToken::KwContinue, "#c792ea"),
         (NotPythonLangToken::KwDef, "#c792ea"),
+        (NotPythonLangToken::KwPure, "#c792ea"),
         (NotPythonLangToken::KwElif, "#c792ea"),
         (NotPythonLangToken::KwElse, "#c792ea"),
         (NotPythonLangToken::KwIf, "#c792ea"),

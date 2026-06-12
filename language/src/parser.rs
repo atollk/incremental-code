@@ -74,6 +74,7 @@ pub enum NotPythonStmt {
         name: String,
         params: Vec<String>,
         body: Box<NotPythonStmt>,
+        is_pure: bool,
     },
 }
 
@@ -379,17 +380,21 @@ where
             .boxed();
 
         let func_stmt = just(NotPythonLangToken::KwDef)
-            .ignore_then(select! { NotPythonLangToken::Identifier(s) => s })
+            .ignore_then(just(NotPythonLangToken::KwPure).or_not())
+            .then(select! { NotPythonLangToken::Identifier(s) => s })
             .then(func_params)
             .then_ignore(colon_newline)
             .then(block)
             .then_ignore(just(NotPythonLangToken::KwEnd))
             .then_ignore(line_end.clone())
-            .map(|((name, params), body)| NotPythonStmt::Function {
-                name,
-                params,
-                body: Box::new(body),
-            })
+            .map(
+                |(((pure_tok, name), params), body)| NotPythonStmt::Function {
+                    name,
+                    params,
+                    body: Box::new(body),
+                    is_pure: pure_tok.is_some(),
+                },
+            )
             .boxed();
 
         just(NotPythonLangToken::Newline)
@@ -641,6 +646,7 @@ mod tests {
                 name: "foo".into(),
                 params: vec![],
                 body: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Pass])),
+                is_pure: false,
             }]
         );
     }
@@ -653,6 +659,7 @@ mod tests {
                 name: "add".into(),
                 params: vec!["x".into(), "y".into()],
                 body: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Pass])),
+                is_pure: false,
             }]
         );
     }
@@ -668,9 +675,38 @@ mod tests {
                     body: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Return(Some(
                         NotPythonExpr::Int(1)
                     ))])),
+                    is_pure: false,
                 },
                 NotPythonStmt::Call("foo".into(), vec![]),
             ]
+        );
+    }
+
+    #[test]
+    fn pure_func_def() {
+        assert_eq!(
+            stmts("def pure foo(x):\nreturn x;\nend\n"),
+            vec![NotPythonStmt::Function {
+                name: "foo".into(),
+                params: vec!["x".into()],
+                body: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Return(Some(
+                    NotPythonExpr::Identifier("x".into())
+                ))])),
+                is_pure: true,
+            }]
+        );
+    }
+
+    #[test]
+    fn pure_func_def_no_params() {
+        assert_eq!(
+            stmts("def pure bar():\npass;\nend\n"),
+            vec![NotPythonStmt::Function {
+                name: "bar".into(),
+                params: vec![],
+                body: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Pass])),
+                is_pure: true,
+            }]
         );
     }
 

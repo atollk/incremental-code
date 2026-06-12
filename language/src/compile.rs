@@ -39,6 +39,7 @@ pub fn compile_with_meta<Meta: CompilingMetadata>(
         control_flow: ProgramExecutionControlFlow::Normal,
         call_stack: vec![ProgramExecutionCallState::default()],
         predefined_functions,
+        pure_caches: HashMap::new(),
     };
     compile_stmt(&program.statement, &mut state, meta)
 }
@@ -72,6 +73,7 @@ struct ProgramExecutionCallState<'a> {
     variables: HashMap<&'a str, ProgramValue>,
     functions: HashMap<&'a str, &'a NotPythonStmt>,
     loop_nesting: usize,
+    is_pure: bool,
 }
 
 pub type PredefinedFunction<Meta> =
@@ -96,7 +98,12 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
             .collect::<anyhow::Result<_>>()?;
         match self {
             Callable::PredefinedFunction(body) => body(meta, arg_values),
-            Callable::UserFunction(NotPythonStmt::Function { params, body, .. }) => {
+            Callable::UserFunction(NotPythonStmt::Function {
+                params,
+                body,
+                is_pure,
+                name: fn_name,
+            }) => {
                 if arg_values.len() != params.len() {
                     bail!(
                         "'{}' expects {} arguments but got {}",
@@ -105,13 +112,40 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                         arg_values.len()
                     );
                 }
-                let mut frame = ProgramExecutionCallState::default();
+
+                let cache_key = if *is_pure {
+                    // Convert args to hashable cache keys; non-hashable args are an error.
+                    let cache_key: Vec<HashableProgramValue> = arg_values
+                        .iter()
+                        .map(|v| match v {
+                            ProgramValue::Hashable(h) => Ok(h.clone()),
+                            _ => bail!("Pure function '{}' received non-hashable argument", name),
+                        })
+                        .collect::<anyhow::Result<_>>()?;
+
+                    // Cache hit: return immediately without executing the body.
+                    if let Some(cached) = state
+                        .pure_caches
+                        .get(fn_name.as_str())
+                        .and_then(|m| m.get(&cache_key))
+                    {
+                        return Ok(cached.clone());
+                    }
+
+                    Some(cache_key)
+                } else {
+                    None
+                };
+
+                // Cache miss: execute with a pure frame.
+                let mut frame = ProgramExecutionCallState {
+                    is_pure: *is_pure,
+                    ..Default::default()
+                };
                 for (param, val) in params.iter().zip(arg_values) {
                     frame.variables.insert(param.as_str(), val);
                 }
                 state.call_stack.push(frame);
-
-                // Run function & return
                 compile_stmt(body, state, meta)?;
                 state.call_stack.pop();
                 let return_value = match std::mem::replace(
@@ -121,6 +155,16 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     ProgramExecutionControlFlow::Return(v) => v,
                     _ => ProgramValue::None,
                 };
+
+                if *is_pure {
+                    // Store in cache.
+                    state
+                        .pure_caches
+                        .entry(fn_name.as_str())
+                        .or_default()
+                        .insert(cache_key.unwrap(), return_value.clone());
+                }
+
                 Ok(return_value)
             }
             _ => bail!("'{}' is not a function", name),
@@ -132,10 +176,23 @@ struct ProgramExecutionState<'a, Meta: CompilingMetadata> {
     control_flow: ProgramExecutionControlFlow,
     call_stack: Vec<ProgramExecutionCallState<'a>>,
     predefined_functions: HashMap<&'a str, PredefinedFunction<Meta>>,
+    pure_caches: HashMap<&'a str, HashMap<Vec<HashableProgramValue>, ProgramValue>>,
 }
 
 impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
+    fn in_pure_context(&self) -> bool {
+        self.call_stack.last().map(|f| f.is_pure).unwrap_or(false)
+    }
+
     fn get_variable(&self, name: &str) -> anyhow::Result<&ProgramValue> {
+        if self.in_pure_context() {
+            // Only look in the top (pure) frame.
+            return self
+                .call_stack
+                .last()
+                .and_then(|f| f.variables.get(name))
+                .ok_or_else(|| anyhow!("Pure function accesses non-local variable '{name}'"));
+        }
         for call_state in self.call_stack.iter().rev() {
             if let Some(value) = call_state.variables.get(name) {
                 return Ok(value);
@@ -153,6 +210,17 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
     }
 
     fn assign_variable(&mut self, name: &str, value: ProgramValue) -> anyhow::Result<()> {
+        if self.in_pure_context() {
+            // Only allow assigning to locals in the top (pure) frame.
+            let frame = self.call_stack.last_mut().unwrap();
+            if let Some(v) = frame.variables.get_mut(name) {
+                *v = value;
+                return Ok(());
+            }
+            return Err(anyhow!(
+                "Pure function accesses non-local variable '{name}'"
+            ));
+        }
         for call_state in self.call_stack.iter_mut().rev() {
             if let Some(v) = call_state.variables.get_mut(name) {
                 *v = value;
@@ -171,12 +239,22 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
     }
 
     fn get_function(&self, name: &str) -> anyhow::Result<Callable<'a, Meta>> {
+        let in_pure = self.in_pure_context();
         for call_state in self.call_stack.iter().rev() {
             if let Some(&stmt) = call_state.functions.get(name) {
+                if in_pure {
+                    // Inside a pure function, only pure user functions may be called.
+                    if let NotPythonStmt::Function { is_pure, .. } = stmt {
+                        if !is_pure {
+                            bail!("Pure function calls non-pure function '{name}'");
+                        }
+                    }
+                }
                 return Ok(Callable::UserFunction(stmt));
             }
         }
         if let Some(&f) = self.predefined_functions.get(name) {
+            // Predefined functions are always allowed, even from pure context.
             return Ok(Callable::PredefinedFunction(f));
         }
         Err(anyhow!("Function {} not found", name))
@@ -267,6 +345,7 @@ fn compile_stmt<'a, Meta: CompilingMetadata>(
             name,
             params: _,
             body: _,
+            is_pure: _,
         } => {
             state.decl_function(name, stmt);
             meta.log_atomic_instruction()?;
@@ -533,6 +612,7 @@ mod tests {
             control_flow: ProgramExecutionControlFlow::Normal,
             call_stack: vec![ProgramExecutionCallState::default()],
             predefined_functions: HashMap::new(),
+            pure_caches: HashMap::new(),
         };
         compile_stmt(&program.statement, &mut state, &mut ()).unwrap_err()
     }
@@ -739,5 +819,81 @@ mod tests {
     #[test]
     fn in_operator_dict() {
         compiled("x := 1 in {1: \"a\", 2: \"b\"};\n");
+    }
+
+    // -------------------------------------------------------------------------
+    // Pure functions
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn pure_function_returns_value() {
+        let src = "def pure double(x):\nreturn x + x;\nend\ny := double(5);\n";
+        // def (1) + return in body (1) + decl y (1)
+        assert_eq!(compiled(src), 3);
+    }
+
+    #[test]
+    fn pure_function_caches_result() {
+        // Call the same pure function twice with the same args.
+        // Second call should be a cache hit, so the body (which has a pass) doesn't count.
+        let src = "def pure f(x):\npass;\nreturn x;\nend\na := f(1);\nb := f(1);\n";
+        // First call: def(1) + body pass(1) + decl a(1) = 3
+        // Second call (cache hit): no body pass, just decl b(1) = 1 extra
+        let first_only = compiled("def pure f(x):\npass;\nreturn x;\nend\na := f(1);\n");
+        let both = compiled(src);
+        // The second call adds fewer instructions than the first (no body re-execution).
+        assert!(both - first_only < first_only);
+    }
+
+    #[test]
+    fn pure_function_different_args_not_cached() {
+        // Calls with different args both execute the body.
+        let src = "def pure f(x):\npass;\nreturn x;\nend\na := f(1);\nb := f(2);\n";
+        let first_only = compiled("def pure f(x):\npass;\nreturn x;\nend\na := f(1);\n");
+        let both = compiled(src);
+        // Second call adds at least as many instructions as the first (body runs again).
+        assert!(both >= first_only * 2 - 1);
+    }
+
+    #[test]
+    fn pure_accessing_non_local_var_is_error() {
+        let err = compiled_err("x := 10;\ndef pure f():\ny := x;\nend\nf();\n");
+        assert!(err.to_string().contains("non-local"));
+    }
+
+    #[test]
+    fn pure_calls_pure_ok() {
+        let src = "def pure double(x):\nreturn x + x;\nend\ndef pure quad(x):\nreturn double(x) + double(x);\nend\ny := quad(3);\n";
+        compiled(src);
+    }
+
+    #[test]
+    fn pure_calls_non_pure_is_error() {
+        let err = compiled_err("def impure():\npass;\nend\ndef pure f():\nimpure();\nend\nf();\n");
+        assert!(err.to_string().contains("non-pure"));
+    }
+
+    #[test]
+    fn pure_calls_predefined_ok() {
+        fn noop(_meta: &mut (), args: Vec<ProgramValue>) -> anyhow::Result<ProgramValue> {
+            Ok(args.into_iter().next().unwrap_or(ProgramValue::None))
+        }
+        let program =
+            parse_program("def pure f(x):\nreturn identity(x);\nend\ny := f(1);\n").unwrap();
+        let mut predefined = HashMap::new();
+        predefined.insert("identity", noop as PredefinedFunction<()>);
+        compile_with_meta(&program, predefined, &mut ()).unwrap();
+    }
+
+    #[test]
+    fn pure_with_non_hashable_arg_is_error() {
+        let err = compiled_err("def pure f(x):\nreturn x;\nend\nf([1, 2]);\n");
+        assert!(err.to_string().contains("hashable"));
+    }
+
+    #[test]
+    fn pure_local_decl_and_assign_ok() {
+        let src = "def pure f(x):\ny := x + 1;\ny = y + 1;\nreturn y;\nend\nz := f(5);\n";
+        compiled(src);
     }
 }
