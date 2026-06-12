@@ -1,4 +1,5 @@
 use crate::game_state::{Resources, with_game_state};
+use itertools::Itertools;
 use language::CompilingMetadata;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -11,8 +12,6 @@ pub struct CompiledProgram {
     pub sleep_calls: Vec<f64>,
     /// Last call to `print` with its string length.
     pub print_len: u64,
-    /// Calls to `brk`.
-    pub brk_calls: u64,
 }
 
 impl CompiledProgram {
@@ -21,7 +20,6 @@ impl CompiledProgram {
             instruction_counts: vec![vec![0]],
             sleep_calls: vec![],
             print_len: 0,
-            brk_calls: 0,
         }
     }
 
@@ -112,23 +110,35 @@ impl CompiledProgram {
             gold_per_print_character: game_state.upgrades.gold_per_print_character.value(),
             diamond_per_brk: game_state.upgrades.diamond_per_brk.value(),
         });
-        let (bronze_const, bronze_exp) = upgrades.bronze_per_instruction;
-        let bronze: f64 = {
-            let counts = self
-                .instruction_counts
-                .iter()
-                .map(|inner| inner.iter().map(|x| *x as f64).sum::<f64>())
-                .sum();
-            hurwitz(counts, bronze_exp as f64) * bronze_const as f64
-        };
+        let instruction_counts_between_brk = self
+            .instruction_counts
+            .iter()
+            .map(|brk_set| brk_set.iter().map(|i| *i as f64).sum())
+            .collect_vec();
+        let total_instruction_count = instruction_counts_between_brk.iter().sum();
+        // Bronze is awarded based on the total number of instructions run.
+        let bronze: f64 = hurwitz(
+            total_instruction_count,
+            upgrades.bronze_per_instruction.1 as f64,
+        ) * upgrades.bronze_per_instruction.0 as f64;
+        // Silver is awarded based on the total sleep duration.
         let silver: f64 = self
             .sleep_calls
             .iter()
             .map(|secs| secs * upgrades.silver_per_sleep_second as f64)
             .sum();
+        // Gold is awarded based on the last print statement and its argument length.
         let gold: f64 = (0..upgrades.gold_per_print_character)
             .fold(self.print_len as f64, |acc, _| acc.log2().min(1.));
-        let diamond = bronze.min(silver.min(gold)).log2() * upgrades.diamond_per_brk as f64;
+        // Brk is awarded based on the other three resources, scaled by the point where the brk was called relative to all instructions.
+        let diamond = {
+            let brk_relatives = instruction_counts_between_brk
+                .iter()
+                .scan(0., |acc, x| Some(*acc + x))
+                .map(|inst_cnt| inst_cnt / total_instruction_count)
+                .product::<f64>();
+            bronze.min(silver.min(gold)).log2() * brk_relatives * upgrades.diamond_per_brk as f64
+        };
         Resources::new(bronze, silver, gold, diamond, 0.)
     }
 }

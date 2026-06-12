@@ -5,7 +5,7 @@ suits the gentler curve), and the Approach 2 budget tier that would naturally si
 |----|--------------------------------|------------:|------------:|--------------------------------:|------------------:|
 | 1  | L: 1→2                         |           1 |           3 |                               2 |                10 |
 | 2  | L: 2→4                         |           2 |           6 |                               4 |                10 |
-| 3  | UnlockPrint                    |           4 |          12 |                               4 |                10 |
+| 3  | UnlockSleep                    |           4 |          12 |                               4 |                10 |
 | 4  | W: 5→10                        |           4 |          12 |                               4 |                10 |
 | 5  | L: 4→"5" *(cosmetic)*          |           4 |          12 |                               4 |                10 |
 | 6  | L: "5"→6                       |           4 |          12 |                               6 |                10 |
@@ -16,7 +16,7 @@ suits the gentler curve), and the Approach 2 budget tier that would naturally si
 | 11 | **S: 0→1 — single loop**       |           8 |          24 |                            ~380 |               1 K |
 | 12 | E: 2→3 (lit ≤10)               |         380 |       1.1 K |                           2.2 K |              10 K |
 | 13 | E: 3→4 (string literal)        |         380 |       1.1 K |                           2.2 K |              10 K |
-| 14 | UnlockSleep                    |             |             |                                 |                   |
+| 14 | UnlockPrint                    |             |             |                                 |                   |
 | 15 | W: 10→15                       |       2.2 K |       6.6 K |                           1.6 M |              10 M |
 | 16 | E: 3→4 (lit ≤100)              |       1.6 M |       4.7 M |                           290 M |               1 B |
 | 17 | L: 8→10                        |       290 M |       870 M |                           480 M |               1 B |

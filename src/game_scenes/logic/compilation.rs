@@ -53,7 +53,6 @@ fn predefined_function_brk(
     if !args.is_empty() {
         bail!("brk takes no arguments")
     }
-    meta.program.brk_calls += 1;
     meta.program.instruction_counts.push(vec![0]);
     Ok(ProgramValue::None)
 }
