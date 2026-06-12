@@ -154,6 +154,13 @@ fn verify_stmt(
     let allows_functions = matches!(
         level,
         CodeStatementLevels::Functions
+            | CodeStatementLevels::PureFunctions
+            | CodeStatementLevels::SingleRecursion
+            | CodeStatementLevels::MultiRecursion
+    );
+    let allows_pure_functions = matches!(
+        level,
+        CodeStatementLevels::PureFunctions
             | CodeStatementLevels::SingleRecursion
             | CodeStatementLevels::MultiRecursion
     );
@@ -219,13 +226,21 @@ fn verify_stmt(
                 verify_expr(e, strings_allowed, max_int)?;
             }
         }
-        NotPythonStmt::Function { name, body, .. } => {
+        NotPythonStmt::Function {
+            name,
+            body,
+            is_pure,
+            ..
+        } => {
             if !allows_functions {
                 bail!("Function definitions are not unlocked yet");
             }
+            if *is_pure && !allows_pure_functions {
+                bail!("Pure functions are not unlocked yet");
+            }
             let self_calls = count_direct_calls(body, name);
             let max_recursive = match level {
-                CodeStatementLevels::Functions => 0,
+                CodeStatementLevels::Functions | CodeStatementLevels::PureFunctions => 0,
                 CodeStatementLevels::SingleRecursion => 1,
                 CodeStatementLevels::MultiRecursion => usize::MAX,
                 _ => 0,

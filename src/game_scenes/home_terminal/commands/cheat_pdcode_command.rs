@@ -26,6 +26,7 @@ fn get_predefined_code(current_upgrades: &Upgrades) -> String {
         CodeStatementLevels::SimpleLoops => nested_loops_code(width, lines, max_int_lit, 1),
         CodeStatementLevels::NestedLoops
         | CodeStatementLevels::Functions
+        | CodeStatementLevels::PureFunctions
         | CodeStatementLevels::SingleRecursion => {
             nested_loops_code(width, lines, max_int_lit, usize::MAX)
         }

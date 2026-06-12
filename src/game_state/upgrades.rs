@@ -607,6 +607,7 @@ pub enum CodeStatementLevels {
     SimpleLoops,
     NestedLoops,
     Functions,
+    PureFunctions,
     SingleRecursion,
     MultiRecursion,
 }
@@ -620,6 +621,7 @@ impl_upgrade!(
         (CodeStatementLevels::SimpleLoops, "simple loops"),
         (CodeStatementLevels::NestedLoops, "nested loops"),
         (CodeStatementLevels::Functions, "functions"),
+        (CodeStatementLevels::PureFunctions, "pure functions"),
         (CodeStatementLevels::SingleRecursion, "single recursion"),
         (CodeStatementLevels::MultiRecursion, "multi recursion"),
     ],
@@ -627,6 +629,7 @@ impl_upgrade!(
         Resources::from_bronze(500e3), // core upgrade 11
         Resources::from_bronze(500e3), // core upgrade 18
         Resources::from_bronze(500e3), // core upgrade 20
+        Resources::from_bronze(500e3),
         Resources::from_bronze(500e3), // core upgrade 25
         Resources::from_bronze(500e3), // core upgrade 26
     ]]
