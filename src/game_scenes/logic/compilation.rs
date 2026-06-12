@@ -5,6 +5,7 @@ use language::{
     CompilingMetadata, HashableProgramValue, NotPythonProgram, PredefinedFunction, ProgramValue,
     compile_with_meta,
 };
+use std::cmp::max;
 use std::collections::HashMap;
 
 fn predefined_function_print(
@@ -18,7 +19,7 @@ fn predefined_function_print(
     let ProgramValue::Hashable(HashableProgramValue::String(s)) = arg else {
         bail!("print requires a string argument")
     };
-    meta.program.print_len = s.len() as u64;
+    meta.program.print_len = Some(max(s.len() as u64, meta.program.print_len.unwrap_or(0)));
     Ok(ProgramValue::None)
 }
 
@@ -91,6 +92,7 @@ fn predefined_functions() -> HashMap<&'static str, PredefinedFunction<WipCompili
     functions
 }
 
+#[derive(Clone)]
 struct WipCompilingProgram {
     program: CompiledProgram,
     is_cancelled: Box<dyn FnMut() -> bool + 'static>,
@@ -98,13 +100,15 @@ struct WipCompilingProgram {
 }
 
 impl WipCompilingProgram {
+    fn instruction_limit() -> u64 {
+        with_game_state(|game_state| game_state.upgrades.max_instructions.value())
+    }
+
     fn new(is_cancelled: impl FnMut() -> bool + 'static) -> Self {
         Self {
             program: CompiledProgram::new(),
             is_cancelled: Box::new(is_cancelled),
-            left_to_instruction_limit: with_game_state(|game_state| {
-                game_state.upgrades.max_instructions.value()
-            }),
+            left_to_instruction_limit: Self::instruction_limit(),
         }
     }
 
@@ -131,8 +135,20 @@ impl CompilingMetadata for WipCompilingProgram {
         self.program.log_atomic_instruction()
     }
 
-    fn merge(&mut self, other: &Self) -> anyhow::Result<()> {
-        todo!()
+    fn merge(mut self, other: Self) -> anyhow::Result<WipCompilingProgram> {
+        self.program = self.program.merge(other.program)?;
+        self.left_to_instruction_limit = self
+            .left_to_instruction_limit
+            .saturating_sub(other.left_to_instruction_limit);
+        if self.left_to_instruction_limit == 0 {
+            bail!("Reached instruction limit. Stopping execution to prevent overheating.")
+        }
+        Ok(self)
+    }
+
+    fn reset(&mut self) {
+        self.program = CompiledProgram::new();
+        self.left_to_instruction_limit = Self::instruction_limit();
     }
 }
 

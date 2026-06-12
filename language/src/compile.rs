@@ -4,10 +4,11 @@ use std::cmp::PartialEq;
 use std::collections::HashMap;
 use std::ops::{Add, Deref};
 
-pub trait CompilingMetadata {
+pub trait CompilingMetadata: Clone {
     fn log_zero_instruction(&mut self) -> anyhow::Result<()>;
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()>;
-    fn merge(&mut self, other: &Self) -> anyhow::Result<()>;
+    fn merge(self, other: Self) -> anyhow::Result<Self>;
+    fn reset(&mut self);
 }
 
 impl CompilingMetadata for () {
@@ -17,9 +18,10 @@ impl CompilingMetadata for () {
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
         Ok(())
     }
-    fn merge(&mut self, _other: &Self) -> anyhow::Result<()> {
+    fn merge(self, _other: Self) -> anyhow::Result<()> {
         Ok(())
     }
+    fn reset(&mut self) {}
 }
 
 /// Validates and executes a parsed [`NotPythonProgram`], returning an error if execution fails.
@@ -131,7 +133,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                         .pure_caches
                         .get(&(fn_name.as_str(), cache_key.clone()))
                     {
-                        meta.merge(other_meta)?;
+                        *meta = meta.merge(other_meta)?;
                         return Ok(value.clone());
                     }
 
@@ -149,8 +151,10 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     frame.variables.insert(param.as_str(), val);
                 }
                 state.call_stack.push(frame);
-                compile_stmt(body, state, meta)?;
+                let mut fresh_meta = Meta::default();
+                compile_stmt(body, state, &mut fresh_meta)?;
                 state.call_stack.pop();
+                *meta = meta.merge(fresh_meta)?;
                 let return_value = match std::mem::replace(
                     &mut state.control_flow,
                     ProgramExecutionControlFlow::Normal,
@@ -163,7 +167,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     // Store in cache.
                     state.pure_caches.insert(
                         (fn_name.as_str(), cache_key.unwrap()),
-                        (return_value, todo!()),
+                        (return_value, fresh_meta),
                     );
                 }
 

@@ -10,8 +10,8 @@ pub struct CompiledProgram {
     pub instruction_counts: Vec<Vec<u64>>,
     /// Calls to `sleep`, with their respective duration.
     pub sleep_calls: Vec<f64>,
-    /// Last call to `print` with its string length.
-    pub print_len: u64,
+    /// Max call to `print` with its string length.
+    pub print_len: Option<u64>,
 }
 
 impl CompiledProgram {
@@ -19,7 +19,7 @@ impl CompiledProgram {
         CompiledProgram {
             instruction_counts: vec![vec![0]],
             sleep_calls: vec![],
-            print_len: 0,
+            print_len: None,
         }
     }
 
@@ -129,7 +129,9 @@ impl CompiledProgram {
             .sum();
         // Gold is awarded based on the last print statement and its argument length.
         let gold: f64 = (0..upgrades.gold_per_print_character)
-            .fold(self.print_len as f64, |acc, _| acc.log2().min(1.));
+            .fold(self.print_len.unwrap_or(0) as f64, |acc, _| {
+                acc.log2().min(1.)
+            });
         // Brk is awarded based on the other three resources, scaled by the point where the brk was called relative to all instructions.
         let diamond = {
             let brk_relatives = instruction_counts_between_brk
@@ -164,7 +166,33 @@ impl CompilingMetadata for CompiledProgram {
         Ok(())
     }
 
-    fn merge(&mut self, other: &Self) -> anyhow::Result<()> {
-        todo!()
+    fn merge(mut self, mut other: Self) -> anyhow::Result<Self> {
+        {
+            let (head, tail) = other.instruction_counts.split_at(1);
+            let head = head.iter().exactly_one().unwrap();
+            let (h, t) = head.split_at(1);
+            let h = *h.iter().exactly_one().unwrap();
+            *self
+                .instruction_counts
+                .last_mut()
+                .unwrap()
+                .last_mut()
+                .unwrap() += h;
+            self.instruction_counts
+                .last_mut()
+                .unwrap()
+                .extend_from_slice(t);
+            self.instruction_counts.extend_from_slice(tail);
+        };
+        self.sleep_calls.append(&mut other.sleep_calls);
+        self.print_len = self
+            .print_len
+            .map(|l| l.max(other.print_len.unwrap_or(0)))
+            .or(other.print_len);
+        Ok(self)
+    }
+
+    fn reset(&mut self) {
+        *self = CompiledProgram::new();
     }
 }
