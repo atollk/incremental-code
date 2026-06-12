@@ -130,6 +130,10 @@ impl CompilingMetadata for WipCompilingProgram {
         }
         self.program.log_atomic_instruction()
     }
+
+    fn merge(&mut self, other: &Self) -> anyhow::Result<()> {
+        todo!()
+    }
 }
 
 fn parse_code(program_code: &str) -> anyhow::Result<NotPythonProgram> {

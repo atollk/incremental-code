@@ -2,19 +2,22 @@ use crate::parser::{NotPythonExpr, NotPythonExprOp, NotPythonProgram, NotPythonS
 use anyhow::{anyhow, bail};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
-use std::ops::Deref;
+use std::ops::{Add, Deref};
 
 pub trait CompilingMetadata {
     fn log_zero_instruction(&mut self) -> anyhow::Result<()>;
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()>;
+    fn merge(&mut self, other: &Self) -> anyhow::Result<()>;
 }
 
 impl CompilingMetadata for () {
     fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
         Ok(())
     }
-
     fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
+        Ok(())
+    }
+    fn merge(&mut self, _other: &Self) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -124,12 +127,12 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                         .collect::<anyhow::Result<_>>()?;
 
                     // Cache hit: return immediately without executing the body.
-                    if let Some(cached) = state
+                    if let Some((value, other_meta)) = state
                         .pure_caches
-                        .get(fn_name.as_str())
-                        .and_then(|m| m.get(&cache_key))
+                        .get(&(fn_name.as_str(), cache_key.clone()))
                     {
-                        return Ok(cached.clone());
+                        meta.merge(other_meta)?;
+                        return Ok(value.clone());
                     }
 
                     Some(cache_key)
@@ -158,11 +161,10 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
 
                 if *is_pure {
                     // Store in cache.
-                    state
-                        .pure_caches
-                        .entry(fn_name.as_str())
-                        .or_default()
-                        .insert(cache_key.unwrap(), return_value.clone());
+                    state.pure_caches.insert(
+                        (fn_name.as_str(), cache_key.unwrap()),
+                        (return_value, todo!()),
+                    );
                 }
 
                 Ok(return_value)
@@ -176,7 +178,7 @@ struct ProgramExecutionState<'a, Meta: CompilingMetadata> {
     control_flow: ProgramExecutionControlFlow,
     call_stack: Vec<ProgramExecutionCallState<'a>>,
     predefined_functions: HashMap<&'a str, PredefinedFunction<Meta>>,
-    pure_caches: HashMap<&'a str, HashMap<Vec<HashableProgramValue>, ProgramValue>>,
+    pure_caches: HashMap<(&'a str, Vec<HashableProgramValue>), (ProgramValue, Meta)>,
 }
 
 impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {

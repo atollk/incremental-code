@@ -163,4 +163,8 @@ impl CompilingMetadata for CompiledProgram {
             .unwrap() += 1;
         Ok(())
     }
+
+    fn merge(&mut self, other: &Self) -> anyhow::Result<()> {
+        todo!()
+    }
 }
