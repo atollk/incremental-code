@@ -170,7 +170,47 @@ impl CompilingMetadata for CompiledProgram {
     }
 
     fn diff(&self, other: &Self) -> anyhow::Result<Self::Diff> {
-        let instruction_counts = vec![]; // TODO
+        let instruction_counts = {
+            let self_brk_len = self.instruction_counts.len();
+            let other_brk_len = other.instruction_counts.len();
+            if other_brk_len < self_brk_len {
+                bail!("instruction_counts brk-block count mismatch");
+            }
+            // All but the last brk-block must match exactly
+            for (i, (l, r)) in self
+                .instruction_counts
+                .iter()
+                .zip(other.instruction_counts.iter())
+                .enumerate()
+                .take(self_brk_len - 1)
+            {
+                if l != r {
+                    bail!("instruction_counts brk-block {i} mismatch");
+                }
+            }
+            let self_last = self.instruction_counts.last().unwrap();
+            let other_last = &other.instruction_counts[self_brk_len - 1];
+            if other_last.len() < self_last.len() {
+                bail!("instruction_counts sleep-block count mismatch");
+            }
+            // All but the last sleep-block in the last brk-block must match
+            for (j, (l, r)) in self_last
+                .iter()
+                .zip(other_last.iter())
+                .enumerate()
+                .take(self_last.len() - 1)
+            {
+                if l != r {
+                    bail!("instruction_counts sleep-block {j} mismatch");
+                }
+            }
+            let delta = other_last[self_last.len() - 1] - self_last.last().unwrap();
+            let mut first_block = vec![delta];
+            first_block.extend_from_slice(&other_last[self_last.len()..]);
+            let mut result = vec![first_block];
+            result.extend_from_slice(&other.instruction_counts[self_brk_len..]);
+            result
+        };
         let sleep_calls = {
             for (l, r) in self.sleep_calls.iter().zip(other.sleep_calls.iter()) {
                 if *l != *r {

@@ -146,7 +146,7 @@ impl CompilingMetadata for WipCompilingProgram {
 
     fn diff(&self, other: &Self) -> anyhow::Result<Self::Diff> {
         Ok(WipCompilingProgramDiff {
-            program: self.program.diff(&other.program),
+            program: self.program.diff(&other.program)?,
             instruction_count: (other.left_to_instruction_limit - self.left_to_instruction_limit)
                 as i64,
         })

@@ -174,7 +174,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     // Store in cache.
                     state.pure_caches.insert(
                         (fn_name.as_str(), cache_key.unwrap()),
-                        (return_value.clone(), meta.diff(&meta_clone)),
+                        (return_value.clone(), meta.diff(&meta_clone)?),
                     );
                 }
 
