@@ -18,7 +18,7 @@ The numbers a run can produce are (from `src/game_state/program.rs`):
 - `silver = Σ tᵢ · silver_per_sec` — driven by **total seconds passed to
   `sleep`**. Each `sleep(t)` inside a loop multiplies its `t` by the
   iteration count.
-- `gold` — driven by the length of the **last** `print(s)`'s argument.
+- `gold` — driven by the length of the **max** `print(s)` argument across all calls.
 - `diamond = log2(min(b,s,g)) · brk_relatives · diamond_per_brk`, where
   `brk_relatives = Π(1 − bucket_size_i / total)`. Brks gate diamond, but
   early brks (before the loop) keep `brk_relatives` close to 1.
@@ -90,7 +90,7 @@ each `*` doubles down on the iteration count.
 
 ## Stage C — `NestedLoops`
 
-State: `CodeStatements ∈ {NestedLoops, Functions, SingleRecursion}`,
+State: `CodeStatements ∈ {NestedLoops, Functions, PureFunctions, SingleRecursion, MultiRecursion}`,
 `lines ≥ 15`, `width ≥ 12`, `max_int_lit = 10`.
 
 ```
@@ -188,41 +188,110 @@ language won't accept a string literal yet.
 
 ---
 
-## Stage F — `MultiRecursion`
+## Stage F — `PureFunctions`
 
-State: `CodeStatements = MultiRecursion`. Sleep + print typically already
-unlocked at this point.
+State: `CodeStatements = PureFunctions`. No recursion allowed yet. Sleep +
+print typically already unlocked at this point.
 
 ```
 s:="";
-def f(n):
+def pure g(x):
+sleep(10*10*10);
+end
+i:=10*10*10;
+loop:
+if i==0:
+break;
+end
+j:=10*10*10;
+loop:
+if j==0:
+break;
+end
+s=s+"aaaaaaaaaa";
+g(0);
+j=j-1;
+end
+i=i-1;
+end
+print(s);
+```
+
+**Idea.** Mark the sleep helper with `pure` and call it with a fixed
+argument (`0`) inside the innermost loop. On the first iteration the
+interpreter executes the body (the sleep call itself) and caches the meta
+diff — instruction counts plus the sleep entry. Every subsequent iteration
+with the same argument is a *cache hit*: the diff is replayed instantly,
+adding the sleep contribution to the total without re-executing the body.
+Bronze and silver accumulate just as if the call were inlined.
+
+The string append `s=s+"...";` lives in the **loop body**, not inside the
+pure function. Cache hit replay only restores the `meta` diff; it does
+**not** re-execute any side effects on outer-scope variables. Putting the
+append inside `g` would mean only the first iteration ever extends `s`,
+and gold would collapse to a tiny value. Keeping the append in the loop
+body ensures it runs every iteration.
+
+At this stage the pure helper is a modest line-saving tool rather than a
+multiplier. The real pay-off arrives in Stage G, where tree recursion
+combined with `pure` lets each unique argument execute only once while
+still accumulating the full exponential instruction and sleep count via
+diff replay.
+
+---
+
+## Stage G — `MultiRecursion` (with `pure`)
+
+State: `CodeStatements = MultiRecursion`. `PureFunctions` is a prerequisite
+and is always available here. Sleep + print typically already unlocked.
+
+```
+s:="";
+def pure f(n):
 if n==0:
 return 0;
 end
-s=s+"aaaaaaa";
 sleep(10*10);
 f(n-1);
 f(n-1);
 end
-f(10*10);
+i:=10*10*10;
+loop:
+if i==0:
+break;
+end
+s=s+"aaaaaaaaaa";
+i=i-1;
+end
+f(10*10*10);
 print(s);
 ```
 
-**Idea.** Replace the nested-loop scaffold with tree recursion: instruction
-count grows like `branching ^ depth`. The body is the same two
-side-effects as the loop case (`s=s+"…";` then `sleep(…);`); they execute
-once per recursive call, so the multiplier carries through. `s` is
-declared in the top-level frame; appends inside `f` resolve up the call
-stack (per `assign_variable` in `compile.rs`), so the accumulator survives
-across calls.
+**Idea.** Pure tree recursion is the bronze and silver multiplier; a
+separate loop outside handles the string accumulator for gold.
 
-`f(n-1); f(n-1);` is the cheapest tree-recursion shape; with more lines in
-the function body you can add more `f(n-1);` calls to increase the branch
+`f` is marked `pure`: the interpreter executes each unique argument exactly
+once. For a starting depth of `D`, it makes `D` unique body executions and
+`2^D − D` cache-hit replays. Each replay applies the full sub-tree's diff
+— instruction counts and sleep calls — without re-running the body. Bronze
+grows like `2^D`; silver likewise. Because `D` can be enormous (the
+interpreter only runs `D` bodies instead of `2^D`), setting `D` orders of
+magnitude larger than feasible without pure is now practical.
+
+The string-accumulator **cannot** go inside `f`. Cache hit replay does not
+re-execute outer-scope mutations: `s=s+"...";` inside `f` would only run
+on the `D` first-call bodies, not the `2^D` cache-hit replays. Gold would
+barely grow. Instead, a separate short loop before `f(...)` accumulates
+`s` the old way — using some of the line budget, but giving gold a proper
+multiplier independently of the recursion depth.
+
+`f(n-1); f(n-1);` is the cheapest tree-recursion shape. With more lines
+in the function body you can add more `f(n-1);` calls for a higher branch
 factor.
 
 ---
 
-## Stage G — `UnlockBrk` (Level 5)
+## Stage H — `UnlockBrk` (Level 5)
 
 State: `unlock_brk = true`. Strings, print, sleep typically all on.
 
@@ -263,7 +332,7 @@ more bronze tax early. The cheat defaults to one.
 
 ---
 
-## Stage H — endgame combined
+## Stage I — endgame combined
 
 State: late literals (`max_int_lit = 99` or `255`), `width = 50`–`80`,
 `lines = 30`–`40`, multi-recursion, all built-ins, brk slowdown high.
@@ -271,11 +340,18 @@ State: late literals (`max_int_lit = 99` or `255`), `width = 50`–`80`,
 ```
 brk();
 s:="";
-def f(n):
+i:=99*99*99*99*99*99*99*99*99*99*99*99*99*99;
+loop:
+if i==0:
+break;
+end
+s=s+"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+i=i-1;
+end
+def pure f(n):
 if n==0:
 return 0;
 end
-s=s+"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 sleep(99*99*99*99*99*99*99*99*99*99*99*99*99*99);
 f(n-1);
 f(n-1);
@@ -285,11 +361,14 @@ f(99*99*99*99);
 print(s);
 ```
 
-**Idea.** All five moves from the cheat-sheet stacked. The function body
-spends three lines on `f(n-1);` calls so the branching factor is 3 — line
-budget will allow more or fewer. Counter, sleep argument, and string
-literal each saturate the line width via `counter_expr` / padding. Brk
-stays at the top. Print stays at the bottom.
+**Idea.** All six moves from the cheat-sheet stacked. `brk();` is first.
+A short loop accumulates `s` for gold — the string literal and loop
+counter each saturate the line width. The pure recursive `f` drives bronze
+and silver: branch factor 3 (add more `f(n-1);` lines if the budget
+allows), sleep argument saturates the line width, `f(99*99*99*99)` sets an
+enormous starting depth that the interpreter can handle because only
+`99*99*99*99` unique bodies run instead of `3^(99^4)`. `print(s);` caps
+the program; gold comes from the loop, not the recursion.
 
 ---
 
@@ -309,3 +388,15 @@ slots in around them:
 
 Each region is gated independently on its unlock, so the stage transitions
 above fall out automatically as upgrades come online.
+
+**Pure functions** (`CodeStatements >= PureFunctions`) change the recursion
+template: the recursive function is emitted as `def pure f(n):` and the
+initial call depth can be set much larger (e.g. `f(max_int^k)`). However,
+the string-accumulator body extra (`s=s+"…";`) must **not** go inside the
+pure function — cache hits skip outer-scope mutations, so gold would barely
+grow. At the `PureFunctions` stage (no recursion), a pure sleep-only helper
+can be called inside the innermost loop with a fixed argument; the
+string-append extra stays in the loop body directly. At the
+`MultiRecursion` stage, the string accumulation is moved to a separate
+short loop outside the recursive function, and the recursive body contains
+only `sleep(…);` and the `f(n-1);` calls.
