@@ -249,8 +249,9 @@ fn pure_multi_recursion_code(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game_state::Upgrade;
-    use crate::game_state::Upgrades;
+    use crate::game_state::{CompiledProgram, Upgrade, Upgrades, with_game_state_mut};
+    use language::{HashableProgramValue, PredefinedFunction, ProgramValue, compile_with_meta};
+    use std::collections::HashMap;
 
     fn make_upgrades(
         statements_lvl: u8,
@@ -380,4 +381,124 @@ mod tests {
     fn multi_recursion_no_builtins() {
         check_parses(&make_upgrades(6, 3, 9, 0, false, false, false));
     }
+
+    fn test_sleep(
+        meta: &mut CompiledProgram,
+        args: Vec<ProgramValue>,
+    ) -> anyhow::Result<ProgramValue> {
+        let t = match args.first().expect("sleep: needs arg") {
+            ProgramValue::Hashable(HashableProgramValue::Int(i)) => *i as f64,
+            ProgramValue::Float(f) => *f,
+            _ => anyhow::bail!("sleep: numeric arg"),
+        };
+        meta.sleep_calls.push(t);
+        meta.instruction_counts.last_mut().unwrap().push(0);
+        Ok(ProgramValue::None)
+    }
+
+    fn test_brk(
+        meta: &mut CompiledProgram,
+        _args: Vec<ProgramValue>,
+    ) -> anyhow::Result<ProgramValue> {
+        meta.instruction_counts.push(vec![0]);
+        Ok(ProgramValue::None)
+    }
+
+    fn test_print(
+        meta: &mut CompiledProgram,
+        args: Vec<ProgramValue>,
+    ) -> anyhow::Result<ProgramValue> {
+        let ProgramValue::Hashable(HashableProgramValue::String(s)) =
+            args.into_iter().next().expect("print: needs arg")
+        else {
+            anyhow::bail!("print: string arg");
+        };
+        meta.print_len = Some(s.len() as u64).max(meta.print_len);
+        Ok(ProgramValue::None)
+    }
+
+    fn run_pd_program(upgrades: &Upgrades) -> CompiledProgram {
+        let code = get_predefined_code(upgrades);
+        let ast = language::parse_program(&code).expect("should parse");
+        let mut predefined: HashMap<&str, PredefinedFunction<CompiledProgram>> = HashMap::new();
+        if upgrades.unlock_sleep.value() {
+            predefined.insert("sleep", test_sleep as PredefinedFunction<CompiledProgram>);
+        }
+        if upgrades.unlock_brk.value() {
+            predefined.insert("brk", test_brk as PredefinedFunction<CompiledProgram>);
+        }
+        if upgrades.unlock_print.value() && upgrades.literals.value().0 {
+            predefined.insert("print", test_print as PredefinedFunction<CompiledProgram>);
+        }
+        // TODO: make sure this stays in the instruction limits
+        let mut program = CompiledProgram::new();
+        compile_with_meta(&ast, predefined, &mut program).expect("should compile");
+        program
+    }
+
+    #[test]
+    fn stage_a_gains_bronze() {
+        let u = make_upgrades(0, 0, 2, 0, false, false, false);
+        let program = run_pd_program(&u);
+        let gain = program.resource_gain();
+        assert!(gain.bronze.0 > 0.0, "stage A should earn bronze");
+        assert_eq!(gain.silver.0, 0.0, "stage A has no sleep");
+    }
+
+    #[test]
+    fn stage_c_loops_more_bronze_than_a() {
+        let u_a = make_upgrades(0, 0, 2, 0, false, false, false);
+        let u_c = make_upgrades(2, 2, 9, 0, false, false, false);
+        let gain_a = run_pd_program(&u_a).resource_gain();
+        let gain_c = run_pd_program(&u_c).resource_gain();
+        assert!(
+            gain_c.bronze.0 > gain_a.bronze.0,
+            "nested loops (stage C) should earn more bronze than stage A: {} vs {}",
+            gain_c.bronze.0,
+            gain_a.bronze.0
+        );
+    }
+
+    /*
+    #[test]
+    fn stage_d_gains_silver() {
+        let u = make_upgrades(2, 2, 9, 3, true, false, false);
+        let gain = run_pd_program(&u).resource_gain();
+        assert!(gain.silver.0 > 0.0, "stage D should earn silver from sleep");
+        assert!(gain.bronze.0 > 0.0, "stage D should still earn bronze");
+    }
+
+    #[test]
+    fn stage_e_has_print_len() {
+        let u = make_upgrades(2, 2, 9, 4, true, true, false);
+        let program = run_pd_program(&u);
+        assert!(
+            program.print_len.is_some(),
+            "stage E program should have a non-empty print"
+        );
+        let gain = program.resource_gain();
+        assert!(gain.silver.0 > 0.0, "stage E should earn silver");
+    }
+
+    #[test]
+    fn stage_h_brk_gains_diamond() {
+        // gold_per_print_character at default (100 iterations) collapses to -inf.
+        // Level it up to 3 (1 iteration = min(log2(n), 1.)) so gold is well-behaved.
+        with_game_state_mut(|state| {
+            for _ in 0..3 {
+                state.upgrades.gold_per_print_character.track_level_up(0);
+            }
+        });
+        let u = make_upgrades(6, 3, 9, 4, true, true, true);
+        let gain = run_pd_program(&u).resource_gain();
+        // Restore global state
+        with_game_state_mut(|state| {
+            for _ in 0..3 {
+                state.upgrades.gold_per_print_character.track_level_down(0);
+            }
+        });
+        assert!(gain.diamond.0.is_finite(), "stage H diamond should be finite");
+        assert!(gain.diamond.0 != 0.0, "stage H should earn diamond from brk");
+    }
+    */
 }

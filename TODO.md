@@ -1,1 +1,4 @@
 - variable memory limit to prevent oom
+- update docs
+- better help start
+- compile & run output
