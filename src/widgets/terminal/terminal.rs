@@ -265,6 +265,7 @@ mod tests {
     use super::*;
 
     use crate::backend::input::{KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+    use assertables::*;
 
     fn key_press(code: KeyCode) -> Event {
         Event::KeyEvent(KeyEvent {
@@ -584,9 +585,10 @@ mod tests {
     }
 
     #[test]
-    fn overflow_history_clips_newest_entries() {
-        // 4-row terminal: two history entries of height=2 each → newest is clipped at bottom.
-        // Top-down layout: oldest fills rows 0-1, newest fills rows 2-3, no room for prompt.
+    fn overflow_history_clips_oldest_entries() {
+        // 4-row terminal: two history entries of height=2 each plus prompt = 5 total rows.
+        // Bottom-anchored layout scrolls by 1: oldest entry (AAA) is partially clipped at
+        // the top; only its second row ("CONT") is visible. Newest (BBB) and prompt are shown.
         struct TwoRowCmd(&'static str);
         impl RunningCommand<()> for TwoRowCmd {
             fn is_done(&self) -> bool {
@@ -616,11 +618,11 @@ mod tests {
         assert_eq!(t.history.len(), 2);
 
         let buf = render_terminal(&t, 10, 4);
-        // Oldest (AAA) at rows 0-1, newest (BBB) at rows 2-3.
-        // Prompt has no space and is not rendered.
-        assert!(row_string(&buf, 0, 10).starts_with("AAA"));
-        assert!(row_string(&buf, 1, 10).starts_with("CONT"));
-        assert!(row_string(&buf, 2, 10).starts_with("BBB"));
-        assert!(row_string(&buf, 3, 10).starts_with("CONT"));
+        // Scroll offset = 5 - 4 = 1: AAA's first row is clipped.
+        // Row 0: second row of AAA ("CONT"), rows 1-2: BBB, row 3: prompt.
+        assert_starts_with!(row_string(&buf, 0, 10), "CONT");
+        assert_starts_with!(row_string(&buf, 1, 10), "BBB");
+        assert_starts_with!(row_string(&buf, 2, 10), "CONT");
+        assert_starts_with!(row_string(&buf, 3, 10), "> ");
     }
 }

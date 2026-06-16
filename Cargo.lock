@@ -145,6 +145,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "175571dd1d178ced59193a6fc02dde1b972eb0bc56c892cde9beeceac5bf0f6b"
 
 [[package]]
+name = "assertables"
+version = "10.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3c16d80246a076246d8b525d9f404543e90fe0818636cd89c249c2a4bee3bb1"
+dependencies = [
+ "regex",
+ "walkdir",
+]
+
+[[package]]
 name = "atomic"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1386,6 +1396,7 @@ name = "incremental-code"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "assertables",
  "beamterm-core 1.0.0",
  "beamterm-renderer 1.0.0",
  "bitflags 2.11.1",
