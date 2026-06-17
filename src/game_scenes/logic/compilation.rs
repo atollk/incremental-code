@@ -95,22 +95,18 @@ fn predefined_functions() -> HashMap<&'static str, PredefinedFunction<WipCompili
 }
 
 #[derive(Clone)]
-struct WipCompilingProgram {
-    program: CompiledProgram,
+pub struct WipCompilingProgram {
+    pub(crate) program: CompiledProgram,
     is_cancelled: Rc<RefCell<dyn FnMut() -> bool + 'static>>,
     left_to_instruction_limit: u64,
 }
 
 impl WipCompilingProgram {
-    fn instruction_limit() -> u64 {
-        with_game_state(|game_state| game_state.upgrades.max_instructions.value())
-    }
-
-    fn new(is_cancelled: impl FnMut() -> bool + 'static) -> Self {
+    pub fn new(is_cancelled: impl FnMut() -> bool + 'static, instruction_limit: u64) -> Self {
         Self {
             program: CompiledProgram::new(),
             is_cancelled: Rc::new(RefCell::new(is_cancelled)),
-            left_to_instruction_limit: Self::instruction_limit(),
+            left_to_instruction_limit: instruction_limit,
         }
     }
 
@@ -122,7 +118,7 @@ impl WipCompilingProgram {
     }
 }
 
-struct WipCompilingProgramDiff {
+pub struct WipCompilingProgramDiff {
     program: <CompiledProgram as CompilingMetadata>::Diff,
     instruction_count: i64,
 }
@@ -183,7 +179,9 @@ fn compile_code(
     parsed_program: &NotPythonProgram,
     is_cancelled: impl FnMut() -> bool + 'static,
 ) -> anyhow::Result<Result<CompiledProgram, (String, Vec<Vec<u64>>)>> {
-    let mut compiling_program = WipCompilingProgram::new(is_cancelled);
+    let instruction_limit =
+        with_game_state(|game_state| game_state.upgrades.max_instructions.value());
+    let mut compiling_program = WipCompilingProgram::new(is_cancelled, instruction_limit);
     let run_result = compile_with_meta(
         &parsed_program,
         predefined_functions(),

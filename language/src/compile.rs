@@ -32,15 +32,6 @@ impl CompilingMetadata for () {
     }
 }
 
-/// Validates and executes a parsed [`NotPythonProgram`], returning an error if execution fails.
-pub fn compile(
-    program: &NotPythonProgram,
-    predefined_functions: HashMap<&str, PredefinedFunction<()>>,
-) -> anyhow::Result<()> {
-    let mut meta = ();
-    compile_with_meta(program, predefined_functions, &mut meta)
-}
-
 /// Like [`compile`], but calls back into `meta` at each zero-cost and atomic instruction
 /// so callers can measure or profile execution.
 pub fn compile_with_meta<Meta: CompilingMetadata>(
@@ -287,6 +278,9 @@ fn compile_stmt<'a, Meta: CompilingMetadata>(
         NotPythonStmt::Block(stmts) => {
             for stmt in stmts {
                 compile_stmt(stmt, state, meta)?;
+                if !matches!(state.control_flow, ProgramExecutionControlFlow::Normal) {
+                    break;
+                }
             }
         }
         NotPythonStmt::Pass => meta.log_atomic_instruction()?,
