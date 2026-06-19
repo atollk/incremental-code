@@ -17,6 +17,10 @@ clippy-all:
 test:
     cargo test --workspace --features tui
 
+bench_test:
+    echo '-1' | sudo tee /proc/sys/kernel/perf_event_paranoid
+    cargo bin samply record cargo test --profile profiling --features tui stage_d_gains_silver
+
 [parallel]
 build-all: build-tui build-opengl build-ratzilla build-egui-desktop build-egui-web
 

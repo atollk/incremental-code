@@ -96,6 +96,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
         state: &mut ProgramExecutionState<'a, Meta>,
         meta: &mut Meta,
     ) -> anyhow::Result<ProgramValue> {
+        // TODO: this takes up a big part of the runtime
         let arg_values: Vec<ProgramValue> = args
             .iter()
             .map(|a| eval_expr(a, state, meta))

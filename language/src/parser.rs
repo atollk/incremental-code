@@ -450,7 +450,11 @@ pub fn parse_program(
     src: &str,
 ) -> anyhow::Result<NotPythonProgram, Vec<Rich<'_, NotPythonLangToken>>> {
     parse(src)
-        .map(|ast| NotPythonProgram { statement: ast })
+        .map(|ast| {
+            let mut program = NotPythonProgram { statement: ast };
+            crate::fold_constants::fold_stmt(&mut program.statement);
+            program
+        })
         .into()
 }
 

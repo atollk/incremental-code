@@ -1,4 +1,5 @@
 mod compile;
+mod fold_constants;
 mod lexer;
 mod parser;
 

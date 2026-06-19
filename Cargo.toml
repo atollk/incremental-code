@@ -6,6 +6,10 @@ edition = "2024"
 [workspace]
 members = ["language", "helper_macros"]
 
+[profile.profiling]
+inherits = "release"
+debug = true
+
 [workspace.dependencies]
 log = "0.4.29"
 
@@ -68,7 +72,7 @@ spfunc = "0.1.3"
 scopeguard = "1.2.0"
 assertables = "10.1.0"
 
-[package.metadata.bin]
+[package.metadata.bin]  # cargo install cargo-run-bin
 trunk = { version = "0.21.14" }
 samply = { version = "0.13.1" }
 
