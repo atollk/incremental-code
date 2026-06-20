@@ -18,8 +18,14 @@ test:
     cargo test --workspace --features tui
 
 bench_test:
-    echo '-1' | sudo tee /proc/sys/kernel/perf_event_paranoid
-    cargo bin samply record cargo test --profile profiling --features tui stage_d_gains_silver
+    #!/usr/bin/env bash
+    export TEST_NAME=stage_d_gains_silver
+    BUILD_OUTPUT=$(cargo test --profile profiling --features tui --no-run 2>&1)
+    BIN_PATH=$(echo "$BUILD_OUTPUT" | sed -n 's/.*(\(.*\))/\1/p' | tail -n1)
+    if [[ $(uname -a) == *"Linux"* ]]; then
+      echo '-1' | sudo tee /proc/sys/kernel/perf_event_paranoid
+    fi
+    cargo bin samply record "$BIN_PATH" "$TEST_NAME"
 
 [parallel]
 build-all: build-tui build-opengl build-ratzilla build-egui-desktop build-egui-web
