@@ -2,8 +2,8 @@ use crate::game_state::{CompiledProgram, with_game_state};
 use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use language::{
-    CompilingMetadata, FnArgVec, HashableProgramValue, NotPythonProgram, PredefinedFunction,
-    ProgramValue, compile_with_meta,
+    CompilingMetadata, FnArgVec, NotPythonProgram, PredefinedFunction, ProgramValue,
+    compile_with_meta,
 };
 use std::cell::RefCell;
 use std::cmp::max;
@@ -18,7 +18,7 @@ fn predefined_function_print(
         .iter()
         .exactly_one()
         .map_err(|_| anyhow!("print takes exactly one argument"))?;
-    let ProgramValue::Hashable(HashableProgramValue::String(s)) = arg else {
+    let ProgramValue::String(s) = arg else {
         bail!("print requires a string argument")
     };
     meta.program.print_len = Some(max(s.len() as u64, meta.program.print_len.unwrap_or(0)));
@@ -33,7 +33,7 @@ fn predefined_function_sleep(
         .iter()
         .exactly_one()
         .map_err(|_| anyhow!("sleep takes exactly one argument"))?;
-    let t = if let ProgramValue::Hashable(HashableProgramValue::Int(i)) = arg {
+    let t = if let ProgramValue::Int(i) = arg {
         *i as f64
     } else if let ProgramValue::Float(f) = arg {
         *f

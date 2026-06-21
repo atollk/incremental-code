@@ -1,6 +1,6 @@
 use crate::game_state::{CodeStatementLevels, with_game_state};
 use anyhow::bail;
-use language::{NotPythonExpr, NotPythonExprOp, NotPythonProgram, NotPythonStmt};
+use language::{NotPythonExpr, NotPythonProgram, NotPythonStmt};
 
 /// Checks whether the code only uses features that have been unlocked.
 pub fn verify_unlocks(source: &str, parsed_program: &NotPythonProgram) -> anyhow::Result<()> {
@@ -77,7 +77,11 @@ fn verify_expr(expr: &NotPythonExpr, strings_allowed: bool, max_int: i64) -> any
                 verify_expr(v, strings_allowed, max_int)?;
             }
         }
-        NotPythonExpr::Op(op) => verify_expr_op(op, strings_allowed, max_int)?,
+        NotPythonExpr::BinaryOp(_, a, b) => {
+            verify_expr(a, strings_allowed, max_int)?;
+            verify_expr(b, strings_allowed, max_int)?;
+        }
+        NotPythonExpr::UnaryOp(_, e) => verify_expr(e, strings_allowed, max_int)?,
         NotPythonExpr::Call(_, args) => {
             for a in args {
                 verify_expr(a, strings_allowed, max_int)?;
@@ -88,31 +92,6 @@ fn verify_expr(expr: &NotPythonExpr, strings_allowed: bool, max_int: i64) -> any
         }
     }
     Ok(())
-}
-
-fn verify_expr_op(op: &NotPythonExprOp, strings_allowed: bool, max_int: i64) -> anyhow::Result<()> {
-    match op {
-        NotPythonExprOp::Neg(e) | NotPythonExprOp::Not(e) => {
-            verify_expr(e, strings_allowed, max_int)
-        }
-        NotPythonExprOp::Add(a, b)
-        | NotPythonExprOp::Sub(a, b)
-        | NotPythonExprOp::Mul(a, b)
-        | NotPythonExprOp::Div(a, b)
-        | NotPythonExprOp::Mod(a, b)
-        | NotPythonExprOp::And(a, b)
-        | NotPythonExprOp::Or(a, b)
-        | NotPythonExprOp::Equal(a, b)
-        | NotPythonExprOp::NotEqual(a, b)
-        | NotPythonExprOp::Greater(a, b)
-        | NotPythonExprOp::Less(a, b)
-        | NotPythonExprOp::GreaterEqual(a, b)
-        | NotPythonExprOp::LessEqual(a, b)
-        | NotPythonExprOp::In(a, b) => {
-            verify_expr(a, strings_allowed, max_int)?;
-            verify_expr(b, strings_allowed, max_int)
-        }
-    }
 }
 
 fn count_direct_calls(stmt: &NotPythonStmt, fn_name: &str) -> usize {

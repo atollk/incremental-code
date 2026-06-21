@@ -12,4 +12,6 @@ pub use compile::{
     compile_with_meta,
 };
 pub use lexer::NotPythonLangToken;
-pub use parser::{NotPythonExpr, NotPythonExprOp, NotPythonProgram, NotPythonStmt, parse_program};
+pub use parser::{
+    BinaryOp, NotPythonExpr, NotPythonProgram, NotPythonStmt, UnaryOp, parse_program,
+};

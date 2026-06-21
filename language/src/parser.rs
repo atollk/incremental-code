@@ -6,28 +6,30 @@ use chumsky::{
 };
 use logos::Logos;
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum NotPythonExprOp {
-    // Arithmetic
-    Add(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    Sub(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    Mul(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    Div(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    Mod(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    Neg(Box<NotPythonExpr>),
-    // Boolean
-    And(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    Or(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    Not(Box<NotPythonExpr>),
-    // Comparison
-    Equal(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    NotEqual(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    Greater(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    Less(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    GreaterEqual(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    LessEqual(Box<NotPythonExpr>, Box<NotPythonExpr>),
-    // Other
-    In(Box<NotPythonExpr>, Box<NotPythonExpr>),
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum BinaryOp {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    And,
+    Or,
+    Equal,
+    NotEqual,
+    Greater,
+    Less,
+    GreaterEqual,
+    LessEqual,
+    In,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum UnaryOp {
+    Neg,
+    Not,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -58,7 +60,8 @@ pub enum NotPythonExpr {
     // Non-atoms
     List(Vec<NotPythonExpr>),
     Dict(Vec<(NotPythonExpr, NotPythonExpr)>),
-    Op(NotPythonExprOp),
+    BinaryOp(BinaryOp, Box<NotPythonExpr>, Box<NotPythonExpr>),
+    UnaryOp(UnaryOp, Box<NotPythonExpr>),
     Call(String, Vec<NotPythonExpr>),
     Index(NotPythonExprVariable, Box<NotPythonExpr>),
 }
@@ -98,31 +101,26 @@ type Extra<'tok> = extra::Err<Rich<'tok, NotPythonLangToken>>;
 
 fn wrap_unary_op<'tok, I>(
     wrapped_parser: impl Parser<'tok, I, NotPythonExpr, Extra<'tok>> + Clone,
-    op_parser: impl Parser<'tok, I, fn(Box<NotPythonExpr>) -> NotPythonExprOp, Extra<'tok>> + Clone,
+    op_parser: impl Parser<'tok, I, UnaryOp, Extra<'tok>> + Clone,
 ) -> impl Parser<'tok, I, NotPythonExpr, Extra<'tok>> + Clone
 where
     I: ValueInput<'tok, Token = NotPythonLangToken, Span = SimpleSpan>,
 {
     op_parser.repeated().foldr(wrapped_parser, |op, rhs| {
-        NotPythonExpr::Op(op(Box::new(rhs)))
+        NotPythonExpr::UnaryOp(op, Box::new(rhs))
     })
 }
 
 fn wrap_binary_op<'tok, I>(
     wrapped_parser: impl Parser<'tok, I, NotPythonExpr, Extra<'tok>> + Clone,
-    op_parser: impl Parser<
-        'tok,
-        I,
-        fn(Box<NotPythonExpr>, Box<NotPythonExpr>) -> NotPythonExprOp,
-        Extra<'tok>,
-    > + Clone,
+    op_parser: impl Parser<'tok, I, BinaryOp, Extra<'tok>> + Clone,
 ) -> impl Parser<'tok, I, NotPythonExpr, Extra<'tok>> + Clone
 where
     I: ValueInput<'tok, Token = NotPythonLangToken, Span = SimpleSpan>,
 {
     wrapped_parser.clone().foldl(
         op_parser.then(wrapped_parser).repeated(),
-        |lhs, (op, rhs)| NotPythonExpr::Op(op(Box::new(lhs), Box::new(rhs))),
+        |lhs, (op, rhs)| NotPythonExpr::BinaryOp(op, Box::new(lhs), Box::new(rhs)),
     )
 }
 
@@ -190,61 +188,39 @@ where
 
         {
             let arith_op = {
-                let neg = wrap_unary_op(
-                    base,
-                    just(NotPythonLangToken::Minus).to(NotPythonExprOp::Neg as fn(_) -> _),
-                );
+                let neg = wrap_unary_op(base, just(NotPythonLangToken::Minus).to(UnaryOp::Neg));
                 let mul_div = wrap_binary_op(
                     neg,
                     choice((
-                        just(NotPythonLangToken::Star).to(NotPythonExprOp::Mul as fn(_, _) -> _),
-                        just(NotPythonLangToken::Slash).to(NotPythonExprOp::Div as fn(_, _) -> _),
+                        just(NotPythonLangToken::Star).to(BinaryOp::Mul),
+                        just(NotPythonLangToken::Slash).to(BinaryOp::Div),
                     )),
                 );
                 let add_sub = wrap_binary_op(
                     mul_div,
                     choice((
-                        just(NotPythonLangToken::Plus).to(NotPythonExprOp::Add as fn(_, _) -> _),
-                        just(NotPythonLangToken::Minus).to(NotPythonExprOp::Sub as fn(_, _) -> _),
+                        just(NotPythonLangToken::Plus).to(BinaryOp::Add),
+                        just(NotPythonLangToken::Minus).to(BinaryOp::Sub),
                     )),
                 );
 
-                wrap_binary_op(
-                    add_sub,
-                    just(NotPythonLangToken::Percent).to(NotPythonExprOp::Mod as fn(_, _) -> _),
-                )
+                wrap_binary_op(add_sub, just(NotPythonLangToken::Percent).to(BinaryOp::Mod))
             };
             let bool_op = wrap_binary_op(
                 arith_op,
                 choice((
-                    just(NotPythonLangToken::EqEqual).to(NotPythonExprOp::Equal as fn(_, _) -> _),
-                    just(NotPythonLangToken::NotEqual)
-                        .to(NotPythonExprOp::NotEqual as fn(_, _) -> _),
-                    just(NotPythonLangToken::Less).to(NotPythonExprOp::Less as fn(_, _) -> _),
-                    just(NotPythonLangToken::Greater).to(NotPythonExprOp::Greater as fn(_, _) -> _),
-                    just(NotPythonLangToken::LessEqual)
-                        .to(NotPythonExprOp::LessEqual as fn(_, _) -> _),
-                    just(NotPythonLangToken::GreaterEqual)
-                        .to(NotPythonExprOp::GreaterEqual as fn(_, _) -> _),
+                    just(NotPythonLangToken::EqEqual).to(BinaryOp::Equal),
+                    just(NotPythonLangToken::NotEqual).to(BinaryOp::NotEqual),
+                    just(NotPythonLangToken::Less).to(BinaryOp::Less),
+                    just(NotPythonLangToken::Greater).to(BinaryOp::Greater),
+                    just(NotPythonLangToken::LessEqual).to(BinaryOp::LessEqual),
+                    just(NotPythonLangToken::GreaterEqual).to(BinaryOp::GreaterEqual),
                 )),
             );
-            let in_op = wrap_binary_op(
-                bool_op,
-                just(NotPythonLangToken::KwIn).to(NotPythonExprOp::In as fn(_, _) -> _),
-            );
-            let not_op = wrap_unary_op(
-                in_op,
-                just(NotPythonLangToken::KwNot).to(NotPythonExprOp::Not as fn(_) -> _),
-            );
-            let and_op = wrap_binary_op(
-                not_op,
-                just(NotPythonLangToken::KwAnd).to(NotPythonExprOp::And as fn(_, _) -> _),
-            );
-            wrap_binary_op(
-                and_op,
-                just(NotPythonLangToken::KwOr).to(NotPythonExprOp::Or as fn(_, _) -> _),
-            )
-            .boxed()
+            let in_op = wrap_binary_op(bool_op, just(NotPythonLangToken::KwIn).to(BinaryOp::In));
+            let not_op = wrap_unary_op(in_op, just(NotPythonLangToken::KwNot).to(UnaryOp::Not));
+            let and_op = wrap_binary_op(not_op, just(NotPythonLangToken::KwAnd).to(BinaryOp::And));
+            wrap_binary_op(and_op, just(NotPythonLangToken::KwOr).to(BinaryOp::Or)).boxed()
         }
     })
     .boxed();
@@ -519,7 +495,10 @@ mod tests {
     fn decl() {
         assert_eq!(
             stmts("x := 42;\n"),
-            vec![NotPythonStmt::Decl("x".into(), NotPythonExpr::Int(42))]
+            vec![NotPythonStmt::Decl(
+                "x".to_string().into(),
+                NotPythonExpr::Int(42)
+            )]
         );
     }
 
@@ -528,7 +507,7 @@ mod tests {
         assert_eq!(
             stmts("x = True;\n"),
             vec![NotPythonStmt::Assign(
-                "x".into(),
+                "x".to_string().into(),
                 NotPythonExpr::Boolean(true)
             )]
         );
@@ -563,14 +542,16 @@ mod tests {
         assert_eq!(
             stmts("x := 1 + 2 * 3;\n"),
             vec![NotPythonStmt::Decl(
-                "x".into(),
-                NotPythonExpr::Op(NotPythonExprOp::Add(
+                "x".to_string().into(),
+                NotPythonExpr::BinaryOp(
+                    BinaryOp::Add,
                     Box::new(NotPythonExpr::Int(1)),
-                    Box::new(NotPythonExpr::Op(NotPythonExprOp::Mul(
+                    Box::new(NotPythonExpr::BinaryOp(
+                        BinaryOp::Mul,
                         Box::new(NotPythonExpr::Int(2)),
                         Box::new(NotPythonExpr::Int(3)),
-                    ))),
-                ))
+                    )),
+                )
             )]
         );
     }
@@ -580,8 +561,8 @@ mod tests {
         assert_eq!(
             stmts("x := -1;\n"),
             vec![NotPythonStmt::Decl(
-                "x".into(),
-                NotPythonExpr::Op(NotPythonExprOp::Neg(Box::new(NotPythonExpr::Int(1))))
+                "x".to_string().into(),
+                NotPythonExpr::UnaryOp(UnaryOp::Neg, Box::new(NotPythonExpr::Int(1)))
             )]
         );
     }
@@ -591,11 +572,12 @@ mod tests {
         assert_eq!(
             stmts("x := 1 == 2;\n"),
             vec![NotPythonStmt::Decl(
-                "x".into(),
-                NotPythonExpr::Op(NotPythonExprOp::Equal(
+                "x".to_string().into(),
+                NotPythonExpr::BinaryOp(
+                    BinaryOp::Equal,
                     Box::new(NotPythonExpr::Int(1)),
                     Box::new(NotPythonExpr::Int(2)),
-                ))
+                )
             )]
         );
     }
@@ -676,7 +658,7 @@ mod tests {
             stmts("def add(x, y):\npass;\nend\n"),
             vec![NotPythonStmt::Function {
                 name: "add".into(),
-                params: vec!["x".into(), "y".into()],
+                params: vec!["x".to_string().into(), "y".to_string().into()],
                 body: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Pass])),
                 is_pure: false,
             }]
@@ -707,9 +689,9 @@ mod tests {
             stmts("def pure foo(x):\nreturn x;\nend\n"),
             vec![NotPythonStmt::Function {
                 name: "foo".into(),
-                params: vec!["x".into()],
+                params: vec!["x".to_string().into()],
                 body: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Return(Some(
-                    "x".into()
+                    NotPythonExpr::Variable("x".to_string().into())
                 ))])),
                 is_pure: true,
             }]
@@ -785,22 +767,24 @@ end
         assert_eq!(
             stmts(code),
             vec![
-                NotPythonStmt::Decl("x".into(), NotPythonExpr::Int(0)),
+                NotPythonStmt::Decl("x".to_string().into(), NotPythonExpr::Int(0)),
                 NotPythonStmt::Loop(Box::new(NotPythonStmt::Block(vec![
                     NotPythonStmt::If {
-                        condition: NotPythonExpr::Op(NotPythonExprOp::Equal(
-                            Box::new(NotPythonExpr::Variable("x".into())),
+                        condition: NotPythonExpr::BinaryOp(
+                            BinaryOp::Equal,
+                            Box::new(NotPythonExpr::Variable("x".to_string().into())),
                             Box::new(NotPythonExpr::Int(1000)),
-                        )),
+                        ),
                         then: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Break])),
                         else_: None,
                     },
                     NotPythonStmt::Assign(
-                        "x".into(),
-                        NotPythonExpr::Op(NotPythonExprOp::Add(
-                            Box::new(NotPythonExpr::Variable("x".into())),
+                        "x".to_string().into(),
+                        NotPythonExpr::BinaryOp(
+                            BinaryOp::Add,
+                            Box::new(NotPythonExpr::Variable("x".to_string().into())),
                             Box::new(NotPythonExpr::Int(1)),
-                        )),
+                        ),
                     ),
                 ]))),
             ],

@@ -1,4 +1,4 @@
-use crate::parser::{NotPythonExpr, NotPythonExprOp, NotPythonStmt};
+use crate::parser::{BinaryOp, NotPythonExpr, NotPythonStmt, UnaryOp};
 use crate::visitor::Visitor;
 
 enum Lit {
@@ -27,9 +27,9 @@ fn lit_to_expr(lit: Lit) -> NotPythonExpr {
     }
 }
 
-fn fold_binary(lhs: &Lit, rhs: &Lit, op: &NotPythonExprOp) -> Option<Lit> {
+fn fold_binary(lhs: &Lit, rhs: &Lit, op: BinaryOp) -> Option<Lit> {
     match op {
-        NotPythonExprOp::Add(_, _) => match (lhs, rhs) {
+        BinaryOp::Add => match (lhs, rhs) {
             (Lit::Int(a), Lit::Int(b)) => a.checked_add(*b).map(Lit::Int),
             (Lit::Int(a), Lit::Float(b)) => Some(Lit::Float(*a as f64 + b)),
             (Lit::Float(a), Lit::Int(b)) => Some(Lit::Float(a + *b as f64)),
@@ -37,21 +37,21 @@ fn fold_binary(lhs: &Lit, rhs: &Lit, op: &NotPythonExprOp) -> Option<Lit> {
             (Lit::Str(a), Lit::Str(b)) => Some(Lit::Str(a.clone() + b)),
             _ => None,
         },
-        NotPythonExprOp::Sub(_, _) => match (lhs, rhs) {
+        BinaryOp::Sub => match (lhs, rhs) {
             (Lit::Int(a), Lit::Int(b)) => a.checked_sub(*b).map(Lit::Int),
             (Lit::Int(a), Lit::Float(b)) => Some(Lit::Float(*a as f64 - b)),
             (Lit::Float(a), Lit::Int(b)) => Some(Lit::Float(a - *b as f64)),
             (Lit::Float(a), Lit::Float(b)) => Some(Lit::Float(a - b)),
             _ => None,
         },
-        NotPythonExprOp::Mul(_, _) => match (lhs, rhs) {
+        BinaryOp::Mul => match (lhs, rhs) {
             (Lit::Int(a), Lit::Int(b)) => a.checked_mul(*b).map(Lit::Int),
             (Lit::Int(a), Lit::Float(b)) => Some(Lit::Float(*a as f64 * b)),
             (Lit::Float(a), Lit::Int(b)) => Some(Lit::Float(a * *b as f64)),
             (Lit::Float(a), Lit::Float(b)) => Some(Lit::Float(a * b)),
             _ => None,
         },
-        NotPythonExprOp::Div(_, _) => match (lhs, rhs) {
+        BinaryOp::Div => match (lhs, rhs) {
             (_, Lit::Int(0)) => None, // let runtime fire the division-by-zero error
             (Lit::Int(a), Lit::Int(b)) => a.checked_div(*b).map(Lit::Int),
             (Lit::Int(a), Lit::Float(b)) => Some(Lit::Float(*a as f64 / b)),
@@ -59,78 +59,76 @@ fn fold_binary(lhs: &Lit, rhs: &Lit, op: &NotPythonExprOp) -> Option<Lit> {
             (Lit::Float(a), Lit::Float(b)) => Some(Lit::Float(a / b)),
             _ => None,
         },
-        NotPythonExprOp::Mod(_, _) => match (lhs, rhs) {
+        BinaryOp::Mod => match (lhs, rhs) {
             (_, Lit::Int(0)) => None, // let runtime fire the modulo-by-zero error
             (Lit::Int(a), Lit::Int(b)) => a.checked_rem(*b).map(Lit::Int),
             _ => None,
         },
-        NotPythonExprOp::And(_, _) => match (lhs, rhs) {
+        BinaryOp::And => match (lhs, rhs) {
             (Lit::Bool(a), Lit::Bool(b)) => Some(Lit::Bool(*a && *b)),
             _ => None,
         },
-        NotPythonExprOp::Or(_, _) => match (lhs, rhs) {
+        BinaryOp::Or => match (lhs, rhs) {
             (Lit::Bool(a), Lit::Bool(b)) => Some(Lit::Bool(*a || *b)),
             _ => None,
         },
-        NotPythonExprOp::Equal(_, _) => match (lhs, rhs) {
+        BinaryOp::Equal => match (lhs, rhs) {
             (Lit::Int(a), Lit::Int(b)) => Some(Lit::Bool(a == b)),
             (Lit::Float(a), Lit::Float(b)) => Some(Lit::Bool(a == b)),
             (Lit::Bool(a), Lit::Bool(b)) => Some(Lit::Bool(a == b)),
             (Lit::Str(a), Lit::Str(b)) => Some(Lit::Bool(a == b)),
             _ => None,
         },
-        NotPythonExprOp::NotEqual(_, _) => match (lhs, rhs) {
+        BinaryOp::NotEqual => match (lhs, rhs) {
             (Lit::Int(a), Lit::Int(b)) => Some(Lit::Bool(a != b)),
             (Lit::Float(a), Lit::Float(b)) => Some(Lit::Bool(a != b)),
             (Lit::Bool(a), Lit::Bool(b)) => Some(Lit::Bool(a != b)),
             (Lit::Str(a), Lit::Str(b)) => Some(Lit::Bool(a != b)),
             _ => None,
         },
-        NotPythonExprOp::Greater(_, _) => match (lhs, rhs) {
+        BinaryOp::Greater => match (lhs, rhs) {
             (Lit::Int(a), Lit::Int(b)) => Some(Lit::Bool(a > b)),
             (Lit::Int(a), Lit::Float(b)) => Some(Lit::Bool((*a as f64) > *b)),
             (Lit::Float(a), Lit::Int(b)) => Some(Lit::Bool(*a > *b as f64)),
             (Lit::Float(a), Lit::Float(b)) => Some(Lit::Bool(a > b)),
             _ => None,
         },
-        NotPythonExprOp::Less(_, _) => match (lhs, rhs) {
+        BinaryOp::Less => match (lhs, rhs) {
             (Lit::Int(a), Lit::Int(b)) => Some(Lit::Bool(a < b)),
             (Lit::Int(a), Lit::Float(b)) => Some(Lit::Bool((*a as f64) < *b)),
             (Lit::Float(a), Lit::Int(b)) => Some(Lit::Bool(*a < *b as f64)),
             (Lit::Float(a), Lit::Float(b)) => Some(Lit::Bool(a < b)),
             _ => None,
         },
-        NotPythonExprOp::GreaterEqual(_, _) => match (lhs, rhs) {
+        BinaryOp::GreaterEqual => match (lhs, rhs) {
             (Lit::Int(a), Lit::Int(b)) => Some(Lit::Bool(a >= b)),
             (Lit::Int(a), Lit::Float(b)) => Some(Lit::Bool((*a as f64) >= *b)),
             (Lit::Float(a), Lit::Int(b)) => Some(Lit::Bool(*a >= *b as f64)),
             (Lit::Float(a), Lit::Float(b)) => Some(Lit::Bool(a >= b)),
             _ => None,
         },
-        NotPythonExprOp::LessEqual(_, _) => match (lhs, rhs) {
+        BinaryOp::LessEqual => match (lhs, rhs) {
             (Lit::Int(a), Lit::Int(b)) => Some(Lit::Bool(a <= b)),
             (Lit::Int(a), Lit::Float(b)) => Some(Lit::Bool((*a as f64) <= *b)),
             (Lit::Float(a), Lit::Int(b)) => Some(Lit::Bool(*a <= *b as f64)),
             (Lit::Float(a), Lit::Float(b)) => Some(Lit::Bool(a <= b)),
             _ => None,
         },
-        NotPythonExprOp::In(_, _) => None,
-        _ => None,
+        BinaryOp::In => None,
     }
 }
 
-fn fold_unary(val: &Lit, op: &NotPythonExprOp) -> Option<Lit> {
+fn fold_unary(val: &Lit, op: UnaryOp) -> Option<Lit> {
     match op {
-        NotPythonExprOp::Neg(_) => match val {
+        UnaryOp::Neg => match val {
             Lit::Int(i) => i.checked_neg().map(Lit::Int),
             Lit::Float(f) => Some(Lit::Float(-f)),
             _ => None,
         },
-        NotPythonExprOp::Not(_) => match val {
+        UnaryOp::Not => match val {
             Lit::Bool(b) => Some(Lit::Bool(!b)),
             _ => None,
         },
-        _ => None,
     }
 }
 
@@ -138,30 +136,12 @@ struct ConstantFolder;
 
 impl Visitor for ConstantFolder {
     fn post_expr(&mut self, expr: NotPythonExpr) -> NotPythonExpr {
-        let folded = if let NotPythonExpr::Op(ref op) = expr {
-            match op {
-                NotPythonExprOp::Neg(v) | NotPythonExprOp::Not(v) => {
-                    expr_to_lit(v).and_then(|l| fold_unary(&l, op))
-                }
-                NotPythonExprOp::Add(l, r)
-                | NotPythonExprOp::Sub(l, r)
-                | NotPythonExprOp::Mul(l, r)
-                | NotPythonExprOp::Div(l, r)
-                | NotPythonExprOp::Mod(l, r)
-                | NotPythonExprOp::And(l, r)
-                | NotPythonExprOp::Or(l, r)
-                | NotPythonExprOp::Equal(l, r)
-                | NotPythonExprOp::NotEqual(l, r)
-                | NotPythonExprOp::Greater(l, r)
-                | NotPythonExprOp::Less(l, r)
-                | NotPythonExprOp::GreaterEqual(l, r)
-                | NotPythonExprOp::LessEqual(l, r)
-                | NotPythonExprOp::In(l, r) => expr_to_lit(l)
-                    .zip(expr_to_lit(r))
-                    .and_then(|(ll, rl)| fold_binary(&ll, &rl, op)),
-            }
-        } else {
-            None
+        let folded = match &expr {
+            NotPythonExpr::UnaryOp(op, v) => expr_to_lit(v).and_then(|l| fold_unary(&l, *op)),
+            NotPythonExpr::BinaryOp(op, l, r) => expr_to_lit(l)
+                .zip(expr_to_lit(r))
+                .and_then(|(ll, rl)| fold_binary(&ll, &rl, *op)),
+            _ => None,
         };
         folded.map(lit_to_expr).unwrap_or(expr)
     }
@@ -208,9 +188,9 @@ mod tests {
 
     #[test]
     fn test_div_by_zero_not_folded() {
-        // Should remain an Op node, not panic at parse time
+        // Should remain a BinaryOp node, not panic at parse time
         let expr = parsed_decl_expr("x = 1 / 0");
-        assert!(matches!(expr, NotPythonExpr::Op(_)));
+        assert!(matches!(expr, NotPythonExpr::BinaryOp(..)));
     }
 
     #[test]
@@ -238,6 +218,6 @@ mod tests {
     fn test_identifier_blocks_fold() {
         // i - 1 cannot be folded because i is an identifier
         let expr = parsed_decl_expr("x = i - 1");
-        assert!(matches!(expr, NotPythonExpr::Op(_)));
+        assert!(matches!(expr, NotPythonExpr::BinaryOp(..)));
     }
 }

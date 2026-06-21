@@ -1,4 +1,4 @@
-use crate::parser::{NotPythonExpr, NotPythonExprOp, NotPythonExprVariable, NotPythonStmt};
+use crate::parser::{NotPythonExpr, NotPythonExprVariable, NotPythonStmt};
 
 pub fn walk_expr_variable<V: Visitor + ?Sized>(
     _v: &mut V,
@@ -7,58 +7,12 @@ pub fn walk_expr_variable<V: Visitor + ?Sized>(
     var
 }
 
-pub fn walk_expr_op<V: Visitor + ?Sized>(v: &mut V, op: NotPythonExprOp) -> NotPythonExprOp {
-    match op {
-        NotPythonExprOp::Add(l, r) => {
-            NotPythonExprOp::Add(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::Sub(l, r) => {
-            NotPythonExprOp::Sub(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::Mul(l, r) => {
-            NotPythonExprOp::Mul(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::Div(l, r) => {
-            NotPythonExprOp::Div(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::Mod(l, r) => {
-            NotPythonExprOp::Mod(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::Neg(inner) => NotPythonExprOp::Neg(Box::new(v.visit_expr(*inner))),
-        NotPythonExprOp::And(l, r) => {
-            NotPythonExprOp::And(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::Or(l, r) => {
-            NotPythonExprOp::Or(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::Not(inner) => NotPythonExprOp::Not(Box::new(v.visit_expr(*inner))),
-        NotPythonExprOp::Equal(l, r) => {
-            NotPythonExprOp::Equal(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::NotEqual(l, r) => {
-            NotPythonExprOp::NotEqual(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::Greater(l, r) => {
-            NotPythonExprOp::Greater(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::Less(l, r) => {
-            NotPythonExprOp::Less(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::GreaterEqual(l, r) => {
-            NotPythonExprOp::GreaterEqual(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::LessEqual(l, r) => {
-            NotPythonExprOp::LessEqual(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-        NotPythonExprOp::In(l, r) => {
-            NotPythonExprOp::In(Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
-        }
-    }
-}
-
 pub fn walk_expr<V: Visitor + ?Sized>(v: &mut V, expr: NotPythonExpr) -> NotPythonExpr {
     match expr {
-        NotPythonExpr::Op(op) => NotPythonExpr::Op(v.visit_expr_op(op)),
+        NotPythonExpr::BinaryOp(op, l, r) => {
+            NotPythonExpr::BinaryOp(op, Box::new(v.visit_expr(*l)), Box::new(v.visit_expr(*r)))
+        }
+        NotPythonExpr::UnaryOp(op, e) => NotPythonExpr::UnaryOp(op, Box::new(v.visit_expr(*e))),
         NotPythonExpr::Variable(var) => NotPythonExpr::Variable(v.visit_expr_variable(var)),
         NotPythonExpr::Index(var, idx) => {
             NotPythonExpr::Index(v.visit_expr_variable(var), Box::new(v.visit_expr(*idx)))
@@ -136,16 +90,6 @@ pub trait Visitor {
         var
     }
 
-    fn pre_expr_op(&mut self, op: NotPythonExprOp) -> NotPythonExprOp {
-        op
-    }
-    fn visit_expr_op_children(&mut self, op: NotPythonExprOp) -> NotPythonExprOp {
-        walk_expr_op(self, op)
-    }
-    fn post_expr_op(&mut self, op: NotPythonExprOp) -> NotPythonExprOp {
-        op
-    }
-
     fn pre_expr(&mut self, expr: NotPythonExpr) -> NotPythonExpr {
         expr
     }
@@ -170,12 +114,6 @@ pub trait Visitor {
         let var = self.pre_expr_variable(var);
         let var = self.visit_expr_variable_children(var);
         self.post_expr_variable(var)
-    }
-
-    fn visit_expr_op(&mut self, op: NotPythonExprOp) -> NotPythonExprOp {
-        let op = self.pre_expr_op(op);
-        let op = self.visit_expr_op_children(op);
-        self.post_expr_op(op)
     }
 
     fn visit_expr(&mut self, expr: NotPythonExpr) -> NotPythonExpr {
@@ -228,28 +166,11 @@ mod tests {
             }
         }
 
-        // "x = 1 + 2" has three expressions: Int(1), Int(2), Op(Add)
+        // "x = 1 + 2" has three expressions: Int(1), Int(2), BinaryOp(Add)
         let stmt = parse("x = 1 + 2");
         let mut c = Counter(0);
         c.visit_stmt(stmt);
         assert_eq!(c.0, 3);
-    }
-
-    #[test]
-    fn post_expr_op_hook_fires() {
-        struct OpCounter(usize);
-        impl Visitor for OpCounter {
-            fn post_expr_op(&mut self, op: NotPythonExprOp) -> NotPythonExprOp {
-                self.0 += 1;
-                op
-            }
-        }
-
-        // "x = 1 + 2 * 3" has two ops: Mul, Add
-        let stmt = parse("x = 1 + 2 * 3");
-        let mut c = OpCounter(0);
-        c.visit_stmt(stmt);
-        assert_eq!(c.0, 2);
     }
 
     #[test]

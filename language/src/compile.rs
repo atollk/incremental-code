@@ -1,5 +1,5 @@
 use crate::parser::{
-    NotPythonExpr, NotPythonExprOp, NotPythonExprVariable, NotPythonProgram, NotPythonStmt,
+    BinaryOp, NotPythonExpr, NotPythonExprVariable, NotPythonProgram, NotPythonStmt, UnaryOp,
 };
 use anyhow::{anyhow, bail};
 use linear_map::LinearMap;
@@ -56,11 +56,22 @@ pub enum HashableProgramValue {
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum ProgramValue {
-    Hashable(HashableProgramValue),
+    Int(i64),
     Float(f64),
+    String(String),
+    Bool(bool),
     None,
     List(Box<Vec<ProgramValue>>),
     Dict(Box<HashMap<HashableProgramValue, ProgramValue>>),
+}
+
+fn to_hashable(v: &ProgramValue) -> Option<HashableProgramValue> {
+    match v {
+        ProgramValue::Int(i) => Some(HashableProgramValue::Int(*i)),
+        ProgramValue::String(s) => Some(HashableProgramValue::String(s.clone())),
+        ProgramValue::Bool(b) => Some(HashableProgramValue::Bool(*b)),
+        _ => None,
+    }
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -134,9 +145,13 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     // Convert args to hashable cache keys; non-hashable args are an error.
                     let cache_key: Vec<HashableProgramValue> = arg_values
                         .iter()
-                        .map(|v| match v {
-                            ProgramValue::Hashable(h) => Ok(h.clone()),
-                            _ => bail!("Pure function '{}' received non-hashable argument", name),
+                        .map(|v| {
+                            to_hashable(v).ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "Pure function '{}' received non-hashable argument",
+                                    name
+                                )
+                            })
                         })
                         .collect::<anyhow::Result<_>>()?;
 
@@ -352,7 +367,7 @@ fn compile_stmt<'a, Meta: CompilingMetadata>(
             then,
             else_,
         } => match eval_expr(condition, state, meta)? {
-            ProgramValue::Hashable(HashableProgramValue::Bool(b)) => {
+            ProgramValue::Bool(b) => {
                 if b {
                     compile_stmt(then, state, meta)?;
                     meta.log_atomic_instruction()?;
@@ -402,136 +417,136 @@ fn compile_stmt<'a, Meta: CompilingMetadata>(
     Ok(())
 }
 
-fn eval_unary_op(val: ProgramValue, op: &NotPythonExprOp) -> anyhow::Result<ProgramValue> {
+fn eval_unary_op(val: ProgramValue, op: UnaryOp) -> anyhow::Result<ProgramValue> {
     match op {
-        NotPythonExprOp::Neg(_) => match val {
-            ProgramValue::Hashable(HashableProgramValue::Int(i)) => {
-                Ok(ProgramValue::Hashable(HashableProgramValue::Int(-i)))
-            }
+        UnaryOp::Neg => match val {
+            ProgramValue::Int(i) => Ok(ProgramValue::Int(-i)),
             ProgramValue::Float(f) => Ok(ProgramValue::Float(-f)),
             _ => Err(anyhow!("Cannot negate non-numeric value")),
         },
-        NotPythonExprOp::Not(_) => match val {
-            ProgramValue::Hashable(HashableProgramValue::Bool(b)) => {
-                Ok(ProgramValue::Hashable(HashableProgramValue::Bool(!b)))
-            }
+        UnaryOp::Not => match val {
+            ProgramValue::Bool(b) => Ok(ProgramValue::Bool(!b)),
             _ => Err(anyhow!("Cannot apply 'not' to non-boolean value")),
         },
-        _ => unreachable!("eval_unary_op called with binary op"),
     }
 }
 
 fn eval_binary_op(
     lhs: ProgramValue,
     rhs: ProgramValue,
-    op: &NotPythonExprOp,
+    op: BinaryOp,
 ) -> anyhow::Result<ProgramValue> {
-    use HashableProgramValue::*;
     use ProgramValue::*;
 
     match op {
-        NotPythonExprOp::Add(_, _) => match (lhs, rhs) {
-            (Hashable(Int(a)), Hashable(Int(b))) => Ok(Hashable(Int(a + b))),
-            (Hashable(Int(a)), Float(b)) => Ok(Float(a as f64 + b)),
-            (Float(a), Hashable(Int(b))) => Ok(Float(a + b as f64)),
+        BinaryOp::Add => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Int(a + b)),
+            (Int(a), Float(b)) => Ok(Float(a as f64 + b)),
+            (Float(a), Int(b)) => Ok(Float(a + b as f64)),
             (Float(a), Float(b)) => Ok(Float(a + b)),
-            (Hashable(String(a)), Hashable(String(b))) => Ok(Hashable(String(a + &b))),
+            (String(a), String(b)) => Ok(String(a + &b)),
             _ => Err(anyhow!("'+' operands must be numeric or both strings")),
         },
-        NotPythonExprOp::Sub(_, _) => match (lhs, rhs) {
-            (Hashable(Int(a)), Hashable(Int(b))) => Ok(Hashable(Int(a - b))),
-            (Hashable(Int(a)), Float(b)) => Ok(Float(a as f64 - b)),
-            (Float(a), Hashable(Int(b))) => Ok(Float(a - b as f64)),
+        BinaryOp::Sub => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Int(a - b)),
+            (Int(a), Float(b)) => Ok(Float(a as f64 - b)),
+            (Float(a), Int(b)) => Ok(Float(a - b as f64)),
             (Float(a), Float(b)) => Ok(Float(a - b)),
             _ => Err(anyhow!("'-' operands must be numeric")),
         },
-        NotPythonExprOp::Mul(_, _) => match (lhs, rhs) {
-            (Hashable(Int(a)), Hashable(Int(b))) => Ok(Hashable(Int(a * b))),
-            (Hashable(Int(a)), Float(b)) => Ok(Float(a as f64 * b)),
-            (Float(a), Hashable(Int(b))) => Ok(Float(a * b as f64)),
+        BinaryOp::Mul => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Int(a * b)),
+            (Int(a), Float(b)) => Ok(Float(a as f64 * b)),
+            (Float(a), Int(b)) => Ok(Float(a * b as f64)),
             (Float(a), Float(b)) => Ok(Float(a * b)),
             _ => Err(anyhow!("'*' operands must be numeric")),
         },
-        NotPythonExprOp::Div(_, _) => match (lhs, rhs) {
-            (Hashable(Int(a)), Hashable(Int(b))) => {
+        BinaryOp::Div => match (lhs, rhs) {
+            (Int(a), Int(b)) => {
                 if b == 0 {
                     return Err(anyhow!("Division by zero"));
                 }
-                Ok(Hashable(Int(a / b)))
+                Ok(Int(a / b))
             }
-            (Hashable(Int(a)), Float(b)) => Ok(Float(a as f64 / b)),
-            (Float(a), Hashable(Int(b))) => Ok(Float(a / b as f64)),
+            (Int(a), Float(b)) => Ok(Float(a as f64 / b)),
+            (Float(a), Int(b)) => Ok(Float(a / b as f64)),
             (Float(a), Float(b)) => Ok(Float(a / b)),
             _ => Err(anyhow!("'/' operands must be numeric")),
         },
-        NotPythonExprOp::Mod(_, _) => match (lhs, rhs) {
-            (Hashable(Int(a)), Hashable(Int(b))) => {
+        BinaryOp::Mod => match (lhs, rhs) {
+            (Int(a), Int(b)) => {
                 if b == 0 {
                     return Err(anyhow!("Modulo by zero"));
                 }
-                Ok(Hashable(Int(a % b)))
+                Ok(Int(a % b))
             }
             _ => Err(anyhow!("'%' operands must be integers")),
         },
-        NotPythonExprOp::And(_, _) => match (lhs, rhs) {
-            (Hashable(Bool(a)), Hashable(Bool(b))) => Ok(Hashable(Bool(a && b))),
+        BinaryOp::And => match (lhs, rhs) {
+            (Bool(a), Bool(b)) => Ok(Bool(a && b)),
             _ => Err(anyhow!("'and' operands must be booleans")),
         },
-        NotPythonExprOp::Or(_, _) => match (lhs, rhs) {
-            (Hashable(Bool(a)), Hashable(Bool(b))) => Ok(Hashable(Bool(a || b))),
+        BinaryOp::Or => match (lhs, rhs) {
+            (Bool(a), Bool(b)) => Ok(Bool(a || b)),
             _ => Err(anyhow!("'or' operands must be booleans")),
         },
-        NotPythonExprOp::Equal(_, _) => match (lhs, rhs) {
-            (Hashable(a), Hashable(b)) => Ok(Hashable(Bool(a == b))),
-            (Float(a), Float(b)) => Ok(Hashable(Bool(a == b))),
-            (None, None) => Ok(Hashable(Bool(true))),
-            _ => Ok(Hashable(Bool(false))),
+        BinaryOp::Equal => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Bool(a == b)),
+            (Float(a), Float(b)) => Ok(Bool(a == b)),
+            (String(a), String(b)) => Ok(Bool(a == b)),
+            (Bool(a), Bool(b)) => Ok(Bool(a == b)),
+            (None, None) => Ok(Bool(true)),
+            _ => Ok(Bool(false)),
         },
-        NotPythonExprOp::NotEqual(_, _) => match (lhs, rhs) {
-            (Hashable(a), Hashable(b)) => Ok(Hashable(Bool(a != b))),
-            (Float(a), Float(b)) => Ok(Hashable(Bool(a != b))),
-            (None, None) => Ok(Hashable(Bool(false))),
-            _ => Ok(Hashable(Bool(true))),
+        BinaryOp::NotEqual => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Bool(a != b)),
+            (Float(a), Float(b)) => Ok(Bool(a != b)),
+            (String(a), String(b)) => Ok(Bool(a != b)),
+            (Bool(a), Bool(b)) => Ok(Bool(a != b)),
+            (None, None) => Ok(Bool(false)),
+            _ => Ok(Bool(true)),
         },
-        NotPythonExprOp::Greater(_, _) => match (lhs, rhs) {
-            (Hashable(Int(a)), Hashable(Int(b))) => Ok(Hashable(Bool(a > b))),
-            (Hashable(Int(a)), Float(b)) => Ok(Hashable(Bool((a as f64) > b))),
-            (Float(a), Hashable(Int(b))) => Ok(Hashable(Bool(a > b as f64))),
-            (Float(a), Float(b)) => Ok(Hashable(Bool(a > b))),
+        BinaryOp::Greater => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Bool(a > b)),
+            (Int(a), Float(b)) => Ok(Bool((a as f64) > b)),
+            (Float(a), Int(b)) => Ok(Bool(a > b as f64)),
+            (Float(a), Float(b)) => Ok(Bool(a > b)),
             _ => Err(anyhow!("'>' operands must be numeric")),
         },
-        NotPythonExprOp::Less(_, _) => match (lhs, rhs) {
-            (Hashable(Int(a)), Hashable(Int(b))) => Ok(Hashable(Bool(a < b))),
-            (Hashable(Int(a)), Float(b)) => Ok(Hashable(Bool((a as f64) < b))),
-            (Float(a), Hashable(Int(b))) => Ok(Hashable(Bool(a < b as f64))),
-            (Float(a), Float(b)) => Ok(Hashable(Bool(a < b))),
+        BinaryOp::Less => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Bool(a < b)),
+            (Int(a), Float(b)) => Ok(Bool((a as f64) < b)),
+            (Float(a), Int(b)) => Ok(Bool(a < b as f64)),
+            (Float(a), Float(b)) => Ok(Bool(a < b)),
             _ => Err(anyhow!("'<' operands must be numeric")),
         },
-        NotPythonExprOp::GreaterEqual(_, _) => match (lhs, rhs) {
-            (Hashable(Int(a)), Hashable(Int(b))) => Ok(Hashable(Bool(a >= b))),
-            (Hashable(Int(a)), Float(b)) => Ok(Hashable(Bool((a as f64) >= b))),
-            (Float(a), Hashable(Int(b))) => Ok(Hashable(Bool(a >= b as f64))),
-            (Float(a), Float(b)) => Ok(Hashable(Bool(a >= b))),
+        BinaryOp::GreaterEqual => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Bool(a >= b)),
+            (Int(a), Float(b)) => Ok(Bool((a as f64) >= b)),
+            (Float(a), Int(b)) => Ok(Bool(a >= b as f64)),
+            (Float(a), Float(b)) => Ok(Bool(a >= b)),
             _ => Err(anyhow!("'>=' operands must be numeric")),
         },
-        NotPythonExprOp::LessEqual(_, _) => match (lhs, rhs) {
-            (Hashable(Int(a)), Hashable(Int(b))) => Ok(Hashable(Bool(a <= b))),
-            (Hashable(Int(a)), Float(b)) => Ok(Hashable(Bool((a as f64) <= b))),
-            (Float(a), Hashable(Int(b))) => Ok(Hashable(Bool(a <= b as f64))),
-            (Float(a), Float(b)) => Ok(Hashable(Bool(a <= b))),
+        BinaryOp::LessEqual => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Bool(a <= b)),
+            (Int(a), Float(b)) => Ok(Bool((a as f64) <= b)),
+            (Float(a), Int(b)) => Ok(Bool(a <= b as f64)),
+            (Float(a), Float(b)) => Ok(Bool(a <= b)),
             _ => Err(anyhow!("'<=' operands must be numeric")),
         },
-        NotPythonExprOp::In(_, _) => match rhs {
-            List(l) => Ok(Hashable(Bool(l.contains(&lhs)))),
-            Dict(d) => match lhs {
-                Hashable(k) => Ok(Hashable(Bool(d.contains_key(&k)))),
-                _ => Err(anyhow!("'in' for dicts requires a hashable key")),
-            },
+        BinaryOp::In => match rhs {
+            List(l) => Ok(Bool(l.contains(&lhs))),
+            Dict(d) => {
+                if let Some(k) = to_hashable(&lhs) {
+                    Ok(Bool(d.contains_key(&k)))
+                } else {
+                    Err(anyhow!("'in' for dicts requires a hashable key"))
+                }
+            }
             _ => Err(anyhow!(
                 "'in' requires a list or dict on the right-hand side"
             )),
         },
-        _ => unreachable!("eval_binary_op called with unary op"),
     }
 }
 
@@ -541,12 +556,10 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
     meta: &mut Meta,
 ) -> anyhow::Result<ProgramValue> {
     match expr {
-        NotPythonExpr::Int(i) => Ok(ProgramValue::Hashable(HashableProgramValue::Int(*i))),
+        NotPythonExpr::Int(i) => Ok(ProgramValue::Int(*i)),
         NotPythonExpr::Float(f) => Ok(ProgramValue::Float(*f)),
-        NotPythonExpr::String(s) => Ok(ProgramValue::Hashable(HashableProgramValue::String(
-            s.clone(),
-        ))),
-        NotPythonExpr::Boolean(b) => Ok(ProgramValue::Hashable(HashableProgramValue::Bool(*b))),
+        NotPythonExpr::String(s) => Ok(ProgramValue::String(s.clone())),
+        NotPythonExpr::Boolean(b) => Ok(ProgramValue::Bool(*b)),
         NotPythonExpr::None => Ok(ProgramValue::None),
         NotPythonExpr::Variable(var) => state.get_variable(var).cloned(),
         NotPythonExpr::List(l) => Ok(ProgramValue::List(Box::new(
@@ -559,38 +572,23 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
             for (k, v) in d {
                 let key = eval_expr(k, state, meta)?;
                 let val = eval_expr(v, state, meta)?;
-                match key {
-                    ProgramValue::Hashable(h) => {
+                match to_hashable(&key) {
+                    Some(h) => {
                         map.insert(h, val);
                     }
-                    _ => return Err(anyhow!("Dict keys must be hashable (int, string, or bool)")),
+                    None => {
+                        return Err(anyhow!("Dict keys must be hashable (int, string, or bool)"));
+                    }
                 }
             }
             Ok(ProgramValue::Dict(Box::new(map)))
         }
-        NotPythonExpr::Op(o) => match o {
-            NotPythonExprOp::Add(lhs, rhs)
-            | NotPythonExprOp::Sub(lhs, rhs)
-            | NotPythonExprOp::Mul(lhs, rhs)
-            | NotPythonExprOp::Div(lhs, rhs)
-            | NotPythonExprOp::Mod(lhs, rhs)
-            | NotPythonExprOp::And(lhs, rhs)
-            | NotPythonExprOp::Or(lhs, rhs)
-            | NotPythonExprOp::Equal(lhs, rhs)
-            | NotPythonExprOp::NotEqual(lhs, rhs)
-            | NotPythonExprOp::Greater(lhs, rhs)
-            | NotPythonExprOp::Less(lhs, rhs)
-            | NotPythonExprOp::GreaterEqual(lhs, rhs)
-            | NotPythonExprOp::LessEqual(lhs, rhs)
-            | NotPythonExprOp::In(lhs, rhs) => eval_binary_op(
-                eval_expr(lhs, state, meta)?,
-                eval_expr(rhs, state, meta)?,
-                o,
-            ),
-            NotPythonExprOp::Neg(val) | NotPythonExprOp::Not(val) => {
-                eval_unary_op(eval_expr(val, state, meta)?, o)
-            }
-        },
+        NotPythonExpr::BinaryOp(op, lhs, rhs) => eval_binary_op(
+            eval_expr(lhs, state, meta)?,
+            eval_expr(rhs, state, meta)?,
+            *op,
+        ),
+        NotPythonExpr::UnaryOp(op, val) => eval_unary_op(eval_expr(val, state, meta)?, *op),
         NotPythonExpr::Call(name, args) => {
             let func = state.get_function(name)?;
             func.call(name, args, state, meta)
@@ -600,7 +598,7 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
             let lhs = state.get_variable(lhs)?;
             match lhs {
                 ProgramValue::List(l) => match rhs {
-                    ProgramValue::Hashable(HashableProgramValue::Int(i)) => l
+                    ProgramValue::Int(i) => l
                         .get(i as usize)
                         .ok_or(anyhow!("Index {i} out of range"))
                         .cloned(),
@@ -608,11 +606,9 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
                         "Index operator on lists can only be used with integers."
                     )),
                 },
-                ProgramValue::Dict(d) => match rhs {
-                    ProgramValue::Hashable(rhs) => {
-                        d.get(&rhs).ok_or(anyhow!("Key not found in dict")).cloned()
-                    }
-                    _ => Err(anyhow!(
+                ProgramValue::Dict(d) => match to_hashable(&rhs) {
+                    Some(k) => d.get(&k).ok_or(anyhow!("Key not found in dict")).cloned(),
+                    None => Err(anyhow!(
                         "Index operator on dicts can only be used with integers, bools, or strings."
                     )),
                 },
@@ -628,7 +624,6 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
 mod tests {
     use super::*;
     use crate::parser::parse_program;
-    use std::ops::Deref;
 
     impl CompilingMetadata for u32 {
         type Diff = i32;
@@ -662,7 +657,7 @@ mod tests {
         let mut state = ProgramExecutionState {
             control_flow: ProgramExecutionControlFlow::Normal,
             call_stack: vec![ProgramExecutionCallState::new(10)],
-            predefined_functions: HashMap::new(),
+            predefined_functions: LinearMap::new(),
             pure_caches: HashMap::new(),
         };
         compile_stmt(&program.statement, &mut state, &mut ()).unwrap_err()
