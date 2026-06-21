@@ -1,4 +1,5 @@
 use crate::parser::{NotPythonExpr, NotPythonExprOp, NotPythonStmt};
+use crate::visitor::Visitor;
 
 enum Lit {
     Int(i64),
@@ -133,115 +134,47 @@ fn fold_unary(val: &Lit, op: &NotPythonExprOp) -> Option<Lit> {
     }
 }
 
-pub fn fold_expr(expr: &mut NotPythonExpr) {
-    // Recurse into children first (post-order)
-    match expr {
-        NotPythonExpr::Op(op) => match op {
-            NotPythonExprOp::Add(l, r)
-            | NotPythonExprOp::Sub(l, r)
-            | NotPythonExprOp::Mul(l, r)
-            | NotPythonExprOp::Div(l, r)
-            | NotPythonExprOp::Mod(l, r)
-            | NotPythonExprOp::And(l, r)
-            | NotPythonExprOp::Or(l, r)
-            | NotPythonExprOp::Equal(l, r)
-            | NotPythonExprOp::NotEqual(l, r)
-            | NotPythonExprOp::Greater(l, r)
-            | NotPythonExprOp::Less(l, r)
-            | NotPythonExprOp::GreaterEqual(l, r)
-            | NotPythonExprOp::LessEqual(l, r)
-            | NotPythonExprOp::In(l, r) => {
-                fold_expr(l);
-                fold_expr(r);
-            }
-            NotPythonExprOp::Neg(v) | NotPythonExprOp::Not(v) => {
-                fold_expr(v);
-            }
-        },
-        NotPythonExpr::List(l) => {
-            for e in l {
-                fold_expr(e);
-            }
-        }
-        NotPythonExpr::Dict(d) => {
-            for (k, v) in d {
-                fold_expr(k);
-                fold_expr(v);
-            }
-        }
-        NotPythonExpr::Call(_, args) => {
-            for a in args {
-                fold_expr(a);
-            }
-        }
-        NotPythonExpr::Index(_, r) => {
-            fold_expr(r);
-        }
-        _ => return,
-    }
+struct ConstantFolder;
 
-    // Try to fold this Op node into a literal
-    let folded = if let NotPythonExpr::Op(op) = &*expr {
-        match op {
-            NotPythonExprOp::Neg(v) | NotPythonExprOp::Not(v) => {
-                expr_to_lit(v).and_then(|l| fold_unary(&l, op))
+impl Visitor for ConstantFolder {
+    fn post_expr(&mut self, expr: NotPythonExpr) -> NotPythonExpr {
+        let folded = if let NotPythonExpr::Op(ref op) = expr {
+            match op {
+                NotPythonExprOp::Neg(v) | NotPythonExprOp::Not(v) => {
+                    expr_to_lit(v).and_then(|l| fold_unary(&l, op))
+                }
+                NotPythonExprOp::Add(l, r)
+                | NotPythonExprOp::Sub(l, r)
+                | NotPythonExprOp::Mul(l, r)
+                | NotPythonExprOp::Div(l, r)
+                | NotPythonExprOp::Mod(l, r)
+                | NotPythonExprOp::And(l, r)
+                | NotPythonExprOp::Or(l, r)
+                | NotPythonExprOp::Equal(l, r)
+                | NotPythonExprOp::NotEqual(l, r)
+                | NotPythonExprOp::Greater(l, r)
+                | NotPythonExprOp::Less(l, r)
+                | NotPythonExprOp::GreaterEqual(l, r)
+                | NotPythonExprOp::LessEqual(l, r)
+                | NotPythonExprOp::In(l, r) => expr_to_lit(l)
+                    .zip(expr_to_lit(r))
+                    .and_then(|(ll, rl)| fold_binary(&ll, &rl, op)),
             }
-            NotPythonExprOp::Add(l, r)
-            | NotPythonExprOp::Sub(l, r)
-            | NotPythonExprOp::Mul(l, r)
-            | NotPythonExprOp::Div(l, r)
-            | NotPythonExprOp::Mod(l, r)
-            | NotPythonExprOp::And(l, r)
-            | NotPythonExprOp::Or(l, r)
-            | NotPythonExprOp::Equal(l, r)
-            | NotPythonExprOp::NotEqual(l, r)
-            | NotPythonExprOp::Greater(l, r)
-            | NotPythonExprOp::Less(l, r)
-            | NotPythonExprOp::GreaterEqual(l, r)
-            | NotPythonExprOp::LessEqual(l, r)
-            | NotPythonExprOp::In(l, r) => expr_to_lit(l)
-                .zip(expr_to_lit(r))
-                .and_then(|(ll, rl)| fold_binary(&ll, &rl, op)),
-        }
-    } else {
-        None
-    };
-
-    if let Some(lit) = folded {
-        *expr = lit_to_expr(lit);
+        } else {
+            None
+        };
+        folded.map(lit_to_expr).unwrap_or(expr)
     }
 }
 
+pub fn fold_expr(expr: &mut NotPythonExpr) {
+    let owned = std::mem::replace(expr, NotPythonExpr::None);
+    *expr = ConstantFolder.visit_expr(owned);
+}
+
 pub fn fold_stmt(stmt: &mut NotPythonStmt) {
-    match stmt {
-        NotPythonStmt::Call(_, args) => {
-            for arg in args {
-                fold_expr(arg);
-            }
-        }
-        NotPythonStmt::Pass | NotPythonStmt::Break | NotPythonStmt::Continue => {}
-        NotPythonStmt::Block(stmts) => {
-            for s in stmts {
-                fold_stmt(s);
-            }
-        }
-        NotPythonStmt::Decl(_, expr) | NotPythonStmt::Assign(_, expr) => fold_expr(expr),
-        NotPythonStmt::Return(Some(expr)) => fold_expr(expr),
-        NotPythonStmt::Return(None) => {}
-        NotPythonStmt::If {
-            condition,
-            then,
-            else_,
-        } => {
-            fold_expr(condition);
-            fold_stmt(then);
-            if let Some(e) = else_ {
-                fold_stmt(e);
-            }
-        }
-        NotPythonStmt::Loop(body) => fold_stmt(body),
-        NotPythonStmt::Function { body, .. } => fold_stmt(body),
-    }
+    let owned = std::mem::replace(stmt, NotPythonStmt::Pass);
+    *stmt = ConstantFolder.visit_stmt(owned);
 }
 
 #[cfg(test)]
