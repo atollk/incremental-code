@@ -1,8 +1,9 @@
-use crate::parser::{NotPythonExpr, NotPythonExprOp, NotPythonProgram, NotPythonStmt};
+use crate::parser::{
+    NotPythonExpr, NotPythonExprOp, NotPythonExprVariable, NotPythonProgram, NotPythonStmt,
+};
 use anyhow::{anyhow, bail};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
-use std::ops::Deref;
 
 pub trait CompilingMetadata: Clone {
     type Diff;
@@ -74,7 +75,7 @@ enum ProgramExecutionControlFlow {
 
 #[derive(Default)]
 struct ProgramExecutionCallState<'a> {
-    variables: HashMap<&'a str, ProgramValue>,
+    variables: HashMap<usize, ProgramValue>, // TODO: replace by Vec
     functions: HashMap<&'a str, &'a NotPythonStmt>,
     loop_nesting: usize,
     is_pure: bool,
@@ -148,7 +149,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     ..Default::default()
                 };
                 for (param, val) in params.iter().zip(arg_values) {
-                    frame.variables.insert(param.as_str(), val);
+                    frame.variables.insert(param.index, val);
                 }
                 let meta_clone = meta.clone();
                 state.call_stack.push(frame);
@@ -189,50 +190,60 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
         self.call_stack.last().map(|f| f.is_pure).unwrap_or(false)
     }
 
-    fn get_variable(&self, name: &str) -> anyhow::Result<&ProgramValue> {
+    fn get_variable(&self, variable: &NotPythonExprVariable) -> anyhow::Result<&ProgramValue> {
         if self.in_pure_context() {
             // Only look in the top (pure) frame.
             return self
                 .call_stack
                 .last()
-                .and_then(|f| f.variables.get(name))
-                .ok_or_else(|| anyhow!("Pure function accesses non-local variable '{name}'"));
+                .and_then(|f| f.variables.get(&variable.index))
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Pure function accesses non-local variable '{}'",
+                        variable.name
+                    )
+                });
         }
         for call_state in self.call_stack.iter().rev() {
-            if let Some(value) = call_state.variables.get(name) {
+            if let Some(value) = call_state.variables.get(&variable.index) {
                 return Ok(value);
             }
         }
-        Err(anyhow::format_err!("Variable {name} not found"))
+        Err(anyhow::format_err!("Variable {} not found", variable.name))
     }
 
-    fn decl_variable(&mut self, name: &'a str, value: ProgramValue) {
+    fn decl_variable(&mut self, variable: &NotPythonExprVariable, value: ProgramValue) {
         self.call_stack
             .last_mut()
             .unwrap()
             .variables
-            .insert(name, value);
+            .insert(variable.index, value);
     }
 
-    fn assign_variable(&mut self, name: &str, value: ProgramValue) -> anyhow::Result<()> {
+    fn assign_variable(
+        &mut self,
+        variable: &NotPythonExprVariable,
+        value: ProgramValue,
+    ) -> anyhow::Result<()> {
         if self.in_pure_context() {
             // Only allow assigning to locals in the top (pure) frame.
             let frame = self.call_stack.last_mut().unwrap();
-            if let Some(v) = frame.variables.get_mut(name) {
+            if let Some(v) = frame.variables.get_mut(&variable.index) {
                 *v = value;
                 return Ok(());
             }
             return Err(anyhow!(
-                "Pure function accesses non-local variable '{name}'"
+                "Pure function accesses non-local variable '{}'",
+                variable.name
             ));
         }
         for call_state in self.call_stack.iter_mut().rev() {
-            if let Some(v) = call_state.variables.get_mut(name) {
+            if let Some(v) = call_state.variables.get_mut(&variable.index) {
                 *v = value;
                 return Ok(());
             }
         }
-        Err(anyhow!("Variable {} not found", name))
+        Err(anyhow!("Variable {} not found", variable.name))
     }
 
     fn decl_function(&mut self, name: &'a str, stmt: &'a NotPythonStmt) {
@@ -301,15 +312,15 @@ fn compile_stmt<'a, Meta: CompilingMetadata>(
             );
             meta.log_atomic_instruction()?;
         }
-        NotPythonStmt::Decl(name, expr) => {
+        NotPythonStmt::Decl(var, expr) => {
             let expr = eval_expr(expr, state, meta)?;
-            state.decl_variable(name, expr);
+            state.decl_variable(var, expr);
             meta.log_atomic_instruction()?;
         }
-        NotPythonStmt::Assign(name, expr) => {
-            state.get_variable(name)?;
+        NotPythonStmt::Assign(var, expr) => {
+            state.get_variable(var)?;
             let expr = eval_expr(expr, state, meta)?;
-            state.assign_variable(name, expr)?;
+            state.assign_variable(var, expr)?;
             meta.log_atomic_instruction()?;
         }
         NotPythonStmt::If {
@@ -513,7 +524,7 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
         ))),
         NotPythonExpr::Boolean(b) => Ok(ProgramValue::Hashable(HashableProgramValue::Bool(*b))),
         NotPythonExpr::None => Ok(ProgramValue::None),
-        NotPythonExpr::Identifier(name) => state.get_variable(name).cloned(),
+        NotPythonExpr::Variable(var) => state.get_variable(var).cloned(),
         NotPythonExpr::List(l) => Ok(ProgramValue::List(
             l.iter()
                 .map(|ex| eval_expr(ex, state, meta))
@@ -556,17 +567,13 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
                 eval_unary_op(eval_expr(val, state, meta)?, o)
             }
         },
-        NotPythonExpr::Call(name_expr, args) => {
-            let name = match name_expr.deref() {
-                NotPythonExpr::Identifier(n) => n.as_str(),
-                _ => return Err(anyhow!("Can only call named functions")),
-            };
+        NotPythonExpr::Call(name, args) => {
             let func = state.get_function(name)?;
             func.call(name, args, state, meta)
         }
         NotPythonExpr::Index(lhs, rhs) => {
-            let lhs = eval_expr(lhs, state, meta)?;
             let rhs = eval_expr(rhs, state, meta)?;
+            let lhs = state.get_variable(lhs)?;
             match lhs {
                 ProgramValue::List(l) => match rhs {
                     ProgramValue::Hashable(HashableProgramValue::Int(i)) => l

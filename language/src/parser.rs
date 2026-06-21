@@ -1,3 +1,4 @@
+use crate::index_variables::index_named_variable_access;
 use crate::lexer::NotPythonLangToken;
 use chumsky::{
     input::{Stream, ValueInput},
@@ -30,6 +31,21 @@ pub enum NotPythonExprOp {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct NotPythonExprVariable {
+    pub name: String,
+    pub index: usize,
+}
+
+impl Into<NotPythonExprVariable> for String {
+    fn into(self) -> NotPythonExprVariable {
+        NotPythonExprVariable {
+            name: self,
+            index: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum NotPythonExpr {
     // Atoms
     Int(i64),
@@ -37,14 +53,14 @@ pub enum NotPythonExpr {
     String(String),
     Boolean(bool),
     None,
-    Identifier(String),
+    Variable(NotPythonExprVariable),
 
     // Non-atoms
     List(Vec<NotPythonExpr>),
     Dict(Vec<(NotPythonExpr, NotPythonExpr)>),
     Op(NotPythonExprOp),
-    Call(Box<NotPythonExpr>, Vec<NotPythonExpr>),
-    Index(Box<NotPythonExpr>, Box<NotPythonExpr>),
+    Call(String, Vec<NotPythonExpr>),
+    Index(NotPythonExprVariable, Box<NotPythonExpr>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,8 +71,8 @@ pub enum NotPythonStmt {
     Block(Vec<NotPythonStmt>),
 
     // Variables
-    Decl(String, NotPythonExpr),
-    Assign(String, NotPythonExpr),
+    Decl(NotPythonExprVariable, NotPythonExpr),
+    Assign(NotPythonExprVariable, NotPythonExpr),
 
     // Control
     If {
@@ -72,7 +88,7 @@ pub enum NotPythonStmt {
     // Function
     Function {
         name: String,
-        params: Vec<String>,
+        params: Vec<NotPythonExprVariable>,
         body: Box<NotPythonStmt>,
         is_pure: bool,
     },
@@ -123,7 +139,7 @@ where
             NotPythonLangToken::KwTrue => NotPythonExpr::Boolean(true),
             NotPythonLangToken::KwFalse => NotPythonExpr::Boolean(false),
             NotPythonLangToken::KwNone => NotPythonExpr::None,
-            NotPythonLangToken::Identifier(s) => NotPythonExpr::Identifier(s),
+            NotPythonLangToken::Identifier(s) => NotPythonExpr::Variable(s.into()),
         }
         .boxed();
         let list = expr
@@ -161,18 +177,14 @@ where
                         just(NotPythonLangToken::RParen),
                     ),
             )
-            .map(|(name, args)| {
-                NotPythonExpr::Call(Box::new(NotPythonExpr::Identifier(name)), args)
-            })
+            .map(|(name, args)| NotPythonExpr::Call(name, args))
             .boxed();
         let index = select! { NotPythonLangToken::Identifier(s) => s }
             .then(expr.clone().delimited_by(
                 just(NotPythonLangToken::LBracket),
                 just(NotPythonLangToken::RBracket),
             ))
-            .map(|(name, idx)| {
-                NotPythonExpr::Index(Box::new(NotPythonExpr::Identifier(name)), Box::new(idx))
-            })
+            .map(|(name, idx)| NotPythonExpr::Index(name.into(), Box::new(idx)))
             .boxed();
         let base = choice((call, index, list, dict, atom));
 
@@ -277,7 +289,7 @@ where
             .then_ignore(just(NotPythonLangToken::ColonEqual))
             .then(expression.clone())
             .then_ignore(semi_line_end.clone())
-            .map(|(name, expr)| NotPythonStmt::Decl(name, expr))
+            .map(|(name, expr)| NotPythonStmt::Decl(name.into(), expr))
             .boxed();
 
         // name = expr;
@@ -285,7 +297,7 @@ where
             .then_ignore(just(NotPythonLangToken::Equal))
             .then(expression.clone())
             .then_ignore(semi_line_end.clone())
-            .map(|(name, expr)| NotPythonStmt::Assign(name, expr))
+            .map(|(name, expr)| NotPythonStmt::Assign(name.into(), expr))
             .boxed();
 
         // name(args...);
@@ -390,7 +402,7 @@ where
             .map(
                 |(((pure_tok, name), params), body)| NotPythonStmt::Function {
                     name,
-                    params,
+                    params: params.iter().map(|p| p.clone().into()).collect(),
                     body: Box::new(body),
                     is_pure: pure_tok.is_some(),
                 },
@@ -435,7 +447,10 @@ fn parse<'a>(src: &'a str) -> Result<NotPythonStmt, Vec<Rich<'a, NotPythonLangTo
         // Tell chumsky to split the (Token, SimpleSpan) stream into its parts so that it can handle the spans for us
         // This involves giving chumsky an 'end of input' span: we just use a zero-width span at the end of the string
         .map((0..src.len()).into(), |(t, s): (_, _)| (t, s));
-    parser().parse(token_stream).into_result()
+    parser()
+        .parse(token_stream)
+        .into_result()
+        .map(|root| index_named_variable_access(root))
 }
 
 /// The root AST node produced by [`parse_program`].
@@ -694,7 +709,7 @@ mod tests {
                 name: "foo".into(),
                 params: vec!["x".into()],
                 body: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Return(Some(
-                    NotPythonExpr::Identifier("x".into())
+                    "x".into()
                 ))])),
                 is_pure: true,
             }]
@@ -774,7 +789,7 @@ end
                 NotPythonStmt::Loop(Box::new(NotPythonStmt::Block(vec![
                     NotPythonStmt::If {
                         condition: NotPythonExpr::Op(NotPythonExprOp::Equal(
-                            Box::new(NotPythonExpr::Identifier("x".into())),
+                            Box::new(NotPythonExpr::Variable("x".into())),
                             Box::new(NotPythonExpr::Int(1000)),
                         )),
                         then: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Break])),
@@ -783,7 +798,7 @@ end
                     NotPythonStmt::Assign(
                         "x".into(),
                         NotPythonExpr::Op(NotPythonExprOp::Add(
-                            Box::new(NotPythonExpr::Identifier("x".into())),
+                            Box::new(NotPythonExpr::Variable("x".into())),
                             Box::new(NotPythonExpr::Int(1)),
                         )),
                     ),

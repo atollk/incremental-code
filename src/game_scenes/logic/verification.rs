@@ -65,7 +65,7 @@ fn verify_expr(expr: &NotPythonExpr, strings_allowed: bool, max_int: i64) -> any
         NotPythonExpr::Float(_)
         | NotPythonExpr::Boolean(_)
         | NotPythonExpr::None
-        | NotPythonExpr::Identifier(_) => {}
+        | NotPythonExpr::Variable(_) => {}
         NotPythonExpr::List(elems) => {
             for e in elems {
                 verify_expr(e, strings_allowed, max_int)?;
@@ -78,14 +78,12 @@ fn verify_expr(expr: &NotPythonExpr, strings_allowed: bool, max_int: i64) -> any
             }
         }
         NotPythonExpr::Op(op) => verify_expr_op(op, strings_allowed, max_int)?,
-        NotPythonExpr::Call(callee, args) => {
-            verify_expr(callee, strings_allowed, max_int)?;
+        NotPythonExpr::Call(_, args) => {
             for a in args {
                 verify_expr(a, strings_allowed, max_int)?;
             }
         }
-        NotPythonExpr::Index(base, idx) => {
-            verify_expr(base, strings_allowed, max_int)?;
+        NotPythonExpr::Index(_, idx) => {
             verify_expr(idx, strings_allowed, max_int)?;
         }
     }

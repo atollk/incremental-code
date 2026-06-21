@@ -169,14 +169,12 @@ pub fn fold_expr(expr: &mut NotPythonExpr) {
                 fold_expr(v);
             }
         }
-        NotPythonExpr::Call(callee, args) => {
-            fold_expr(callee);
+        NotPythonExpr::Call(_, args) => {
             for a in args {
                 fold_expr(a);
             }
         }
-        NotPythonExpr::Index(l, r) => {
-            fold_expr(l);
+        NotPythonExpr::Index(_, r) => {
             fold_expr(r);
         }
         _ => return,
