@@ -1,6 +1,7 @@
 use crate::parser::{
     BinaryOp, NotPythonExpr, NotPythonExprVariable, NotPythonProgram, NotPythonStmt, UnaryOp,
 };
+use crate::string_hasher::HashedString;
 use anyhow::{anyhow, bail};
 use linear_map::LinearMap;
 use smallvec::SmallVec;
@@ -50,7 +51,7 @@ pub fn compile_with_meta<Meta: CompilingMetadata>(
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub enum HashableProgramValue {
     Int(i64),
-    String(String),
+    String(u64),
     Bool(bool),
 }
 
@@ -58,7 +59,7 @@ pub enum HashableProgramValue {
 pub enum ProgramValue {
     Int(i64),
     Float(f64),
-    String(String),
+    String(HashedString),
     Bool(bool),
     None,
     List(Box<Vec<ProgramValue>>),
@@ -68,7 +69,7 @@ pub enum ProgramValue {
 fn to_hashable(v: &ProgramValue) -> Option<HashableProgramValue> {
     match v {
         ProgramValue::Int(i) => Some(HashableProgramValue::Int(*i)),
-        ProgramValue::String(s) => Some(HashableProgramValue::String(s.clone())),
+        ProgramValue::String(s) => Some(HashableProgramValue::String(s.hash)),
         ProgramValue::Bool(b) => Some(HashableProgramValue::Bool(*b)),
         _ => None,
     }
@@ -444,7 +445,7 @@ fn eval_binary_op(
             (Int(a), Float(b)) => Ok(Float(a as f64 + b)),
             (Float(a), Int(b)) => Ok(Float(a + b as f64)),
             (Float(a), Float(b)) => Ok(Float(a + b)),
-            (String(a), String(b)) => Ok(String(a + &b)),
+            (String(a), String(b)) => Ok(String(a + b)),
             _ => Err(anyhow!("'+' operands must be numeric or both strings")),
         },
         BinaryOp::Sub => match (lhs, rhs) {
@@ -558,7 +559,7 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
     match expr {
         NotPythonExpr::Int(i) => Ok(ProgramValue::Int(*i)),
         NotPythonExpr::Float(f) => Ok(ProgramValue::Float(*f)),
-        NotPythonExpr::String(s) => Ok(ProgramValue::String(s.clone())),
+        NotPythonExpr::String((_, hs)) => Ok(ProgramValue::String(*hs)),
         NotPythonExpr::Boolean(b) => Ok(ProgramValue::Bool(*b)),
         NotPythonExpr::None => Ok(ProgramValue::None),
         NotPythonExpr::Variable(var) => state.get_variable(var).cloned(),

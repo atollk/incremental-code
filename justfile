@@ -20,7 +20,7 @@ test:
 bench_test:
     #!/usr/bin/env bash
     set -x
-    export TEST_NAME=stage_d_gains_silver
+    export TEST_NAME=stage_e_has_print_len
     BUILD_OUTPUT=$(cargo test --profile profiling --features tui --no-run 2>&1)
     BIN_PATH=$(echo "$BUILD_OUTPUT" | sed -n 's/.*(\(.*\))/\1/p' | tail -n1)
     if [[ $(uname -a) == *"Linux"* ]]; then

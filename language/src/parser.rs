@@ -1,5 +1,6 @@
 use crate::index_variables::index_named_variable_access;
 use crate::lexer::NotPythonLangToken;
+use crate::string_hasher::HashedString;
 use chumsky::{
     input::{Stream, ValueInput},
     prelude::*,
@@ -52,7 +53,7 @@ pub enum NotPythonExpr {
     // Atoms
     Int(i64),
     Float(f64),
-    String(String),
+    String((String, HashedString)),
     Boolean(bool),
     None,
     Variable(NotPythonExprVariable),
@@ -133,7 +134,10 @@ where
         let atom = select! {
             NotPythonLangToken::Int(s) => NotPythonExpr::Int(s.parse::<i64>().unwrap()),
             NotPythonLangToken::Float(s) => NotPythonExpr::Float(s.parse::<f64>().unwrap()),
-            NotPythonLangToken::StringLiteral(s) => NotPythonExpr::String(s),
+            NotPythonLangToken::StringLiteral(s) => {
+                let hash = HashedString::from(s.as_str());
+                NotPythonExpr::String((s, hash))
+            },
             NotPythonLangToken::KwTrue => NotPythonExpr::Boolean(true),
             NotPythonLangToken::KwFalse => NotPythonExpr::Boolean(false),
             NotPythonLangToken::KwNone => NotPythonExpr::None,

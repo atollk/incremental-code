@@ -1,10 +1,9 @@
-#![feature(iter_collect_into)]
-
 mod compile;
 mod fold_constants;
 mod index_variables;
 mod lexer;
 mod parser;
+pub mod string_hasher;
 mod visitor;
 
 pub use compile::{

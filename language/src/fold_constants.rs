@@ -1,4 +1,5 @@
 use crate::parser::{BinaryOp, NotPythonExpr, NotPythonStmt, UnaryOp};
+use crate::string_hasher::HashedString;
 use crate::visitor::Visitor;
 
 enum Lit {
@@ -13,7 +14,7 @@ fn expr_to_lit(expr: &NotPythonExpr) -> Option<Lit> {
         NotPythonExpr::Int(i) => Some(Lit::Int(*i)),
         NotPythonExpr::Float(f) => Some(Lit::Float(*f)),
         NotPythonExpr::Boolean(b) => Some(Lit::Bool(*b)),
-        NotPythonExpr::String(s) => Some(Lit::Str(s.clone())),
+        NotPythonExpr::String((s, _)) => Some(Lit::Str(s.clone())),
         _ => None,
     }
 }
@@ -23,7 +24,10 @@ fn lit_to_expr(lit: Lit) -> NotPythonExpr {
         Lit::Int(i) => NotPythonExpr::Int(i),
         Lit::Float(f) => NotPythonExpr::Float(f),
         Lit::Bool(b) => NotPythonExpr::Boolean(b),
-        Lit::Str(s) => NotPythonExpr::String(s),
+        Lit::Str(s) => {
+            let hs = HashedString::from(s.as_str());
+            NotPythonExpr::String((s, hs))
+        }
     }
 }
 
@@ -145,11 +149,6 @@ impl Visitor for ConstantFolder {
         };
         folded.map(lit_to_expr).unwrap_or(expr)
     }
-}
-
-pub fn fold_expr(expr: &mut NotPythonExpr) {
-    let owned = std::mem::replace(expr, NotPythonExpr::None);
-    *expr = ConstantFolder.visit_expr(owned);
 }
 
 pub fn fold_stmt(stmt: &mut NotPythonStmt) {

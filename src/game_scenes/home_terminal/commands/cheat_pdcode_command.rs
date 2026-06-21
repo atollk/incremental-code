@@ -251,7 +251,7 @@ mod tests {
     use super::*;
     use crate::game_scenes::logic::compilation::WipCompilingProgram;
     use crate::game_state::{CompiledProgram, Upgrade, Upgrades};
-    use language::{FnArgVec, PredefinedFunction, ProgramValue, compile_with_meta};
+    use language::{PredefinedFunction, ProgramValue, compile_with_meta};
     use std::collections::HashMap;
 
     fn make_upgrades(
@@ -412,7 +412,7 @@ mod tests {
         let ProgramValue::String(s) = args.into_iter().next().expect("print: needs arg") else {
             anyhow::bail!("print: string arg");
         };
-        meta.program.print_len = Some(s.len() as u64).max(meta.program.print_len);
+        meta.program.print_len = Some(s.len()).max(meta.program.print_len);
         Ok(ProgramValue::None)
     }
 

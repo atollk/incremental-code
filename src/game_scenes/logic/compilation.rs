@@ -2,8 +2,7 @@ use crate::game_state::{CompiledProgram, with_game_state};
 use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use language::{
-    CompilingMetadata, FnArgVec, NotPythonProgram, PredefinedFunction, ProgramValue,
-    compile_with_meta,
+    CompilingMetadata, NotPythonProgram, PredefinedFunction, ProgramValue, compile_with_meta,
 };
 use std::cell::RefCell;
 use std::cmp::max;
