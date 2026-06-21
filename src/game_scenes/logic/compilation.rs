@@ -98,6 +98,7 @@ fn predefined_functions() -> HashMap<&'static str, PredefinedFunction<WipCompili
 pub struct WipCompilingProgram {
     pub(crate) program: CompiledProgram,
     is_cancelled: Rc<RefCell<dyn FnMut() -> bool + 'static>>,
+    is_cancelled_debounce: u32,
     left_to_instruction_limit: u64,
 }
 
@@ -106,14 +107,19 @@ impl WipCompilingProgram {
         Self {
             program: CompiledProgram::new(),
             is_cancelled: Rc::new(RefCell::new(is_cancelled)),
+            is_cancelled_debounce: 0,
             left_to_instruction_limit: instruction_limit,
         }
     }
 
     fn check_cancel(&mut self) -> anyhow::Result<()> {
-        if (self.is_cancelled.borrow_mut())() {
-            bail!("Cancelling logic program");
+        if self.is_cancelled_debounce == 0 {
+            self.is_cancelled_debounce = 4096;
+            if self.is_cancelled.borrow_mut()() {
+                bail!("Cancelling logic program");
+            }
         }
+        self.is_cancelled_debounce -= 1;
         Ok(())
     }
 }
