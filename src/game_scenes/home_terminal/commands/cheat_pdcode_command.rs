@@ -466,7 +466,6 @@ mod tests {
 
     #[test]
     fn stage_d_gains_silver() {
-        // let u = make_upgrades(2, 2, 9, 3, true, false, false);
         let u = make_upgrades(2, 2, 9, 3, true, false, false);
         let gain = run_pd_program(&u).resource_gain();
         assert!(gain.silver.0 > 0.0, "stage D should earn silver from sleep");
@@ -475,7 +474,6 @@ mod tests {
 
     #[test]
     fn stage_e_has_print_len() {
-        return;
         let u = make_upgrades(2, 2, 9, 4, true, true, false);
         let program = run_pd_program(&u);
         assert!(
