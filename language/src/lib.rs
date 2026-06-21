@@ -1,5 +1,4 @@
 #![feature(iter_collect_into)]
-#![feature(iterator_try_collect)]
 
 mod compile;
 mod fold_constants;

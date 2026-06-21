@@ -2,7 +2,6 @@ use crate::parser::{
     NotPythonExpr, NotPythonExprOp, NotPythonExprVariable, NotPythonProgram, NotPythonStmt,
 };
 use anyhow::{anyhow, bail};
-use itertools::Itertools;
 use smallvec::SmallVec;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
@@ -89,29 +88,31 @@ impl ProgramExecutionCallState<'_> {
     }
 }
 
-pub type PredefinedFunction<const NArgs: usize, Meta> =
-    fn(&mut Meta, &[ProgramValue; NArgs]) -> anyhow::Result<ProgramValue>;
+pub type FnArgVec<T> = SmallVec<[T; 8]>;
 
-enum Callable<'a, const NArgs: usize, Meta: CompilingMetadata> {
-    PredefinedFunction(PredefinedFunction<NArgs, Meta>),
+pub type PredefinedFunction<Meta> =
+    fn(&mut Meta, FnArgVec<ProgramValue>) -> anyhow::Result<ProgramValue>;
+
+enum Callable<'a, Meta: CompilingMetadata> {
+    PredefinedFunction(PredefinedFunction<Meta>),
     UserFunction(&'a NotPythonStmt),
 }
 
-impl<'a, const NArgs: usize, Meta: CompilingMetadata> Callable<'a, NArgs, Meta> {
+impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
     fn call(
         self,
         name: &str,
-        args: &[NotPythonExpr; NArgs],
+        args: &[NotPythonExpr],
         state: &mut ProgramExecutionState<'a, Meta>,
         meta: &mut Meta,
     ) -> anyhow::Result<ProgramValue> {
-        let arg_values: [ProgramValue; NArgs] = args
-            .iter()
-            .map(|a| eval_expr(a, state, meta))
-            .process_results(|args| {
-            args.collect_array()
-                .ok_or(anyhow!("Tried to pass arg list of wrong size"))
-        })??;
+        let arg_values = {
+            let mut arg_values = FnArgVec::new();
+            for arg in args {
+                arg_values.push(eval_expr(arg, state, meta)?);
+            }
+            arg_values
+        };
         match self {
             Callable::PredefinedFunction(body) => body(meta, arg_values),
             Callable::UserFunction(NotPythonStmt::Function {
