@@ -2,36 +2,53 @@ use crate::parser::{
     BinaryOp, NotPythonExpr, NotPythonExprVariable, NotPythonProgram, NotPythonStmt, UnaryOp,
 };
 use crate::string_hasher::HashedString;
-use anyhow::{anyhow, bail};
 use linear_map::LinearMap;
 use smallvec::SmallVec;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 
+#[derive(thiserror::Error, Debug, Clone)]
+#[error("{msg}")]
+pub struct CompileError {
+    msg: String,
+}
+
+impl CompileError {
+    pub fn new(msg: String) -> Self {
+        Self { msg }
+    }
+}
+
+pub type CompileResult<T> = Result<T, CompileError>;
+
+fn new_compile_err<T>(msg: String) -> CompileResult<T> {
+    Err(CompileError { msg })
+}
+
 pub trait CompilingMetadata: Clone {
     type Diff;
-    fn log_zero_instruction(&mut self) -> anyhow::Result<()>;
-    fn log_atomic_instruction(&mut self) -> anyhow::Result<()>;
-    fn diff(&self, other: &Self) -> anyhow::Result<Self::Diff>;
-    fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()>;
+    fn log_zero_instruction(&mut self) -> CompileResult<()>;
+    fn log_atomic_instruction(&mut self) -> CompileResult<()>;
+    fn diff(&self, other: &Self) -> CompileResult<Self::Diff>;
+    fn add_assign(&mut self, diff: &Self::Diff) -> CompileResult<()>;
 }
 
 impl CompilingMetadata for () {
     type Diff = ();
 
-    fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
+    fn log_zero_instruction(&mut self) -> CompileResult<()> {
         Ok(())
     }
 
-    fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
+    fn log_atomic_instruction(&mut self) -> CompileResult<()> {
         Ok(())
     }
 
-    fn diff(&self, _other: &Self) -> anyhow::Result<Self::Diff> {
+    fn diff(&self, _other: &Self) -> CompileResult<Self::Diff> {
         Ok(())
     }
 
-    fn add_assign(&mut self, _diff: &Self::Diff) -> anyhow::Result<()> {
+    fn add_assign(&mut self, _diff: &Self::Diff) -> CompileResult<()> {
         Ok(())
     }
 }
@@ -42,7 +59,7 @@ pub fn compile_with_meta<Meta: CompilingMetadata>(
     program: &NotPythonProgram,
     predefined_functions: HashMap<&str, PredefinedFunction<Meta>>,
     meta: &mut Meta,
-) -> anyhow::Result<()> {
+) -> CompileResult<()> {
     let variable_len = 100; // TODO
     let mut state = ProgramExecutionState::new(variable_len, predefined_functions);
     compile_stmt(&program.statement, &mut state, meta)
@@ -101,9 +118,9 @@ impl ProgramExecutionCallState<'_> {
     }
 }
 
-pub type FnArgVec<T> = SmallVec<[T; 8]>;
+pub type FnArgVec<T> = SmallVec<[T; 4]>;
 
-pub type PredefinedFunction<Meta> = fn(&mut Meta, &[ProgramValue]) -> anyhow::Result<ProgramValue>;
+pub type PredefinedFunction<Meta> = fn(&mut Meta, &[ProgramValue]) -> CompileResult<ProgramValue>;
 
 enum Callable<'a, Meta: CompilingMetadata> {
     PredefinedFunction(PredefinedFunction<Meta>),
@@ -117,7 +134,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
         args: &[NotPythonExpr],
         state: &mut ProgramExecutionState<'a, Meta>,
         meta: &mut Meta,
-    ) -> anyhow::Result<ProgramValue> {
+    ) -> CompileResult<ProgramValue> {
         let arg_values = {
             let mut arg_values = FnArgVec::new();
             for arg in args {
@@ -134,12 +151,12 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                 name: fn_name,
             }) => {
                 if arg_values.len() != params.len() {
-                    bail!(
+                    return new_compile_err(format!(
                         "'{}' expects {} arguments but got {}",
                         name,
                         params.len(),
                         arg_values.len()
-                    );
+                    ));
                 }
 
                 let cache_key = if *is_pure {
@@ -147,14 +164,14 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     let cache_key: Vec<HashableProgramValue> = arg_values
                         .iter()
                         .map(|v| {
-                            to_hashable(v).ok_or_else(|| {
-                                anyhow::anyhow!(
+                            to_hashable(v).ok_or_else(|| CompileError {
+                                msg: format!(
                                     "Pure function '{}' received non-hashable argument",
                                     name
-                                )
+                                ),
                             })
                         })
-                        .collect::<anyhow::Result<_>>()?;
+                        .collect::<CompileResult<_>>()?;
 
                     // Cache hit: return immediately without executing the body.
                     if let Some((value, diff)) = state
@@ -203,7 +220,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
 
                 Ok(return_value)
             }
-            _ => bail!("'{}' is not a function", name),
+            _ => new_compile_err(format!("'{}' is not a function", name)),
         }
     }
 }
@@ -234,18 +251,18 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
         self.call_stack.last().map(|f| f.is_pure).unwrap_or(false)
     }
 
-    fn get_variable(&self, variable: &NotPythonExprVariable) -> anyhow::Result<&ProgramValue> {
+    fn get_variable(&self, variable: &NotPythonExprVariable) -> CompileResult<&ProgramValue> {
         if self.in_pure_context() {
             // Only look in the top (pure) frame.
             return self
                 .call_stack
                 .last()
                 .and_then(|f| f.variables.get(variable.index))
-                .ok_or_else(|| {
-                    anyhow!(
+                .ok_or_else(|| CompileError {
+                    msg: format!(
                         "Pure function accesses non-local variable '{}'",
                         variable.name
-                    )
+                    ),
                 });
         }
         for call_state in self.call_stack.iter().rev() {
@@ -253,7 +270,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
                 return Ok(value);
             }
         }
-        Err(anyhow::format_err!("Variable {} not found", variable.name))
+        new_compile_err(format!("Variable {} not found", variable.name))
     }
 
     fn decl_variable(&mut self, variable: &NotPythonExprVariable, value: ProgramValue) {
@@ -264,7 +281,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
         &mut self,
         variable: &NotPythonExprVariable,
         value: ProgramValue,
-    ) -> anyhow::Result<()> {
+    ) -> CompileResult<()> {
         if self.in_pure_context() {
             // Only allow assigning to locals in the top (pure) frame.
             let frame = self.call_stack.last_mut().unwrap();
@@ -272,7 +289,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
                 *v = value;
                 return Ok(());
             }
-            return Err(anyhow!(
+            return new_compile_err(format!(
                 "Pure function accesses non-local variable '{}'",
                 variable.name
             ));
@@ -283,7 +300,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
                 return Ok(());
             }
         }
-        Err(anyhow!("Variable {} not found", variable.name))
+        new_compile_err(format!("Variable {} not found", variable.name))
     }
 
     fn decl_function(&mut self, name: &'a str, stmt: &'a NotPythonStmt) {
@@ -294,7 +311,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
             .insert(name, stmt);
     }
 
-    fn get_function(&self, name: &str) -> anyhow::Result<Callable<'a, Meta>> {
+    fn get_function(&self, name: &str) -> CompileResult<Callable<'a, Meta>> {
         let in_pure = self.in_pure_context();
         for call_state in self.call_stack.iter().rev() {
             if let Some(&stmt) = call_state.functions.get(name) {
@@ -302,7 +319,9 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
                     // Inside a pure function, only pure user functions may be called.
                     if let NotPythonStmt::Function { is_pure, .. } = stmt {
                         if !is_pure {
-                            bail!("Pure function calls non-pure function '{name}'");
+                            return new_compile_err(format!(
+                                "Pure function calls non-pure function '{name}'"
+                            ));
                         }
                     }
                 }
@@ -313,7 +332,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
             // Predefined functions are always allowed, even from pure context.
             return Ok(Callable::PredefinedFunction(f));
         }
-        Err(anyhow!("Function {} not found", name))
+        new_compile_err(format!("Function {} not found", name))
     }
 }
 
@@ -321,7 +340,7 @@ fn compile_stmt<'a, Meta: CompilingMetadata>(
     stmt: &'a NotPythonStmt,
     state: &mut ProgramExecutionState<'a, Meta>,
     meta: &mut Meta,
-) -> anyhow::Result<()> {
+) -> CompileResult<()> {
     if matches!(state.control_flow, ProgramExecutionControlFlow::Return(_)) {
         meta.log_zero_instruction()?;
         return Ok(());
@@ -379,7 +398,7 @@ fn compile_stmt<'a, Meta: CompilingMetadata>(
                     meta.log_atomic_instruction()?;
                 }
             }
-            _ => bail!("Condition expression is not a boolean"),
+            _ => return new_compile_err("Condition expression is not a boolean".to_string()),
         },
         NotPythonStmt::Loop(body) => {
             state.call_stack.last_mut().unwrap().loop_nesting += 1;
@@ -418,16 +437,16 @@ fn compile_stmt<'a, Meta: CompilingMetadata>(
     Ok(())
 }
 
-fn eval_unary_op(val: ProgramValue, op: UnaryOp) -> anyhow::Result<ProgramValue> {
+fn eval_unary_op(val: ProgramValue, op: UnaryOp) -> CompileResult<ProgramValue> {
     match op {
         UnaryOp::Neg => match val {
             ProgramValue::Int(i) => Ok(ProgramValue::Int(-i)),
             ProgramValue::Float(f) => Ok(ProgramValue::Float(-f)),
-            _ => Err(anyhow!("Cannot negate non-numeric value")),
+            _ => new_compile_err("Cannot negate non-numeric value".to_string()),
         },
         UnaryOp::Not => match val {
             ProgramValue::Bool(b) => Ok(ProgramValue::Bool(!b)),
-            _ => Err(anyhow!("Cannot apply 'not' to non-boolean value")),
+            _ => new_compile_err("Cannot apply 'not' to non-boolean value".to_string()),
         },
     }
 }
@@ -436,7 +455,7 @@ fn eval_binary_op(
     lhs: ProgramValue,
     rhs: ProgramValue,
     op: BinaryOp,
-) -> anyhow::Result<ProgramValue> {
+) -> CompileResult<ProgramValue> {
     use ProgramValue::*;
 
     match op {
@@ -446,50 +465,50 @@ fn eval_binary_op(
             (Float(a), Int(b)) => Ok(Float(a + b as f64)),
             (Float(a), Float(b)) => Ok(Float(a + b)),
             (String(a), String(b)) => Ok(String(a + b)),
-            _ => Err(anyhow!("'+' operands must be numeric or both strings")),
+            _ => new_compile_err("'+' operands must be numeric or both strings".to_string()),
         },
         BinaryOp::Sub => match (lhs, rhs) {
             (Int(a), Int(b)) => Ok(Int(a - b)),
             (Int(a), Float(b)) => Ok(Float(a as f64 - b)),
             (Float(a), Int(b)) => Ok(Float(a - b as f64)),
             (Float(a), Float(b)) => Ok(Float(a - b)),
-            _ => Err(anyhow!("'-' operands must be numeric")),
+            _ => new_compile_err("'-' operands must be numeric".to_string()),
         },
         BinaryOp::Mul => match (lhs, rhs) {
             (Int(a), Int(b)) => Ok(Int(a * b)),
             (Int(a), Float(b)) => Ok(Float(a as f64 * b)),
             (Float(a), Int(b)) => Ok(Float(a * b as f64)),
             (Float(a), Float(b)) => Ok(Float(a * b)),
-            _ => Err(anyhow!("'*' operands must be numeric")),
+            _ => new_compile_err("'*' operands must be numeric".to_string()),
         },
         BinaryOp::Div => match (lhs, rhs) {
             (Int(a), Int(b)) => {
                 if b == 0 {
-                    return Err(anyhow!("Division by zero"));
+                    return new_compile_err("Division by zero".to_string());
                 }
                 Ok(Int(a / b))
             }
             (Int(a), Float(b)) => Ok(Float(a as f64 / b)),
             (Float(a), Int(b)) => Ok(Float(a / b as f64)),
             (Float(a), Float(b)) => Ok(Float(a / b)),
-            _ => Err(anyhow!("'/' operands must be numeric")),
+            _ => new_compile_err("'/' operands must be numeric".to_string()),
         },
         BinaryOp::Mod => match (lhs, rhs) {
             (Int(a), Int(b)) => {
                 if b == 0 {
-                    return Err(anyhow!("Modulo by zero"));
+                    return new_compile_err("Modulo by zero".to_string());
                 }
                 Ok(Int(a % b))
             }
-            _ => Err(anyhow!("'%' operands must be integers")),
+            _ => new_compile_err("'%' operands must be integers".to_string()),
         },
         BinaryOp::And => match (lhs, rhs) {
             (Bool(a), Bool(b)) => Ok(Bool(a && b)),
-            _ => Err(anyhow!("'and' operands must be booleans")),
+            _ => new_compile_err("'and' operands must be booleans".to_string()),
         },
         BinaryOp::Or => match (lhs, rhs) {
             (Bool(a), Bool(b)) => Ok(Bool(a || b)),
-            _ => Err(anyhow!("'or' operands must be booleans")),
+            _ => new_compile_err("'or' operands must be booleans".to_string()),
         },
         BinaryOp::Equal => match (lhs, rhs) {
             (Int(a), Int(b)) => Ok(Bool(a == b)),
@@ -512,28 +531,28 @@ fn eval_binary_op(
             (Int(a), Float(b)) => Ok(Bool((a as f64) > b)),
             (Float(a), Int(b)) => Ok(Bool(a > b as f64)),
             (Float(a), Float(b)) => Ok(Bool(a > b)),
-            _ => Err(anyhow!("'>' operands must be numeric")),
+            _ => new_compile_err("'>' operands must be numeric".to_string()),
         },
         BinaryOp::Less => match (lhs, rhs) {
             (Int(a), Int(b)) => Ok(Bool(a < b)),
             (Int(a), Float(b)) => Ok(Bool((a as f64) < b)),
             (Float(a), Int(b)) => Ok(Bool(a < b as f64)),
             (Float(a), Float(b)) => Ok(Bool(a < b)),
-            _ => Err(anyhow!("'<' operands must be numeric")),
+            _ => new_compile_err("'<' operands must be numeric".to_string()),
         },
         BinaryOp::GreaterEqual => match (lhs, rhs) {
             (Int(a), Int(b)) => Ok(Bool(a >= b)),
             (Int(a), Float(b)) => Ok(Bool((a as f64) >= b)),
             (Float(a), Int(b)) => Ok(Bool(a >= b as f64)),
             (Float(a), Float(b)) => Ok(Bool(a >= b)),
-            _ => Err(anyhow!("'>=' operands must be numeric")),
+            _ => new_compile_err("'>=' operands must be numeric".to_string()),
         },
         BinaryOp::LessEqual => match (lhs, rhs) {
             (Int(a), Int(b)) => Ok(Bool(a <= b)),
             (Int(a), Float(b)) => Ok(Bool((a as f64) <= b)),
             (Float(a), Int(b)) => Ok(Bool(a <= b as f64)),
             (Float(a), Float(b)) => Ok(Bool(a <= b)),
-            _ => Err(anyhow!("'<=' operands must be numeric")),
+            _ => new_compile_err("'<=' operands must be numeric".to_string()),
         },
         BinaryOp::In => match rhs {
             List(l) => Ok(Bool(l.contains(&lhs))),
@@ -541,12 +560,10 @@ fn eval_binary_op(
                 if let Some(k) = to_hashable(&lhs) {
                     Ok(Bool(d.contains_key(&k)))
                 } else {
-                    Err(anyhow!("'in' for dicts requires a hashable key"))
+                    new_compile_err("'in' for dicts requires a hashable key".to_string())
                 }
             }
-            _ => Err(anyhow!(
-                "'in' requires a list or dict on the right-hand side"
-            )),
+            _ => new_compile_err("'in' requires a list or dict on the right-hand side".to_string()),
         },
     }
 }
@@ -555,7 +572,7 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
     expr: &NotPythonExpr,
     state: &mut ProgramExecutionState<'a, Meta>,
     meta: &mut Meta,
-) -> anyhow::Result<ProgramValue> {
+) -> CompileResult<ProgramValue> {
     match expr {
         NotPythonExpr::Int(i) => Ok(ProgramValue::Int(*i)),
         NotPythonExpr::Float(f) => Ok(ProgramValue::Float(*f)),
@@ -566,7 +583,7 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
         NotPythonExpr::List(l) => Ok(ProgramValue::List(Box::new(
             l.iter()
                 .map(|ex| eval_expr(ex, state, meta))
-                .collect::<anyhow::Result<_>>()?,
+                .collect::<CompileResult<_>>()?,
         ))),
         NotPythonExpr::Dict(d) => {
             let mut map = HashMap::new();
@@ -578,7 +595,9 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
                         map.insert(h, val);
                     }
                     None => {
-                        return Err(anyhow!("Dict keys must be hashable (int, string, or bool)"));
+                        return new_compile_err(
+                            "Dict keys must be hashable (int, string, or bool)".to_string(),
+                        );
                     }
                 }
             }
@@ -601,21 +620,15 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
                 ProgramValue::List(l) => match rhs {
                     ProgramValue::Int(i) => l
                         .get(i as usize)
-                        .ok_or(anyhow!("Index {i} out of range"))
+                        .ok_or_else(|| CompileError { msg: format!("Index {i} out of range") })
                         .cloned(),
-                    _ => Err(anyhow!(
-                        "Index operator on lists can only be used with integers."
-                    )),
+                    _ => new_compile_err("Index operator on lists can only be used with integers.".to_string()),
                 },
                 ProgramValue::Dict(d) => match to_hashable(&rhs) {
-                    Some(k) => d.get(&k).ok_or(anyhow!("Key not found in dict")).cloned(),
-                    None => Err(anyhow!(
-                        "Index operator on dicts can only be used with integers, bools, or strings."
-                    )),
+                    Some(k) => d.get(&k).ok_or_else(|| CompileError { msg: "Key not found in dict".to_string() }).cloned(),
+                    None => new_compile_err("Index operator on dicts can only be used with integers, bools, or strings.".to_string()),
                 },
-                _ => Err(anyhow!(
-                    "Index operator can only be used on lists or dicts."
-                )),
+                _ => new_compile_err("Index operator can only be used on lists or dicts.".to_string()),
             }
         }
     }
@@ -629,19 +642,19 @@ mod tests {
     impl CompilingMetadata for u32 {
         type Diff = i32;
 
-        fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
+        fn log_zero_instruction(&mut self) -> CompileResult<()> {
             Ok(())
         }
-        fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
+        fn log_atomic_instruction(&mut self) -> CompileResult<()> {
             *self += 1;
             Ok(())
         }
 
-        fn diff(&self, other: &Self) -> anyhow::Result<Self::Diff> {
+        fn diff(&self, other: &Self) -> CompileResult<Self::Diff> {
             Ok((*self as i32) - (*other as i32))
         }
 
-        fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()> {
+        fn add_assign(&mut self, diff: &Self::Diff) -> CompileResult<()> {
             *self = self.checked_add_signed(*diff).unwrap();
             Ok(())
         }
@@ -653,7 +666,7 @@ mod tests {
         count
     }
 
-    fn compiled_err(src: &str) -> anyhow::Error {
+    fn compiled_err(src: &str) -> CompileError {
         let program = parse_program(src).unwrap();
         let mut state = ProgramExecutionState {
             control_flow: ProgramExecutionControlFlow::Normal,
@@ -922,7 +935,7 @@ mod tests {
 
     #[test]
     fn pure_calls_predefined_ok() {
-        fn noop(_meta: &mut (), args: &[ProgramValue]) -> anyhow::Result<ProgramValue> {
+        fn noop(_meta: &mut (), args: &[ProgramValue]) -> CompileResult<ProgramValue> {
             Ok(args
                 .into_iter()
                 .next()

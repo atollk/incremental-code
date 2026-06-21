@@ -1,7 +1,6 @@
 use crate::game_state::{Resources, with_game_state};
-use anyhow::bail;
 use itertools::Itertools;
-use language::CompilingMetadata;
+use language::{CompileError, CompileResult, CompilingMetadata};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -155,11 +154,11 @@ fn hurwitz(n: f64, k: f64) -> f64 {
 impl CompilingMetadata for CompiledProgram {
     type Diff = CompiledProgram;
 
-    fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
+    fn log_zero_instruction(&mut self) -> CompileResult<()> {
         Ok(())
     }
 
-    fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
+    fn log_atomic_instruction(&mut self) -> CompileResult<()> {
         *self
             .instruction_counts
             .last_mut()
@@ -169,12 +168,14 @@ impl CompilingMetadata for CompiledProgram {
         Ok(())
     }
 
-    fn diff(&self, other: &Self) -> anyhow::Result<Self::Diff> {
+    fn diff(&self, other: &Self) -> CompileResult<Self::Diff> {
         let instruction_counts = {
             let self_brk_len = self.instruction_counts.len();
             let other_brk_len = other.instruction_counts.len();
             if other_brk_len < self_brk_len {
-                bail!("instruction_counts brk-block count mismatch");
+                return Err(CompileError::new(
+                    "instruction_counts brk-block count mismatch".to_string(),
+                ));
             }
             // All but the last brk-block must match exactly
             for (i, (l, r)) in self
@@ -185,13 +186,17 @@ impl CompilingMetadata for CompiledProgram {
                 .take(self_brk_len - 1)
             {
                 if l != r {
-                    bail!("instruction_counts brk-block {i} mismatch");
+                    return Err(CompileError::new(format!(
+                        "instruction_counts brk-block {i} mismatch"
+                    )));
                 }
             }
             let self_last = self.instruction_counts.last().unwrap();
             let other_last = &other.instruction_counts[self_brk_len - 1];
             if other_last.len() < self_last.len() {
-                bail!("instruction_counts sleep-block count mismatch");
+                return Err(CompileError::new(
+                    "instruction_counts sleep-block count mismatch".to_string(),
+                ));
             }
             // All but the last sleep-block in the last brk-block must match
             for (j, (l, r)) in self_last
@@ -201,7 +206,9 @@ impl CompilingMetadata for CompiledProgram {
                 .take(self_last.len() - 1)
             {
                 if l != r {
-                    bail!("instruction_counts sleep-block {j} mismatch");
+                    return Err(CompileError::new(format!(
+                        "instruction_counts sleep-block {j} mismatch"
+                    )));
                 }
             }
             let delta = other_last[self_last.len() - 1] - self_last.last().unwrap();
@@ -214,7 +221,7 @@ impl CompilingMetadata for CompiledProgram {
         let sleep_calls = {
             for (l, r) in self.sleep_calls.iter().zip(other.sleep_calls.iter()) {
                 if *l != *r {
-                    bail!("sleep_calls mismatch");
+                    return Err(CompileError::new("sleep_calls mismatch".to_string()));
                 }
             }
             if self.sleep_calls.len() <= other.sleep_calls.len() {
@@ -227,7 +234,7 @@ impl CompilingMetadata for CompiledProgram {
             if let Some(l) = self.print_len
                 && other.print_len.map(|r| r < l).unwrap_or(true)
             {
-                bail!("print_len mismatch");
+                return Err(CompileError::new("print_len mismatch".to_string()));
             }
             other.print_len
         };
@@ -238,7 +245,7 @@ impl CompilingMetadata for CompiledProgram {
         })
     }
 
-    fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()> {
+    fn add_assign(&mut self, diff: &Self::Diff) -> CompileResult<()> {
         {
             let (head, tail) = diff.instruction_counts.split_at(1);
             let head = head.iter().exactly_one().unwrap();

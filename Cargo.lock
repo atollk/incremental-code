@@ -1640,6 +1640,7 @@ dependencies = [
  "logos",
  "serde",
  "smallvec",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

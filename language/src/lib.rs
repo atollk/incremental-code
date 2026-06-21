@@ -7,8 +7,8 @@ pub mod string_hasher;
 mod visitor;
 
 pub use compile::{
-    CompilingMetadata, FnArgVec, HashableProgramValue, PredefinedFunction, ProgramValue,
-    compile_with_meta,
+    CompileError, CompileResult, CompilingMetadata, FnArgVec, HashableProgramValue,
+    PredefinedFunction, ProgramValue, compile_with_meta,
 };
 pub use lexer::NotPythonLangToken;
 pub use parser::{

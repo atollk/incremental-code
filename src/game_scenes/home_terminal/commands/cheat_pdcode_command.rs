@@ -251,7 +251,9 @@ mod tests {
     use super::*;
     use crate::game_scenes::logic::compilation::WipCompilingProgram;
     use crate::game_state::{CompiledProgram, Upgrade, Upgrades};
-    use language::{PredefinedFunction, ProgramValue, compile_with_meta};
+    use language::{
+        CompileError, CompileResult, PredefinedFunction, ProgramValue, compile_with_meta,
+    };
     use std::collections::HashMap;
 
     fn make_upgrades(
@@ -386,11 +388,11 @@ mod tests {
     fn test_sleep(
         meta: &mut WipCompilingProgram,
         args: &[ProgramValue],
-    ) -> anyhow::Result<ProgramValue> {
+    ) -> CompileResult<ProgramValue> {
         let t = match args.first().expect("sleep: needs arg") {
             ProgramValue::Int(i) => *i as f64,
             ProgramValue::Float(f) => *f,
-            _ => anyhow::bail!("sleep: numeric arg"),
+            _ => return Err(CompileError::new("sleep: numeric arg".to_string())),
         };
         meta.program.sleep_calls.push(t);
         meta.program.instruction_counts.last_mut().unwrap().push(0);
@@ -400,7 +402,7 @@ mod tests {
     fn test_brk(
         meta: &mut WipCompilingProgram,
         _args: &[ProgramValue],
-    ) -> anyhow::Result<ProgramValue> {
+    ) -> CompileResult<ProgramValue> {
         meta.program.instruction_counts.push(vec![0]);
         Ok(ProgramValue::None)
     }
@@ -408,9 +410,9 @@ mod tests {
     fn test_print(
         meta: &mut WipCompilingProgram,
         args: &[ProgramValue],
-    ) -> anyhow::Result<ProgramValue> {
+    ) -> CompileResult<ProgramValue> {
         let ProgramValue::String(s) = args.into_iter().next().expect("print: needs arg") else {
-            anyhow::bail!("print: string arg");
+            return Err(CompileError::new("print: string arg".to_string()));
         };
         meta.program.print_len = Some(s.len()).max(meta.program.print_len);
         Ok(ProgramValue::None)
@@ -486,7 +488,6 @@ mod tests {
 
     #[test]
     fn stage_h_brk_gains_diamond() {
-        return;
         // gold_per_print_character at default (100 iterations) collapses to -inf.
         // Level it up to 3 (1 iteration = min(log2(n), 1.)) so gold is well-behaved.
         with_game_state_mut(|state| {

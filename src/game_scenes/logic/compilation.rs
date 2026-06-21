@@ -1,8 +1,8 @@
 use crate::game_state::{CompiledProgram, with_game_state};
-use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use language::{
-    CompilingMetadata, NotPythonProgram, PredefinedFunction, ProgramValue, compile_with_meta,
+    CompileError, CompileResult, CompilingMetadata, NotPythonProgram, PredefinedFunction,
+    ProgramValue, compile_with_meta,
 };
 use std::cell::RefCell;
 use std::cmp::max;
@@ -12,13 +12,15 @@ use std::rc::Rc;
 fn predefined_function_print(
     meta: &mut WipCompilingProgram,
     args: &[ProgramValue],
-) -> anyhow::Result<ProgramValue> {
+) -> CompileResult<ProgramValue> {
     let arg = args
         .iter()
         .exactly_one()
-        .map_err(|_| anyhow!("print takes exactly one argument"))?;
+        .map_err(|_| CompileError::new("print takes exactly one argument".to_string()))?;
     let ProgramValue::String(s) = arg else {
-        bail!("print requires a string argument")
+        return Err(CompileError::new(
+            "print requires a string argument".to_string(),
+        ));
     };
     meta.program.print_len = Some(max(s.len() as u64, meta.program.print_len.unwrap_or(0)));
     Ok(ProgramValue::None)
@@ -27,17 +29,19 @@ fn predefined_function_print(
 fn predefined_function_sleep(
     meta: &mut WipCompilingProgram,
     args: &[ProgramValue],
-) -> anyhow::Result<ProgramValue> {
+) -> CompileResult<ProgramValue> {
     let arg = args
         .iter()
         .exactly_one()
-        .map_err(|_| anyhow!("sleep takes exactly one argument"))?;
+        .map_err(|_| CompileError::new("sleep takes exactly one argument".to_string()))?;
     let t = if let ProgramValue::Int(i) = arg {
         *i as f64
     } else if let ProgramValue::Float(f) = arg {
         *f
     } else {
-        bail!("sleep requires a numeric argument")
+        return Err(CompileError::new(
+            "sleep requires a numeric argument".to_string(),
+        ));
     };
     meta.program.sleep_calls.push(t);
     meta.program
@@ -51,9 +55,9 @@ fn predefined_function_sleep(
 fn predefined_function_brk(
     meta: &mut WipCompilingProgram,
     args: &[ProgramValue],
-) -> anyhow::Result<ProgramValue> {
+) -> CompileResult<ProgramValue> {
     if !args.is_empty() {
-        bail!("brk takes no arguments")
+        return Err(CompileError::new("brk takes no arguments".to_string()));
     }
     meta.program.instruction_counts.push(vec![0]);
     Ok(ProgramValue::None)
@@ -111,11 +115,11 @@ impl WipCompilingProgram {
         }
     }
 
-    fn check_cancel(&mut self) -> anyhow::Result<()> {
+    fn check_cancel(&mut self) -> CompileResult<()> {
         if self.is_cancelled_debounce == 0 {
             self.is_cancelled_debounce = 4096;
             if self.is_cancelled.borrow_mut()() {
-                bail!("Cancelling logic program");
+                return Err(CompileError::new("Cancelling logic program".to_string()));
             }
         }
         self.is_cancelled_debounce -= 1;
@@ -131,21 +135,23 @@ pub struct WipCompilingProgramDiff {
 impl CompilingMetadata for WipCompilingProgram {
     type Diff = WipCompilingProgramDiff;
 
-    fn log_zero_instruction(&mut self) -> anyhow::Result<()> {
+    fn log_zero_instruction(&mut self) -> CompileResult<()> {
         self.check_cancel()?;
         self.program.log_zero_instruction()
     }
 
-    fn log_atomic_instruction(&mut self) -> anyhow::Result<()> {
+    fn log_atomic_instruction(&mut self) -> CompileResult<()> {
         self.check_cancel()?;
         self.left_to_instruction_limit -= 1;
         if self.left_to_instruction_limit == 0 {
-            bail!("Reached instruction limit. Stopping execution to prevent overheating.")
+            return Err(CompileError::new(
+                "Reached instruction limit. Stopping execution to prevent overheating.".to_string(),
+            ));
         }
         self.program.log_atomic_instruction()
     }
 
-    fn diff(&self, other: &Self) -> anyhow::Result<Self::Diff> {
+    fn diff(&self, other: &Self) -> CompileResult<Self::Diff> {
         Ok(WipCompilingProgramDiff {
             program: self.program.diff(&other.program)?,
             instruction_count: (other.left_to_instruction_limit - self.left_to_instruction_limit)
@@ -153,28 +159,30 @@ impl CompilingMetadata for WipCompilingProgram {
         })
     }
 
-    fn add_assign(&mut self, diff: &Self::Diff) -> anyhow::Result<()> {
+    fn add_assign(&mut self, diff: &Self::Diff) -> CompileResult<()> {
         self.program.add_assign(&diff.program)?;
         self.left_to_instruction_limit = self
             .left_to_instruction_limit
             .saturating_sub_signed(diff.instruction_count);
         if self.left_to_instruction_limit == 0 {
-            bail!("Reached instruction limit. Stopping execution to prevent overheating.")
+            Err(CompileError::new(
+                "Reached instruction limit. Stopping execution to prevent overheating.".to_string(),
+            ))
         } else {
             Ok(())
         }
     }
 }
 
-fn parse_code(program_code: &str) -> anyhow::Result<NotPythonProgram> {
+fn parse_code(program_code: &str) -> CompileResult<NotPythonProgram> {
     match language::parse_program(program_code) {
         Ok(parsed) => Ok(parsed),
-        Err(richs) => Err(anyhow!(
+        Err(richs) => Err(CompileError::new(
             richs
                 .into_iter()
                 .map(|rich| format!("{rich}"))
                 .collect::<Vec<_>>()
-                .join("\n")
+                .join("\n"),
         )),
     }
 }
@@ -183,7 +191,7 @@ fn parse_code(program_code: &str) -> anyhow::Result<NotPythonProgram> {
 fn compile_code(
     parsed_program: &NotPythonProgram,
     is_cancelled: impl FnMut() -> bool + 'static,
-) -> anyhow::Result<Result<CompiledProgram, (String, Vec<Vec<u64>>)>> {
+) -> CompileResult<Result<CompiledProgram, (String, Vec<Vec<u64>>)>> {
     let instruction_limit =
         with_game_state(|game_state| game_state.upgrades.max_instructions.value());
     let mut compiling_program = WipCompilingProgram::new(is_cancelled, instruction_limit);
@@ -192,8 +200,8 @@ fn compile_code(
         predefined_functions(),
         &mut compiling_program,
     );
-    if (compiling_program.is_cancelled.borrow_mut())() {
-        bail!("Compilation was cancelled")
+    if compiling_program.is_cancelled.borrow_mut()() {
+        Err(CompileError::new("Compilation was cancelled".to_string()))
     } else {
         Ok(match run_result {
             Ok(()) => Ok(compiling_program.program),
@@ -207,6 +215,7 @@ pub mod compile_thread {
     use crate::game_scenes::logic::verification::verify_unlocks;
     use crate::game_state::{with_game_state, with_game_state_mut};
     use crate::global_variable;
+    use language::{CompileError, CompileResult};
     use std::sync::{Arc, Mutex};
     #[cfg(not(target_arch = "wasm32"))]
     use std::thread;
@@ -251,11 +260,12 @@ pub mod compile_thread {
                 };
 
                 // Compile
-                let get_compile_result = || -> anyhow::Result<_> {
+                let get_compile_result = || -> CompileResult<_> {
                     let program_code =
                         with_game_state(|game_state| game_state.program_code.clone());
                     let parsed_code = parse_code(&program_code)?;
-                    verify_unlocks(&program_code, &parsed_code)?;
+                    verify_unlocks(&program_code, &parsed_code)
+                        .map_err(|e| CompileError::new(e.to_string()))?;
                     compile_code(&parsed_code, is_cancelled)
                 };
                 let thread_result = match get_compile_result() {
