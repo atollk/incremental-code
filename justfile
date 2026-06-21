@@ -19,6 +19,7 @@ test:
 
 bench_test:
     #!/usr/bin/env bash
+    set -x
     export TEST_NAME=stage_d_gains_silver
     BUILD_OUTPUT=$(cargo test --profile profiling --features tui --no-run 2>&1)
     BIN_PATH=$(echo "$BUILD_OUTPUT" | sed -n 's/.*(\(.*\))/\1/p' | tail -n1)

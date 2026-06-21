@@ -2,6 +2,7 @@ use crate::parser::{
     NotPythonExpr, NotPythonExprOp, NotPythonExprVariable, NotPythonProgram, NotPythonStmt,
 };
 use anyhow::{anyhow, bail};
+use smallvec::SmallVec;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
 
@@ -40,12 +41,8 @@ pub fn compile_with_meta<Meta: CompilingMetadata>(
     predefined_functions: HashMap<&str, PredefinedFunction<Meta>>,
     meta: &mut Meta,
 ) -> anyhow::Result<()> {
-    let mut state = ProgramExecutionState {
-        control_flow: ProgramExecutionControlFlow::Normal,
-        call_stack: vec![ProgramExecutionCallState::default()],
-        predefined_functions,
-        pure_caches: HashMap::new(),
-    };
+    let variable_len = 100; // TODO
+    let mut state = ProgramExecutionState::new(variable_len, predefined_functions);
     compile_stmt(&program.statement, &mut state, meta)
 }
 
@@ -73,16 +70,28 @@ enum ProgramExecutionControlFlow {
     Return(ProgramValue),
 }
 
-#[derive(Default)]
 struct ProgramExecutionCallState<'a> {
-    variables: HashMap<usize, ProgramValue>, // TODO: replace by Vec
+    variables: Vec<ProgramValue>,
     functions: HashMap<&'a str, &'a NotPythonStmt>,
     loop_nesting: usize,
     is_pure: bool,
 }
 
+impl ProgramExecutionCallState<'_> {
+    fn new(variable_len: usize) -> Self {
+        Self {
+            variables: vec![ProgramValue::None; variable_len],
+            functions: HashMap::new(),
+            loop_nesting: 0,
+            is_pure: false,
+        }
+    }
+}
+
+pub type FnArgVec<T> = SmallVec<[T; 8]>;
+
 pub type PredefinedFunction<Meta> =
-    fn(&mut Meta, Vec<ProgramValue>) -> anyhow::Result<ProgramValue>;
+    fn(&mut Meta, FnArgVec<ProgramValue>) -> anyhow::Result<ProgramValue>;
 
 enum Callable<'a, Meta: CompilingMetadata> {
     PredefinedFunction(PredefinedFunction<Meta>),
@@ -97,11 +106,13 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
         state: &mut ProgramExecutionState<'a, Meta>,
         meta: &mut Meta,
     ) -> anyhow::Result<ProgramValue> {
-        // TODO: this takes up a big part of the runtime
-        let arg_values: Vec<ProgramValue> = args
-            .iter()
-            .map(|a| eval_expr(a, state, meta))
-            .collect::<anyhow::Result<_>>()?;
+        let arg_values = {
+            let mut arg_values = FnArgVec::new();
+            for arg in args {
+                arg_values.push(eval_expr(arg, state, meta)?);
+            }
+            arg_values
+        };
         match self {
             Callable::PredefinedFunction(body) => body(meta, arg_values),
             Callable::UserFunction(NotPythonStmt::Function {
@@ -144,9 +155,12 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                 };
 
                 // Cache miss: execute with a pure frame.
-                let mut frame = ProgramExecutionCallState {
-                    is_pure: *is_pure,
-                    ..Default::default()
+                let mut frame = {
+                    let mut frame = ProgramExecutionCallState::new(
+                        state.call_stack.last().unwrap().variables.len(),
+                    );
+                    frame.is_pure = *is_pure;
+                    frame
                 };
                 for (param, val) in params.iter().zip(arg_values) {
                     frame.variables.insert(param.index, val);
@@ -186,6 +200,20 @@ struct ProgramExecutionState<'a, Meta: CompilingMetadata> {
 }
 
 impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
+    fn new(
+        variable_len: usize,
+        predefined_functions: HashMap<&'a str, PredefinedFunction<Meta>>,
+    ) -> Self {
+        Self {
+            control_flow: ProgramExecutionControlFlow::Normal,
+            call_stack: vec![ProgramExecutionCallState::new(variable_len)],
+            predefined_functions,
+            pure_caches: HashMap::new(),
+        }
+    }
+}
+
+impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
     fn in_pure_context(&self) -> bool {
         self.call_stack.last().map(|f| f.is_pure).unwrap_or(false)
     }
@@ -196,7 +224,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
             return self
                 .call_stack
                 .last()
-                .and_then(|f| f.variables.get(&variable.index))
+                .and_then(|f| f.variables.get(variable.index))
                 .ok_or_else(|| {
                     anyhow!(
                         "Pure function accesses non-local variable '{}'",
@@ -205,7 +233,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
                 });
         }
         for call_state in self.call_stack.iter().rev() {
-            if let Some(value) = call_state.variables.get(&variable.index) {
+            if let Some(value) = call_state.variables.get(variable.index) {
                 return Ok(value);
             }
         }
@@ -213,11 +241,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
     }
 
     fn decl_variable(&mut self, variable: &NotPythonExprVariable, value: ProgramValue) {
-        self.call_stack
-            .last_mut()
-            .unwrap()
-            .variables
-            .insert(variable.index, value);
+        self.call_stack.last_mut().unwrap().variables[variable.index] = value;
     }
 
     fn assign_variable(
@@ -228,7 +252,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
         if self.in_pure_context() {
             // Only allow assigning to locals in the top (pure) frame.
             let frame = self.call_stack.last_mut().unwrap();
-            if let Some(v) = frame.variables.get_mut(&variable.index) {
+            if let Some(v) = frame.variables.get_mut(variable.index) {
                 *v = value;
                 return Ok(());
             }
@@ -238,7 +262,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
             ));
         }
         for call_state in self.call_stack.iter_mut().rev() {
-            if let Some(v) = call_state.variables.get_mut(&variable.index) {
+            if let Some(v) = call_state.variables.get_mut(variable.index) {
                 *v = value;
                 return Ok(());
             }
@@ -636,7 +660,7 @@ mod tests {
         let program = parse_program(src).unwrap();
         let mut state = ProgramExecutionState {
             control_flow: ProgramExecutionControlFlow::Normal,
-            call_stack: vec![ProgramExecutionCallState::default()],
+            call_stack: vec![ProgramExecutionCallState::new(10)],
             predefined_functions: HashMap::new(),
             pure_caches: HashMap::new(),
         };
@@ -901,7 +925,7 @@ mod tests {
 
     #[test]
     fn pure_calls_predefined_ok() {
-        fn noop(_meta: &mut (), args: Vec<ProgramValue>) -> anyhow::Result<ProgramValue> {
+        fn noop(_meta: &mut (), args: FnArgVec<ProgramValue>) -> anyhow::Result<ProgramValue> {
             Ok(args.into_iter().next().unwrap_or(ProgramValue::None))
         }
         let program =

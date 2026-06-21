@@ -2,8 +2,8 @@ use crate::game_state::{CompiledProgram, with_game_state};
 use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use language::{
-    CompilingMetadata, HashableProgramValue, NotPythonProgram, PredefinedFunction, ProgramValue,
-    compile_with_meta,
+    CompilingMetadata, FnArgVec, HashableProgramValue, NotPythonProgram, PredefinedFunction,
+    ProgramValue, compile_with_meta,
 };
 use std::cell::RefCell;
 use std::cmp::max;
@@ -12,7 +12,7 @@ use std::rc::Rc;
 
 fn predefined_function_print(
     meta: &mut WipCompilingProgram,
-    args: Vec<ProgramValue>,
+    args: FnArgVec<ProgramValue>,
 ) -> anyhow::Result<ProgramValue> {
     let arg = args
         .iter()
@@ -27,7 +27,7 @@ fn predefined_function_print(
 
 fn predefined_function_sleep(
     meta: &mut WipCompilingProgram,
-    args: Vec<ProgramValue>,
+    args: FnArgVec<ProgramValue>,
 ) -> anyhow::Result<ProgramValue> {
     let arg = args
         .iter()
@@ -51,7 +51,7 @@ fn predefined_function_sleep(
 
 fn predefined_function_brk(
     meta: &mut WipCompilingProgram,
-    args: Vec<ProgramValue>,
+    args: FnArgVec<ProgramValue>,
 ) -> anyhow::Result<ProgramValue> {
     if !args.is_empty() {
         bail!("brk takes no arguments")

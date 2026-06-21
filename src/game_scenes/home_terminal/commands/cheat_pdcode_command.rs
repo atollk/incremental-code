@@ -251,7 +251,9 @@ mod tests {
     use super::*;
     use crate::game_scenes::logic::compilation::WipCompilingProgram;
     use crate::game_state::{CompiledProgram, Upgrade, Upgrades};
-    use language::{HashableProgramValue, PredefinedFunction, ProgramValue, compile_with_meta};
+    use language::{
+        FnArgVec, HashableProgramValue, PredefinedFunction, ProgramValue, compile_with_meta,
+    };
     use std::collections::HashMap;
 
     fn make_upgrades(
@@ -385,7 +387,7 @@ mod tests {
 
     fn test_sleep(
         meta: &mut WipCompilingProgram,
-        args: Vec<ProgramValue>,
+        args: FnArgVec<ProgramValue>,
     ) -> anyhow::Result<ProgramValue> {
         let t = match args.first().expect("sleep: needs arg") {
             ProgramValue::Hashable(HashableProgramValue::Int(i)) => *i as f64,
@@ -399,7 +401,7 @@ mod tests {
 
     fn test_brk(
         meta: &mut WipCompilingProgram,
-        _args: Vec<ProgramValue>,
+        _args: FnArgVec<ProgramValue>,
     ) -> anyhow::Result<ProgramValue> {
         meta.program.instruction_counts.push(vec![0]);
         Ok(ProgramValue::None)
@@ -407,7 +409,7 @@ mod tests {
 
     fn test_print(
         meta: &mut WipCompilingProgram,
-        args: Vec<ProgramValue>,
+        args: FnArgVec<ProgramValue>,
     ) -> anyhow::Result<ProgramValue> {
         let ProgramValue::Hashable(HashableProgramValue::String(s)) =
             args.into_iter().next().expect("print: needs arg")
