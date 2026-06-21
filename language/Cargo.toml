@@ -10,6 +10,7 @@ anyhow = "1.0.102"
 serde = { version = "1.0.228", features = ["derive"] }
 log = { workspace = true }
 smallvec = { workspace = true }
+linear-map = "1.2.0"
 
 [lints.clippy]
 new_without_default = "allow"

@@ -2,6 +2,7 @@ use crate::parser::{
     NotPythonExpr, NotPythonExprOp, NotPythonExprVariable, NotPythonProgram, NotPythonStmt,
 };
 use anyhow::{anyhow, bail};
+use linear_map::LinearMap;
 use smallvec::SmallVec;
 use std::cmp::PartialEq;
 use std::collections::HashMap;
@@ -58,8 +59,8 @@ pub enum ProgramValue {
     Hashable(HashableProgramValue),
     Float(f64),
     None,
-    List(Vec<ProgramValue>),
-    Dict(HashMap<HashableProgramValue, ProgramValue>),
+    List(Box<Vec<ProgramValue>>),
+    Dict(Box<HashMap<HashableProgramValue, ProgramValue>>),
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -72,7 +73,7 @@ enum ProgramExecutionControlFlow {
 
 struct ProgramExecutionCallState<'a> {
     variables: Vec<ProgramValue>,
-    functions: HashMap<&'a str, &'a NotPythonStmt>,
+    functions: LinearMap<&'a str, &'a NotPythonStmt>,
     loop_nesting: usize,
     is_pure: bool,
 }
@@ -81,7 +82,7 @@ impl ProgramExecutionCallState<'_> {
     fn new(variable_len: usize) -> Self {
         Self {
             variables: vec![ProgramValue::None; variable_len],
-            functions: HashMap::new(),
+            functions: LinearMap::new(),
             loop_nesting: 0,
             is_pure: false,
         }
@@ -194,7 +195,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
 struct ProgramExecutionState<'a, Meta: CompilingMetadata> {
     control_flow: ProgramExecutionControlFlow,
     call_stack: Vec<ProgramExecutionCallState<'a>>,
-    predefined_functions: HashMap<&'a str, PredefinedFunction<Meta>>,
+    predefined_functions: LinearMap<&'a str, PredefinedFunction<Meta>>,
     pure_caches: HashMap<(&'a str, Vec<HashableProgramValue>), (ProgramValue, Meta::Diff)>,
 }
 
@@ -206,7 +207,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
         Self {
             control_flow: ProgramExecutionControlFlow::Normal,
             call_stack: vec![ProgramExecutionCallState::new(variable_len)],
-            predefined_functions,
+            predefined_functions: LinearMap::from_iter(predefined_functions.into_iter()),
             pure_caches: HashMap::new(),
         }
     }
@@ -548,11 +549,11 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
         NotPythonExpr::Boolean(b) => Ok(ProgramValue::Hashable(HashableProgramValue::Bool(*b))),
         NotPythonExpr::None => Ok(ProgramValue::None),
         NotPythonExpr::Variable(var) => state.get_variable(var).cloned(),
-        NotPythonExpr::List(l) => Ok(ProgramValue::List(
+        NotPythonExpr::List(l) => Ok(ProgramValue::List(Box::new(
             l.iter()
                 .map(|ex| eval_expr(ex, state, meta))
                 .collect::<anyhow::Result<_>>()?,
-        )),
+        ))),
         NotPythonExpr::Dict(d) => {
             let mut map = HashMap::new();
             for (k, v) in d {
@@ -565,7 +566,7 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
                     _ => return Err(anyhow!("Dict keys must be hashable (int, string, or bool)")),
                 }
             }
-            Ok(ProgramValue::Dict(map))
+            Ok(ProgramValue::Dict(Box::new(map)))
         }
         NotPythonExpr::Op(o) => match o {
             NotPythonExprOp::Add(lhs, rhs)
@@ -627,6 +628,7 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
 mod tests {
     use super::*;
     use crate::parser::parse_program;
+    use std::ops::Deref;
 
     impl CompilingMetadata for u32 {
         type Diff = i32;
@@ -924,8 +926,12 @@ mod tests {
 
     #[test]
     fn pure_calls_predefined_ok() {
-        fn noop(_meta: &mut (), args: FnArgVec<ProgramValue>) -> anyhow::Result<ProgramValue> {
-            Ok(args.into_iter().next().unwrap_or(ProgramValue::None))
+        fn noop(_meta: &mut (), args: &[ProgramValue]) -> anyhow::Result<ProgramValue> {
+            Ok(args
+                .into_iter()
+                .next()
+                .cloned()
+                .unwrap_or(ProgramValue::None))
         }
         let program =
             parse_program("def pure f(x):\nreturn identity(x);\nend\ny := f(1);\n").unwrap();
