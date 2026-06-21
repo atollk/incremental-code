@@ -1434,7 +1434,6 @@ dependencies = [
  "serde_json",
  "signal-hook 0.4.4",
  "simple_logger",
- "smallvec",
  "spfunc",
  "tachyonfx",
  "throbber-widgets-tui",
@@ -1636,6 +1635,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chumsky",
+ "itertools",
  "log",
  "logos",
  "serde",
