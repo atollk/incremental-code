@@ -387,7 +387,7 @@ mod tests {
 
     fn test_sleep(
         meta: &mut WipCompilingProgram,
-        args: FnArgVec<ProgramValue>,
+        args: &[ProgramValue],
     ) -> anyhow::Result<ProgramValue> {
         let t = match args.first().expect("sleep: needs arg") {
             ProgramValue::Hashable(HashableProgramValue::Int(i)) => *i as f64,
@@ -401,7 +401,7 @@ mod tests {
 
     fn test_brk(
         meta: &mut WipCompilingProgram,
-        _args: FnArgVec<ProgramValue>,
+        _args: &[ProgramValue],
     ) -> anyhow::Result<ProgramValue> {
         meta.program.instruction_counts.push(vec![0]);
         Ok(ProgramValue::None)
@@ -409,7 +409,7 @@ mod tests {
 
     fn test_print(
         meta: &mut WipCompilingProgram,
-        args: FnArgVec<ProgramValue>,
+        args: &[ProgramValue],
     ) -> anyhow::Result<ProgramValue> {
         let ProgramValue::Hashable(HashableProgramValue::String(s)) =
             args.into_iter().next().expect("print: needs arg")

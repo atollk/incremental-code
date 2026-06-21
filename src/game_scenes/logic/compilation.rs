@@ -12,7 +12,7 @@ use std::rc::Rc;
 
 fn predefined_function_print(
     meta: &mut WipCompilingProgram,
-    args: FnArgVec<ProgramValue>,
+    args: &[ProgramValue],
 ) -> anyhow::Result<ProgramValue> {
     let arg = args
         .iter()
@@ -27,7 +27,7 @@ fn predefined_function_print(
 
 fn predefined_function_sleep(
     meta: &mut WipCompilingProgram,
-    args: FnArgVec<ProgramValue>,
+    args: &[ProgramValue],
 ) -> anyhow::Result<ProgramValue> {
     let arg = args
         .iter()
@@ -51,7 +51,7 @@ fn predefined_function_sleep(
 
 fn predefined_function_brk(
     meta: &mut WipCompilingProgram,
-    args: FnArgVec<ProgramValue>,
+    args: &[ProgramValue],
 ) -> anyhow::Result<ProgramValue> {
     if !args.is_empty() {
         bail!("brk takes no arguments")

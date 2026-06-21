@@ -90,8 +90,7 @@ impl ProgramExecutionCallState<'_> {
 
 pub type FnArgVec<T> = SmallVec<[T; 8]>;
 
-pub type PredefinedFunction<Meta> =
-    fn(&mut Meta, FnArgVec<ProgramValue>) -> anyhow::Result<ProgramValue>;
+pub type PredefinedFunction<Meta> = fn(&mut Meta, &[ProgramValue]) -> anyhow::Result<ProgramValue>;
 
 enum Callable<'a, Meta: CompilingMetadata> {
     PredefinedFunction(PredefinedFunction<Meta>),
@@ -114,7 +113,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
             arg_values
         };
         match self {
-            Callable::PredefinedFunction(body) => body(meta, arg_values),
+            Callable::PredefinedFunction(body) => body(meta, &arg_values),
             Callable::UserFunction(NotPythonStmt::Function {
                 params,
                 body,
@@ -154,7 +153,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     None
                 };
 
-                // Cache miss: execute with a pure frame.
+                // Cache miss / unpure context: execute with a pure frame.
                 let mut frame = {
                     let mut frame = ProgramExecutionCallState::new(
                         state.call_stack.last().unwrap().variables.len(),
@@ -163,7 +162,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     frame
                 };
                 for (param, val) in params.iter().zip(arg_values) {
-                    frame.variables.insert(param.index, val);
+                    frame.variables[param.index] = val;
                 }
                 let meta_clone = meta.clone();
                 state.call_stack.push(frame);
