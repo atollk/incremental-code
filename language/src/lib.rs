@@ -3,6 +3,7 @@ mod fold_constants;
 mod index_variables;
 mod lexer;
 mod parser;
+mod visitor;
 
 pub use compile::{
     CompilingMetadata, HashableProgramValue, PredefinedFunction, ProgramValue, compile_with_meta,

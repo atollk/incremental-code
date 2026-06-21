@@ -2,6 +2,9 @@
 
 use crate::NotPythonStmt;
 
-pub fn index_named_variable_access(root_stmt: NotPythonStmt) -> NotPythonStmt {
+/** Builds an index-list of all variables in a program and replaces their `index` fields. */
+pub fn index_named_variable_access(root_stmt: &mut NotPythonStmt) {
     todo!()
 }
+
+fn index_named_variable_access_stmt(stmt: &mut NotPythonStmt) {}
