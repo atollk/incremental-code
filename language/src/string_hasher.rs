@@ -5,13 +5,13 @@ const B: u64 = 1_000_003;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HashedString {
-    values: Box<(u64, u64)>,
+    length: u64,
 }
 
 impl From<&str> for HashedString {
     fn from(value: &str) -> Self {
         Self {
-            values: Box::new((HashedString::compute_hash(value), value.len() as u64)),
+            length: value.len() as u64,
         }
     }
 }
@@ -19,11 +19,14 @@ impl From<&str> for HashedString {
 impl Add for HashedString {
     type Output = HashedString;
 
-    fn add(mut self, rhs: Self) -> Self::Output {
-        let shifted = mul_mod(self.hash(), pow_mod(B, rhs.len()));
+    fn add(self, rhs: Self) -> Self::Output {
+        /*let shifted = mul_mod(self.hash(), pow_mod(B, rhs.len()));
         self.values.0 = add_mod(shifted, rhs.hash());
         self.values.1 += rhs.len();
-        self
+        self*/
+        HashedString {
+            length: self.length + rhs.length,
+        }
     }
 }
 
@@ -37,11 +40,11 @@ impl HashedString {
     }
 
     pub fn hash(&self) -> u64 {
-        self.values.0
+        self.length
     }
 
     pub fn len(&self) -> u64 {
-        self.values.1
+        self.length
     }
 }
 
