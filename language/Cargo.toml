@@ -12,6 +12,7 @@ log = { workspace = true }
 smallvec = { workspace = true }
 linear-map = "1.2.0"
 thiserror = "2.0.18"
+beef = "0.5.2"
 
 [lints.clippy]
 new_without_default = "allow"

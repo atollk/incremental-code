@@ -10,19 +10,19 @@ use std::collections::HashMap;
 #[derive(thiserror::Error, Debug, Clone)]
 #[error("{msg}")]
 pub struct CompileError {
-    msg: String,
+    msg: Box<String>,
 }
 
 impl CompileError {
     pub fn new(msg: String) -> Self {
-        Self { msg }
+        Self { msg: Box::new(msg) }
     }
 }
 
 pub type CompileResult<T> = Result<T, CompileError>;
 
 fn new_compile_err<T>(msg: String) -> CompileResult<T> {
-    Err(CompileError { msg })
+    Err(CompileError::new(msg))
 }
 
 pub trait CompilingMetadata: Clone {
@@ -86,7 +86,7 @@ pub enum ProgramValue {
 fn to_hashable(v: &ProgramValue) -> Option<HashableProgramValue> {
     match v {
         ProgramValue::Int(i) => Some(HashableProgramValue::Int(*i)),
-        ProgramValue::String(s) => Some(HashableProgramValue::String(s.hash)),
+        ProgramValue::String(s) => Some(HashableProgramValue::String(s.hash())),
         ProgramValue::Bool(b) => Some(HashableProgramValue::Bool(*b)),
         _ => None,
     }
@@ -164,11 +164,11 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     let cache_key: Vec<HashableProgramValue> = arg_values
                         .iter()
                         .map(|v| {
-                            to_hashable(v).ok_or_else(|| CompileError {
-                                msg: format!(
+                            to_hashable(v).ok_or_else(|| {
+                                CompileError::new(format!(
                                     "Pure function '{}' received non-hashable argument",
                                     name
-                                ),
+                                ))
                             })
                         })
                         .collect::<CompileResult<_>>()?;
@@ -258,11 +258,11 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
                 .call_stack
                 .last()
                 .and_then(|f| f.variables.get(variable.index))
-                .ok_or_else(|| CompileError {
-                    msg: format!(
+                .ok_or_else(|| {
+                    CompileError::new(format!(
                         "Pure function accesses non-local variable '{}'",
                         variable.name
-                    ),
+                    ))
                 });
         }
         for call_state in self.call_stack.iter().rev() {
@@ -576,7 +576,7 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
     match expr {
         NotPythonExpr::Int(i) => Ok(ProgramValue::Int(*i)),
         NotPythonExpr::Float(f) => Ok(ProgramValue::Float(*f)),
-        NotPythonExpr::String((_, hs)) => Ok(ProgramValue::String(*hs)),
+        NotPythonExpr::String((_, hs)) => Ok(ProgramValue::String(hs.clone())),
         NotPythonExpr::Boolean(b) => Ok(ProgramValue::Bool(*b)),
         NotPythonExpr::None => Ok(ProgramValue::None),
         NotPythonExpr::Variable(var) => state.get_variable(var).cloned(),
@@ -620,12 +620,12 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
                 ProgramValue::List(l) => match rhs {
                     ProgramValue::Int(i) => l
                         .get(i as usize)
-                        .ok_or_else(|| CompileError { msg: format!("Index {i} out of range") })
+                        .ok_or_else(|| CompileError::new( format!("Index {i} out of range") ))
                         .cloned(),
                     _ => new_compile_err("Index operator on lists can only be used with integers.".to_string()),
                 },
                 ProgramValue::Dict(d) => match to_hashable(&rhs) {
-                    Some(k) => d.get(&k).ok_or_else(|| CompileError { msg: "Key not found in dict".to_string() }).cloned(),
+                    Some(k) => d.get(&k).ok_or_else(|| CompileError::new( "Key not found in dict".to_string() )).cloned(),
                     None => new_compile_err("Index operator on dicts can only be used with integers, bools, or strings.".to_string()),
                 },
                 _ => new_compile_err("Index operator can only be used on lists or dicts.".to_string()),
