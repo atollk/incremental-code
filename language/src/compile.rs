@@ -101,7 +101,7 @@ enum ProgramExecutionControlFlow {
 }
 
 struct ProgramExecutionCallState<'a> {
-    variables: Vec<ProgramValue>,
+    variables: Vec<Option<ProgramValue>>,
     functions: LinearMap<&'a str, &'a NotPythonStmt>,
     loop_nesting: usize,
     is_pure: bool,
@@ -110,7 +110,7 @@ struct ProgramExecutionCallState<'a> {
 impl ProgramExecutionCallState<'_> {
     fn new(variable_len: usize) -> Self {
         Self {
-            variables: vec![ProgramValue::None; variable_len],
+            variables: vec![None; variable_len],
             functions: LinearMap::new(),
             loop_nesting: 0,
             is_pure: false,
@@ -196,7 +196,7 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                     frame
                 };
                 for (param, val) in params.iter().zip(arg_values) {
-                    frame.variables[param.index] = val;
+                    frame.variables[param.index] = Some(val);
                 }
                 let meta_clone = meta.clone();
                 state.call_stack.push(frame);
@@ -254,7 +254,7 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
     fn get_variable(&self, variable: &NotPythonExprVariable) -> CompileResult<&ProgramValue> {
         if self.in_pure_context() {
             // Only look in the top (pure) frame.
-            return self
+            let variable_value = self
                 .call_stack
                 .last()
                 .and_then(|f| f.variables.get(variable.index))
@@ -263,18 +263,23 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
                         "Pure function accesses non-local variable '{}'",
                         variable.name
                     ))
-                });
+                })?;
+            return variable_value.as_ref().ok_or(CompileError::new(format!(
+                "Variable '{}' has no assigned value",
+                variable.name
+            )));
         }
         for call_state in self.call_stack.iter().rev() {
-            if let Some(value) = call_state.variables.get(variable.index) {
-                return Ok(value);
+            if let Some(Some(variable_value)) = call_state.variables.get(variable.index) {
+                return Ok(variable_value);
             }
         }
         new_compile_err(format!("Variable {} not found", variable.name))
     }
 
     fn decl_variable(&mut self, variable: &NotPythonExprVariable, value: ProgramValue) {
-        self.call_stack.last_mut().unwrap().variables[variable.index] = value;
+        let frame = self.call_stack.last_mut().unwrap();
+        frame.variables[variable.index] = Some(value);
     }
 
     fn assign_variable(
@@ -285,8 +290,8 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
         if self.in_pure_context() {
             // Only allow assigning to locals in the top (pure) frame.
             let frame = self.call_stack.last_mut().unwrap();
-            if let Some(v) = frame.variables.get_mut(variable.index) {
-                *v = value;
+            if let Some(Some(variable_value)) = frame.variables.get_mut(variable.index) {
+                *variable_value = value;
                 return Ok(());
             }
             return new_compile_err(format!(
@@ -295,8 +300,8 @@ impl<'a, Meta: CompilingMetadata> ProgramExecutionState<'a, Meta> {
             ));
         }
         for call_state in self.call_stack.iter_mut().rev() {
-            if let Some(v) = call_state.variables.get_mut(variable.index) {
-                *v = value;
+            if let Some(Some(variable_value)) = call_state.variables.get_mut(variable.index) {
+                *variable_value = value;
                 return Ok(());
             }
         }

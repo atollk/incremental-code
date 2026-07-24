@@ -144,14 +144,14 @@ mod tests {
 
     #[test]
     fn identity_visitor_preserves_literals() {
-        let stmt = parse("x = 1 + 2");
+        let stmt = parse("x = 1 + 2;\n");
         let result = IdentityVisitor.visit_stmt(stmt.clone());
         assert_eq!(result, stmt);
     }
 
     #[test]
     fn identity_visitor_preserves_nested_stmts() {
-        let stmt = parse("if true:\n    x = 1\nelse:\n    x = 2");
+        let stmt = parse("if True:\nx = 1;\nelse:\nx = 2;\nend\n");
         let result = IdentityVisitor.visit_stmt(stmt.clone());
         assert_eq!(result, stmt);
     }
@@ -166,8 +166,10 @@ mod tests {
             }
         }
 
-        // "x = 1 + 2" has three expressions: Int(1), Int(2), BinaryOp(Add)
-        let stmt = parse("x = 1 + 2");
+        // "x = y + 2" has three expressions: Variable(y), Int(2), BinaryOp(Add).
+        // (An all-literal expression like "1 + 2" would get constant-folded away
+        // by parse_program before the visitor ever sees it.)
+        let stmt = parse("x = y + 2;\n");
         let mut c = Counter(0);
         c.visit_stmt(stmt);
         assert_eq!(c.0, 3);
@@ -183,8 +185,8 @@ mod tests {
             }
         }
 
-        // "x = y + z" has two variable reads (y, z) plus one in the Decl lhs
-        let stmt = parse("x = y + z");
+        // "x = y + z" has two variable reads (y, z) plus one in the Assign lhs
+        let stmt = parse("x = y + z;\n");
         let mut c = VarCounter(0);
         c.visit_stmt(stmt);
         assert_eq!(c.0, 3);
@@ -203,9 +205,12 @@ mod tests {
             }
         }
 
-        let stmt = parse("x = 3");
+        let stmt = parse("x := 3;\n");
         let result = DoubleInts.visit_stmt(stmt);
-        let NotPythonStmt::Decl(_, expr) = result else {
+        let NotPythonStmt::Block(stmts) = result else {
+            panic!()
+        };
+        let NotPythonStmt::Decl(_, expr) = stmts.into_iter().next().unwrap() else {
             panic!()
         };
         assert_eq!(expr, NotPythonExpr::Int(6));
@@ -224,7 +229,7 @@ mod tests {
             }
         }
 
-        let stmt = parse("x = 1 + 2");
+        let stmt = parse("x = 1 + 2;\n");
         // Should not panic
         NoOpVisitor.visit_stmt(stmt);
     }

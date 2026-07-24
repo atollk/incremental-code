@@ -175,40 +175,46 @@ mod tests {
     #[test]
     fn test_mul_chain_folds_to_int() {
         assert_eq!(
-            parsed_decl_expr("x = 9*9*9*9*9*9"),
+            parsed_decl_expr("x := 9*9*9*9*9*9;\n"),
             NotPythonExpr::Int(531441)
         );
     }
 
     #[test]
     fn test_mixed_arithmetic_folds() {
-        assert_eq!(parsed_decl_expr("x = 3 + 4 * 2"), NotPythonExpr::Int(11));
+        assert_eq!(
+            parsed_decl_expr("x := 3 + 4 * 2;\n"),
+            NotPythonExpr::Int(11)
+        );
     }
 
     #[test]
     fn test_div_by_zero_not_folded() {
         // Should remain a BinaryOp node, not panic at parse time
-        let expr = parsed_decl_expr("x = 1 / 0");
+        let expr = parsed_decl_expr("x := 1 / 0;\n");
         assert!(matches!(expr, NotPythonExpr::BinaryOp(..)));
     }
 
     #[test]
     fn test_bool_fold() {
         assert_eq!(
-            parsed_decl_expr("x = true and false"),
+            parsed_decl_expr("x := True and False;\n"),
             NotPythonExpr::Boolean(false)
         );
         assert_eq!(
-            parsed_decl_expr("x = not true"),
+            parsed_decl_expr("x := not True;\n"),
             NotPythonExpr::Boolean(false)
         );
     }
 
     #[test]
     fn test_comparison_fold() {
-        assert_eq!(parsed_decl_expr("x = 3 < 5"), NotPythonExpr::Boolean(true));
         assert_eq!(
-            parsed_decl_expr("x = 10 == 10"),
+            parsed_decl_expr("x := 3 < 5;\n"),
+            NotPythonExpr::Boolean(true)
+        );
+        assert_eq!(
+            parsed_decl_expr("x := 10 == 10;\n"),
             NotPythonExpr::Boolean(true)
         );
     }
@@ -216,7 +222,7 @@ mod tests {
     #[test]
     fn test_identifier_blocks_fold() {
         // i - 1 cannot be folded because i is an identifier
-        let expr = parsed_decl_expr("x = i - 1");
+        let expr = parsed_decl_expr("x := i - 1;\n");
         assert!(matches!(expr, NotPythonExpr::BinaryOp(..)));
     }
 }

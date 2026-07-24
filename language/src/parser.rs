@@ -662,7 +662,16 @@ mod tests {
             stmts("def add(x, y):\npass;\nend\n"),
             vec![NotPythonStmt::Function {
                 name: "add".into(),
-                params: vec!["x".to_string().into(), "y".to_string().into()],
+                params: vec![
+                    NotPythonExprVariable {
+                        name: "x".to_string(),
+                        index: 0,
+                    },
+                    NotPythonExprVariable {
+                        name: "y".to_string(),
+                        index: 1,
+                    },
+                ],
                 body: Box::new(NotPythonStmt::Block(vec![NotPythonStmt::Pass])),
                 is_pure: false,
             }]
