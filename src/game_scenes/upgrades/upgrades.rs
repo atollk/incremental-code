@@ -21,15 +21,22 @@ pub struct UpgradesScene<'a> {
 
 impl<'a> Default for UpgradesScene<'a> {
     fn default() -> Self {
-        let (upgrades, current_resources, carryover_resources) = with_game_state(|game_state| {
-            (
-                game_state.upgrades.clone(),
-                game_state.current_resources.clone(),
-                game_state.carryover_resources.clone(),
-            )
-        });
+        let (upgrades, current_resources, carryover_resources, saved_selection) =
+            with_game_state(|game_state| {
+                (
+                    game_state.upgrades.clone(),
+                    game_state.current_resources.clone(),
+                    game_state.carryover_resources.clone(),
+                    game_state.upgrade_tree_selected.clone(),
+                )
+            });
         let mut tree_widget = create_tree_widget(&upgrades);
-        tree_widget.with_tree_state_mut(|state| state.select(vec![0]));
+        let selection = if saved_selection.is_empty() {
+            vec![0]
+        } else {
+            saved_selection
+        };
+        tree_widget.with_tree_state_mut(|state| state.select(selection));
         UpgradesScene {
             tree_widget,
             confirm_dialog: None,
@@ -40,6 +47,13 @@ impl<'a> Default for UpgradesScene<'a> {
 }
 
 impl<'a> UpgradesScene<'a> {
+    fn save_tree_selection(&self) {
+        let selected = self
+            .tree_widget
+            .with_tree_state(|ts| ts.selected().to_vec());
+        with_game_state_mut(|gs| gs.upgrade_tree_selected = selected);
+    }
+
     fn level(&mut self, identifier_path: &[usize; 3], level_up: bool) {
         let &[group, upgrade_idx, track] = identifier_path;
 
@@ -156,6 +170,7 @@ impl<'a> UpgradesScene<'a> {
                         self.upgrades_working_copy == game_state.upgrades
                     }) {
                         // no changes -> just switch back
+                        self.save_tree_selection();
                         return SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()));
                     } else {
                         // upgrades leveled -> open confirm dialog
@@ -207,6 +222,7 @@ impl<'a> Scene for UpgradesScene<'a> {
                         game_state.upgrades = self.upgrades_working_copy.clone()
                     });
                     on_upgrades_commit();
+                    self.save_tree_selection();
                     SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
                 }
                 Some(ConfirmResult::No) => {
@@ -214,6 +230,7 @@ impl<'a> Scene for UpgradesScene<'a> {
                         game_state.current_resources = self.resources_backup.0.clone();
                         game_state.carryover_resources = self.resources_backup.1.clone();
                     });
+                    self.save_tree_selection();
                     SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
                 }
                 Some(ConfirmResult::Cancel) => {

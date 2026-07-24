@@ -1,7 +1,7 @@
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_state::with_game_state;
+use crate::game_state::{CodeStatementLevels, with_game_state};
 use crate::widgets::terminal::RunningCommand;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
@@ -16,13 +16,41 @@ pub(super) fn docs_cmd(height: u16) -> Box<dyn RunningCommand<SceneSwitch>> {
 }
 
 fn get_docs_lines() -> Vec<Line<'static>> {
-    let (unlock_print, unlock_sleep, unlock_brk) = with_game_state(|gs| {
-        (
-            gs.upgrades.unlock_print.value(),
-            gs.upgrades.unlock_sleep.value(),
-            gs.upgrades.unlock_brk.value(),
-        )
-    });
+    let (unlock_print, unlock_sleep, unlock_brk, statements, (strings_allowed, max_int)) =
+        with_game_state(|gs| {
+            (
+                gs.upgrades.unlock_print.value(),
+                gs.upgrades.unlock_sleep.value(),
+                gs.upgrades.unlock_brk.value(),
+                gs.upgrades.statements.value(),
+                gs.upgrades.literals.value(),
+            )
+        });
+
+    // Mirrors the gating in `verification::verify_stmt`.
+    let allows_loops = !matches!(statements, CodeStatementLevels::None);
+    let allows_nested_loops = !matches!(
+        statements,
+        CodeStatementLevels::None | CodeStatementLevels::SimpleLoops
+    );
+    let allows_functions = matches!(
+        statements,
+        CodeStatementLevels::Functions
+            | CodeStatementLevels::PureFunctions
+            | CodeStatementLevels::SingleRecursion
+            | CodeStatementLevels::MultiRecursion
+    );
+    let allows_pure_functions = matches!(
+        statements,
+        CodeStatementLevels::PureFunctions
+            | CodeStatementLevels::SingleRecursion
+            | CodeStatementLevels::MultiRecursion
+    );
+    let max_recursion = match statements {
+        CodeStatementLevels::SingleRecursion => 1,
+        CodeStatementLevels::MultiRecursion => usize::MAX,
+        _ => 0,
+    };
 
     let mut lines: Vec<Line> = Vec::new();
     macro_rules! ln {
@@ -30,6 +58,9 @@ fn get_docs_lines() -> Vec<Line<'static>> {
             lines.push(Line::from(""))
         };
         ($s:literal) => {
+            lines.push(Line::from($s))
+        };
+        ($s:expr) => {
             lines.push(Line::from($s))
         };
     }
@@ -47,9 +78,11 @@ fn get_docs_lines() -> Vec<Line<'static>> {
     ln!("  a[0]            index into a list or dict");
     ln!();
     ln!("TYPES");
-    ln!("  42  1_000_000   integer");
+    ln!(format!("  -{max_int} to {max_int}       integer"));
     ln!("  3.14  .5        float");
-    ln!("  \"hello\"         string");
+    if strings_allowed {
+        ln!("  \"hello\"         string");
+    }
     ln!("  True  False     boolean");
     ln!("  None            null");
     ln!("  [1, 2, 3]       list");
@@ -70,17 +103,44 @@ fn get_docs_lines() -> Vec<Line<'static>> {
     ln!("    pass;");
     ln!("  end");
     ln!();
-    ln!("LOOPS");
-    ln!("  loop:");
-    ln!("    break;");
-    ln!("  end");
-    ln!("  break and continue are supported inside loops");
-    ln!();
-    ln!("FUNCTIONS");
-    ln!("  def add(a, b):");
-    ln!("    return a + b;");
-    ln!("  end");
-    ln!("  return; with no value returns None");
+    if allows_loops {
+        ln!("LOOPS");
+        ln!("  loop:");
+        ln!("    break;");
+        ln!("  end");
+        ln!("  break and continue are supported inside loops");
+        if allows_nested_loops {
+            ln!("  loops may be nested");
+        } else {
+            ln!("  loops cannot be nested yet");
+        }
+        ln!();
+    }
+
+    if allows_functions {
+        ln!("FUNCTIONS");
+        ln!("  def add(a, b):");
+        ln!("    return a + b;");
+        ln!("  end");
+        ln!("  return; with no value returns None");
+
+        if allows_pure_functions {
+            ln!();
+            ln!("MODIFIER: pure");
+            ln!("  def pure add(a, b):");
+            ln!("    return a + b;");
+            ln!("  end");
+            ln!("  Caches the result per input (memoization).");
+            ln!("  May only access its own local variables, not outer-scope ones.");
+        }
+
+        ln!();
+        ln!(match max_recursion {
+            0 => "  functions cannot call themselves yet".to_string(),
+            1 => "  functions may call themselves once (single recursion)".to_string(),
+            _ => "  functions may recurse freely".to_string(),
+        });
+    }
 
     if unlock_print {
         ln!();

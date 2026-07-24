@@ -159,7 +159,7 @@ struct ResourcesFmt<'a> {
 impl Display for ResourcesFmt<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let write_stars = self.parent.stars.0 != 0.0;
-        let write_diamond = self.parent.stars.0 != 0.0 || write_stars;
+        let write_diamond = self.parent.diamond.0 != 0.0 || write_stars;
         let write_gold = self.parent.gold.0 != 0.0 || write_diamond;
         let write_silver = self.parent.silver.0 != 0.0 || write_gold;
         let write_strings = Iterator::intersperse(

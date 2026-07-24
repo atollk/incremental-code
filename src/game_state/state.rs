@@ -16,11 +16,17 @@ pub struct GameState {
     // Program
     pub program_code: String,
     pub compiled_program: Option<Result<CompiledProgram, (String, Vec<Vec<u64>>)>>,
+    /// Whether `program_code` has changed since `compiled_program` was last produced.
+    #[serde(default)]
+    pub is_stale: bool,
     // Resources
     pub current_resources: Resources,
     pub carryover_resources: Resources,
     // Upgrades
     pub upgrades: Upgrades,
+    /// Identifier path of the last-selected node in the upgrade tree, restored on scene re-entry.
+    #[serde(default)]
+    pub upgrade_tree_selected: Vec<usize>,
 }
 
 impl Default for GameState {
@@ -31,9 +37,11 @@ impl Default for GameState {
         GameState {
             program_code: start_code.to_string(),
             compiled_program: None,
+            is_stale: false,
             current_resources: start_resources,
             carryover_resources: Resources::default(),
             upgrades: Upgrades::default(),
+            upgrade_tree_selected: Vec::new(),
         }
     }
 }
@@ -149,9 +157,12 @@ impl GameState {
     }
 
     pub fn prestige(&mut self) {
+        let keep_code = self.upgrades.keep_code_on_prestige.value();
         (self.current_resources, self.carryover_resources) = self.prestige_currency();
         self.upgrades = self.prestige_upgrades();
-        self.program_code = String::new();
+        if !keep_code {
+            self.program_code = String::new();
+        }
         self.compiled_program = None;
         self.on_upgrades_commit();
     }
@@ -215,52 +226,55 @@ mod tests {
     #[test]
     fn currency_shifts_each_denomination_up_one_tier_1() {
         let mut state = GameState::default();
-        state.current_resources = Resources::from_bronze(50);
+        state.current_resources = Resources::from_bronze(64); // 2^6
         state.carryover_resources = Resources::zero();
 
-        state.prestige_currency();
+        (state.current_resources, state.carryover_resources) = state.prestige_currency();
 
         assert_resources_close(&state.current_resources, &Resources::zero());
-        assert_resources_close(&state.carryover_resources, &Resources::from_silver(2));
+        assert_resources_close(&state.carryover_resources, &Resources::from_silver(6));
     }
 
-    // Each denomination's log10 is written one tier up (bronze -> new silver,
-    // silver -> new gold, gold -> new diamond, diamond -> new stars), and the
+    // Each denomination's log2 is written one tier up (bronze -> new silver,
+    // silver -> new gold, gold -> new diamond, diamond -> new stars) once it
+    // clears that tier's minimum threshold (1 / 100 / 1000 / 100_000), and the
     // new bronze tier is always emptied. Carryover resources held before the
     // prestige are discarded (see `carryover_stars_and_discarded_carryover`
     // below for the one field, stars, that survives).
     #[test]
     fn currency_shifts_each_denomination_up_one_tier() {
         let mut state = GameState::default();
-        state.current_resources = Resources::new(100.0, 1_000.0, 10.0, 1.0, 0.0);
+        // Powers of two chosen to clear each tier's minimum and give exact log2 results.
+        state.current_resources = Resources::new(64.0, 128.0, 1_024.0, 131_072.0, 0.0);
         state.carryover_resources = Resources::zero();
 
-        state.prestige_currency();
+        (state.current_resources, state.carryover_resources) = state.prestige_currency();
 
         assert_resources_close(&state.current_resources, &Resources::zero());
         assert_resources_close(
             &state.carryover_resources,
-            &Resources::new(0.0, 2.0, 3.0, 1.0, 0.0),
+            &Resources::new(0.0, 6.0, 7.0, 10.0, 17.0),
         );
     }
 
     // Stars are the one resource that isn't reset: prior current + carryover
-    // stars carry into the new current_resources untouched, and any log10 of
-    // diamond adds *more* stars into carryover (diamond is the top tier, so
-    // it feeds the prestige currency). Non-star carryover from before the
-    // prestige (e.g. old carryover bronze) is discarded, not converted.
+    // stars carry into the new current_resources untouched, and any log2 of
+    // diamond (once it clears the 100_000 threshold) adds *more* stars into
+    // carryover (diamond is the top tier, so it feeds the prestige currency).
+    // Non-star carryover from before the prestige (e.g. old carryover bronze)
+    // is discarded, not converted.
     #[test]
     fn carryover_stars_and_discarded_carryover() {
         let mut state = GameState::default();
-        state.current_resources = Resources::new(1.0, 1.0, 1.0, 1_000.0, 5.0);
+        state.current_resources = Resources::new(1.0, 1.0, 1.0, 131_072.0, 5.0); // diamond = 2^17
         state.carryover_resources = Resources::new(999.0, 0.0, 0.0, 0.0, 3.0);
 
-        state.prestige_currency();
+        (state.current_resources, state.carryover_resources) = state.prestige_currency();
 
         assert_eq!(state.current_resources.stars.0, 8.0); // 5 + 3
         assert_eq!(state.carryover_resources.bronze.0, 0.0); // old 999 discarded
-        assert_eq!(state.carryover_resources.stars.0, 3.0); // log10(1000) diamond -> stars
-        assert_eq!(state.total_resources().stars.0, 11.0); // 8 (current) + 3 (carryover)
+        assert_eq!(state.carryover_resources.stars.0, 17.0); // log2(131072) diamond -> stars
+        assert_eq!(state.total_resources().stars.0, 25.0); // 8 (current) + 17 (carryover)
     }
 
     // resources_after_reboot is added to current_resources *after* it has
@@ -278,7 +292,7 @@ mod tests {
             Resources::new(10_000.0, 100.0, 0.0, 0.0, 0.0)
         );
 
-        state.prestige_currency();
+        (state.current_resources, state.carryover_resources) = state.prestige_currency();
 
         assert_resources_close(
             &state.current_resources,
@@ -298,7 +312,7 @@ mod tests {
         state.upgrades.compile_time.track_level_up(0);
         state.upgrades.unlock_level2.track_level_up(0); // group 1, but always kept
 
-        state.prestige_upgrades();
+        state.upgrades = state.prestige_upgrades();
 
         assert!(state.upgrades.unlock_hud.value(), "group 0 upgrade kept");
         assert_eq!(
@@ -323,7 +337,7 @@ mod tests {
         state.upgrades.bronze_per_instruction.track_level_up(0);
         state.upgrades.auto_compile.track_level_up(0); // group 3
 
-        state.prestige_upgrades();
+        state.upgrades = state.prestige_upgrades();
 
         assert_eq!(
             state.upgrades.keep_prestige_upgrades.value(),
@@ -349,7 +363,7 @@ mod tests {
         let mut state = GameState::default();
         state.upgrades.keep_prestige_upgrades.track_level_up(0); // level 1, "keep L1"
 
-        state.prestige_upgrades();
+        state.upgrades = state.prestige_upgrades();
 
         assert_eq!(state.upgrades.keep_prestige_upgrades.value(), 0);
     }
@@ -364,7 +378,7 @@ mod tests {
         state.upgrades.instruction_execution_speed.track_level_up(0);
         state.upgrades.instruction_execution_speed.track_level_up(2);
 
-        state.prestige_upgrades();
+        state.upgrades = state.prestige_upgrades();
 
         assert_eq!(
             state
@@ -406,12 +420,33 @@ mod tests {
         );
         assert_resources_close(
             &state.carryover_resources,
-            &Resources::new(0.0, 2.0, 0.0, 0.0, 0.0), // log10(100) shifted into silver
+            &Resources::new(0.0, 6.0, 0.0, 0.0, 0.0), // log2(100) shifted into silver
         );
         assert_eq!(
             state.upgrades.compile_time.value(),
             10.0,
             "upgrades reset since keep_prestige_upgrades stayed at its default"
         );
+    }
+
+    #[test]
+    fn prestige_resets_code_by_default() {
+        let mut state = GameState::default();
+        state.program_code = "print(\"hi\");".to_string();
+
+        state.prestige();
+
+        assert_eq!(state.program_code, "");
+    }
+
+    #[test]
+    fn prestige_keeps_code_when_upgrade_purchased() {
+        let mut state = GameState::default();
+        state.program_code = "print(\"hi\");".to_string();
+        state.upgrades.keep_code_on_prestige.track_level_up(0);
+
+        state.prestige();
+
+        assert_eq!(state.program_code, "print(\"hi\");".to_string());
     }
 }

@@ -46,6 +46,9 @@ impl CodeEditorScene {
     fn save_code(&self) {
         let content = self.editor.get_content();
         with_game_state_mut(|state| {
+            if state.program_code != content {
+                state.is_stale = true;
+            }
             state.program_code = content.clone();
         });
     }

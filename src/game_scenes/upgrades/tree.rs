@@ -47,17 +47,40 @@ fn render_column_texts(upgrade: &dyn Upgrade) -> TreeColumns<String> {
     }
 }
 
-fn cost_style(cost: Option<Resources>) -> Style {
-    match cost {
-        None => Style::default().fg(Color::Gray),
-        Some(cost) => {
-            if cost <= with_game_state(|game_state| game_state.total_resources()) {
-                Style::default().fg(Color::White)
-            } else {
-                Style::default().fg(Color::LightRed)
-            }
+/// Builds colored spans for a cost, one per non-zero denomination (mirroring the
+/// cascade in `Resources::fmt_oneline`), coloring only the denominations the
+/// player is actually short on in red.
+fn cost_spans(cost: &Resources, available: &Resources) -> Vec<Span<'static>> {
+    let write_stars = cost.stars.0 != 0.0;
+    let write_diamond = cost.diamond.0 != 0.0 || write_stars;
+    let write_gold = cost.gold.0 != 0.0 || write_diamond;
+    let write_silver = cost.silver.0 != 0.0 || write_gold;
+    let denoms = [
+        (write_stars, cost.stars, available.stars, '⭐'),
+        (write_diamond, cost.diamond, available.diamond, '💎'),
+        (write_gold, cost.gold, available.gold, '🟡'),
+        (write_silver, cost.silver, available.silver, '⚪'),
+        (true, cost.bronze, available.bronze, '🟤'), // bronze always shown
+    ];
+    let mut spans = Vec::new();
+    for (write, amount, avail, symbol) in denoms {
+        if !write {
+            continue;
         }
+        if !spans.is_empty() {
+            spans.push(Span::raw(" "));
+        }
+        let color = if amount.0 > avail.0 {
+            Color::LightRed
+        } else {
+            Color::White
+        };
+        spans.push(Span::styled(
+            format!("{amount} {symbol}"),
+            Style::default().fg(color),
+        ));
     }
+    spans
 }
 
 fn render_track_items(upgrade: &dyn Upgrade) -> Vec<TreeItem<'static, usize>> {
@@ -67,16 +90,18 @@ fn render_track_items(upgrade: &dyn Upgrade) -> Vec<TreeItem<'static, usize>> {
             let track_level = upgrade.track_get_level(track);
             let max_level = upgrade.max_level();
             let cost = upgrade.track_next_cost(track);
-            let cost_str = match &cost {
-                None => "maxed".to_string(),
-                Some(c) => c.fmt_oneline().to_string(),
-            };
-            let style = cost_style(cost);
-            let line = Line::from(vec![
-                Span::raw(format!("-  {:>3}/{:<3}  ", track_level, max_level)),
-                Span::styled(cost_str, style),
-            ]);
-            TreeItem::new_leaf(track, line)
+            let mut spans = vec![Span::raw(format!(
+                "-  {:>3}/{:<3}  ",
+                track_level, max_level
+            ))];
+            match &cost {
+                None => spans.push(Span::styled("maxed", Style::default().fg(Color::Gray))),
+                Some(c) => {
+                    let available = with_game_state(|game_state| game_state.total_resources());
+                    spans.extend(cost_spans(c, &available));
+                }
+            }
+            TreeItem::new_leaf(track, Line::from(spans))
         })
         .collect()
 }
@@ -140,17 +165,33 @@ fn groups_are_unlocked(upgrades: &Upgrades) -> [bool; 7] {
     ]
 }
 
+const GROUP_FINISHED_ICON: &str = "✅";
+
+/// A group is "finished" once every upgrade in it has no purchasable track left.
+fn group_is_finished(upgrade_list: &[&dyn Upgrade], group_i: usize) -> bool {
+    let mut any = false;
+    let all_maxed = upgrade_list
+        .iter()
+        .filter(|u| u.group() == group_i)
+        .all(|u| {
+            any = true;
+            (0..u.count_tracks()).all(|t| u.track_next_cost(t).is_none())
+        });
+    any && all_maxed
+}
+
 fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'static, usize>> {
     let upgrade_list = upgrades.upgrades();
     let group_unlocks = groups_are_unlocked(upgrades);
     let groups = (0..group_unlocks.len())
         .filter(|i| group_unlocks[*i])
         .map(|group_i| {
-            TreeItem::new(
-                group_i,
-                format!("Level {group_i} upgrades"),
-                render_group_items(&upgrade_list, group_i),
-            )
+            let label = if group_is_finished(&upgrade_list, group_i) {
+                format!("Level {group_i} upgrades {GROUP_FINISHED_ICON}")
+            } else {
+                format!("Level {group_i} upgrades")
+            };
+            TreeItem::new(group_i, label, render_group_items(&upgrade_list, group_i))
         });
     groups.map(|item| item.unwrap()).collect()
 }

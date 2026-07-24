@@ -56,6 +56,7 @@ pub struct Upgrades {
     // Level 4
     pub unlock_print: UnlockPrint,
     pub min_instruction_duration: MinInstructionDuration,
+    pub keep_code_on_prestige: KeepCodeOnPrestige,
     pub gold_print_log_nesting: GoldPrintLogNesting,
     pub unlock_level5: UnlockLevel5,
     // Level 5
@@ -69,7 +70,7 @@ pub struct Upgrades {
 }
 
 impl Upgrades {
-    pub(crate) const UPGRADES_LEN: usize = 32;
+    pub(crate) const UPGRADES_LEN: usize = 33;
 
     /// Returns all upgrades as an array of trait-object references.
     pub fn upgrades(&self) -> [&dyn Upgrade; Self::UPGRADES_LEN] {
@@ -715,6 +716,14 @@ impl_upgrade!(
         Resources::from_gold(100.),
         Resources::from_gold(1e3),
     ]]
+);
+
+impl_upgrade!(
+    KeepCodeOnPrestige,
+    type=bool,
+    level=4,
+    values=[(false, LOCKED), (true, UNLOCKED)],
+    costs=[[Resources::from_gold(1e3)]]
 );
 
 impl_upgrade!(

@@ -423,6 +423,26 @@ impl Editor {
             0
         };
 
+        // Index of the segment that will end up adjacent to the original line's
+        // remaining tail (the text after the insertion/deletion point that gets
+        // pushed right rather than replaced). Only that segment's budget needs to
+        // account for the tail — earlier segments are always followed by a newline.
+        let total_segments = text.split('\n').count();
+        let last_emitted_seg_idx = match newlines_allowed {
+            Some(allowed) => (total_segments - 1).min(allowed),
+            None => total_segments - 1,
+        };
+        let tail_len = if self.max_line_width.is_some() {
+            let del_end = match selection {
+                Some(sel) if !sel.is_empty() => sel.sorted().1,
+                _ => effective_cursor,
+            };
+            let (row, col) = self.code.point(del_end);
+            self.code.line_len(row).saturating_sub(col)
+        } else {
+            0
+        };
+
         let mut result = String::with_capacity(text.len());
         let mut newlines_used = 0usize;
         let mut seg_start_col = cursor_col;
@@ -441,7 +461,14 @@ impl Editor {
             }
 
             let truncated = if let Some(max_width) = self.max_line_width {
-                let remaining = max_width.saturating_sub(seg_start_col);
+                let extra_budget = if seg_idx == last_emitted_seg_idx {
+                    tail_len
+                } else {
+                    0
+                };
+                let remaining = max_width
+                    .saturating_sub(seg_start_col)
+                    .saturating_sub(extra_budget);
                 let char_count = segment.chars().count();
                 if char_count <= remaining {
                     segment
@@ -572,5 +599,61 @@ impl Editor {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::widgets::code_editor::code_logos::plain_text_lang;
+
+    #[test]
+    fn clamp_insertion_text_accounts_for_line_tail_on_mid_line_insert() {
+        // "abcde" (5 chars), max width 10, inserting mid-line at col 2 ("ab|cde").
+        let editor = Editor::new(plain_text_lang(), "abcde").with_max_line_width(10);
+        let clamped = editor.clamp_insertion_text(2, None, "XXXXXXXX");
+        // "ab" + clamped + "cde" must not exceed 10 chars: 2 + 5 + 3 = 10.
+        assert_eq!(clamped, "XXXXX");
+    }
+
+    #[test]
+    fn clamp_insertion_text_unbounded_when_no_tail() {
+        // Inserting at end of line: no tail, full budget available.
+        let editor = Editor::new(plain_text_lang(), "ab").with_max_line_width(10);
+        let clamped = editor.clamp_insertion_text(2, None, "XXXXXXXX");
+        assert_eq!(clamped, "XXXXXXXX");
+    }
+
+    #[test]
+    fn clamp_insertion_text_applies_tail_budget_to_last_emitted_segment_after_line_cutoff() {
+        // 2 existing lines, max_lines=2 -> no new lines may be inserted, so the
+        // paste's first segment is also the last *emitted* one, and must still
+        // account for the tail of the line it's inserted into.
+        let editor = Editor::new(plain_text_lang(), "ab\ncd")
+            .with_max_line_width(10)
+            .with_max_lines(2);
+        // Insert at col 1 of line 0 ("a|b"): tail is "b" (1 char).
+        let clamped = editor.clamp_insertion_text(1, None, "XXXXXXXXXX\nYYYY");
+        // remaining = 10 - col(1) - tail(1) = 8, and the newline is rejected outright.
+        assert_eq!(clamped, "XXXXXXXX");
+    }
+
+    #[test]
+    fn clamp_insertion_text_measures_tail_from_selection_end() {
+        // "abcdef", replacing the selected "cd" (indices 2..4) with pasted text.
+        let editor = Editor::new(plain_text_lang(), "abcdef").with_max_line_width(10);
+        let selection = Selection::new(2, 4);
+        let clamped = editor.clamp_insertion_text(2, Some(selection), "XXXXXXXX");
+        // remaining = 10 - col(2) - tail_after_selection("ef" = 2) = 6.
+        assert_eq!(clamped, "XXXXXX");
+    }
+
+    #[test]
+    fn clamp_insertion_text_empty_selection_falls_back_to_cursor() {
+        // An empty (zero-width) selection behaves like no selection at all.
+        let editor = Editor::new(plain_text_lang(), "abcde").with_max_line_width(10);
+        let selection = Selection::new(2, 2);
+        let clamped = editor.clamp_insertion_text(2, Some(selection), "XXXXXXXX");
+        assert_eq!(clamped, "XXXXX");
     }
 }

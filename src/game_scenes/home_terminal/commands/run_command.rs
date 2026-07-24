@@ -26,6 +26,22 @@ pub(super) fn run_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
 }
 
 fn run_cmd_without_auto_compile() -> Box<dyn RunningCommand<SceneSwitch>> {
+    let is_stale =
+        with_game_state(|game_state| game_state.compiled_program.is_some() && game_state.is_stale);
+    if is_stale {
+        Box::new(ChainCmd::new(
+            Box::new(ParagraphCmd::new(Paragraph::new(Text::from(
+                "Warning: code has changed since last compile; running the old compiled version.",
+            )))),
+            Box::new(|_| run_cmd_inner()),
+            true,
+        ))
+    } else {
+        run_cmd_inner()
+    }
+}
+
+fn run_cmd_inner() -> Box<dyn RunningCommand<SceneSwitch>> {
     let compiled_program = with_game_state(|game_state| game_state.compiled_program.clone());
     if let Some(compiled_program) = compiled_program {
         match compiled_program {

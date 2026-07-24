@@ -148,7 +148,10 @@ impl CompiledProgram {
             },
         );
         // Brk is awarded based on the other three resources, scaled by the point where the brk was called relative to all instructions.
-        let diamond = {
+        // Without an actual brk() call there's only one block, so no diamond is earned.
+        let diamond = if instruction_counts_between_brk.len() <= 1 {
+            0.
+        } else {
             let brk_relatives = instruction_counts_between_brk
                 .iter()
                 .dropping_back(1)
@@ -174,7 +177,7 @@ mod tests {
     use crate::game_state::{Upgrade, with_game_state_mut};
 
     /// Levels up (and, after `f` runs, levels back down) the four upgrades that
-    /// `instr_to_execution_time` reads from global game state, then runs `f`.
+    /// `execution_time` reads from global game state, then runs `f`.
     fn with_levels<T>(
         speed_level: u8,
         min_duration_level: u8,
@@ -217,6 +220,14 @@ mod tests {
         result
     }
 
+    fn exec_time(counts: &Vec<Vec<u64>>) -> Duration {
+        CompiledProgram {
+            instruction_counts: counts.clone(),
+            ..CompiledProgram::new()
+        }
+        .execution_time()
+    }
+
     fn assert_close(actual: Duration, expected_secs: f64) {
         let actual_secs = actual.as_secs_f64();
         assert!(
@@ -225,16 +236,14 @@ mod tests {
         );
     }
 
-    // Level 1 of instruction_execution_speed (0.9x) with everything else at
+    // Level 1 of instruction_execution_speed (0.8x) with everything else at
     // its default level.
     #[test]
     #[serial]
     fn speed_level_1_only() {
         let counts = vec![vec![10]];
-        let duration = with_levels(1, 0, 0, 0, || {
-            CompiledProgram::instr_to_execution_time(&counts)
-        });
-        assert_close(duration, 9.);
+        let duration = with_levels(1, 0, 0, 0, || exec_time(&counts));
+        assert_close(duration, 8.);
     }
 
     // With min_instruction_duration lowered so the floor never binds, and the
@@ -245,8 +254,8 @@ mod tests {
     #[serial]
     fn linear_scaling_with_default_speed_upgrade() {
         let (d10, d25) = with_levels(0, 2, 0, 0, || {
-            let d10 = CompiledProgram::instr_to_execution_time(&vec![vec![10]]);
-            let d25 = CompiledProgram::instr_to_execution_time(&vec![vec![25]]);
+            let d10 = exec_time(&vec![vec![10]]);
+            let d25 = exec_time(&vec![vec![25]]);
             (d10, d25)
         });
         assert_close(d10, 10.0);
@@ -259,14 +268,11 @@ mod tests {
     #[serial]
     fn faster_instruction_speed_reduces_execution_time() {
         let counts = vec![vec![10]];
-        let default_duration = with_levels(0, 2, 0, 0, || {
-            CompiledProgram::instr_to_execution_time(&counts)
-        });
-        let upgraded_duration = with_levels(5, 2, 0, 0, || {
-            CompiledProgram::instr_to_execution_time(&counts)
-        });
+        let default_duration = with_levels(0, 2, 0, 0, || exec_time(&counts));
+        let upgraded_duration = with_levels(5, 2, 0, 0, || exec_time(&counts));
         assert_close(default_duration, 10.0);
-        assert_close(upgraded_duration, 5.0);
+        // Level 5 of instruction_execution_speed is 0.15x.
+        assert_close(upgraded_duration, 1.5);
     }
 
     // brk_slowdown divides the per-instruction duration by brk_slowdown^k, so
@@ -276,12 +282,8 @@ mod tests {
     #[serial]
     fn brk_slowdown_level_divides_second_block_duration() {
         let counts = vec![vec![10], vec![10]];
-        let default_duration = with_levels(0, 2, 0, 0, || {
-            CompiledProgram::instr_to_execution_time(&counts)
-        });
-        let upgraded_duration = with_levels(0, 2, 1, 0, || {
-            CompiledProgram::instr_to_execution_time(&counts)
-        });
+        let default_duration = with_levels(0, 2, 0, 0, || exec_time(&counts));
+        let upgraded_duration = with_levels(0, 2, 1, 0, || exec_time(&counts));
         // Block 1 (k=0) always takes 10s; block 2 (k=1) takes 10/brk_slowdown seconds.
         assert_close(default_duration, 10.0 + 10.0 * 10.);
         assert_close(upgraded_duration, 10.0 + 10.0 * 5.);
@@ -294,16 +296,12 @@ mod tests {
     #[serial]
     fn sleep_speed_reset_controls_carryover_between_segments() {
         let counts = vec![vec![10, 10]];
-        let full_reset_duration = with_levels(5, 2, 0, 0, || {
-            CompiledProgram::instr_to_execution_time(&counts)
-        });
-        let full_carryover_duration = with_levels(5, 2, 0, 10, || {
-            CompiledProgram::instr_to_execution_time(&counts)
-        });
-        // Segment 1 always takes 5s (10 * 0.5). Segment 2 takes 5s again if
-        // speed was reset to baseline, or 2.5s if the 0.5x speedup carried over.
-        assert_close(full_reset_duration, 5.0 + 5.0);
-        assert_close(full_carryover_duration, 5.0 + 2.5);
+        let full_reset_duration = with_levels(5, 2, 0, 0, || exec_time(&counts));
+        let full_carryover_duration = with_levels(5, 2, 0, 10, || exec_time(&counts));
+        // Segment 1 always takes 1.5s (10 * 0.15). Segment 2 takes 1.5s again if
+        // speed was reset to baseline, or 0.225s if the 0.15x speedup carried over.
+        assert_close(full_reset_duration, 1.5 + 1.5);
+        assert_close(full_carryover_duration, 1.5 + 0.225);
     }
 }
 

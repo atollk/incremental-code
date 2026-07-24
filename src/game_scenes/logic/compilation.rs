@@ -272,6 +272,7 @@ pub mod compile_thread {
                     Ok(compile_result) => {
                         with_game_state_mut(|game_state| {
                             game_state.compiled_program = Some(compile_result);
+                            game_state.is_stale = false;
                         });
                         Ok(())
                     }
