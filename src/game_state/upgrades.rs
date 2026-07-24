@@ -199,7 +199,7 @@ macro_rules! impl_upgrade {
                 if total >= self.max_level() {
                     return None;
                 }
-                Self::cost_at_track(track, total)
+                Self::cost_at_track(track, self.track_get_level(track))
             }
 
             fn track_level_up(&mut self, track: usize) {
@@ -323,12 +323,12 @@ impl_upgrade!(
             Resources::from_bronze(30),
             Resources::from_bronze(200),
             Resources::from_bronze(1000),
-            Resources::from_bronze(30e3),
+            Resources::from_bronze(10e3),
         ],
         [
             Resources::from_silver(1),
-            Resources::from_silver(1),
-            Resources::from_silver(1),
+            Resources::from_silver(5),
+            Resources::from_silver(100),
             Resources::from_silver(30e3),
             Resources::from_silver(30e3),
             Resources::from_gold(30e3),
@@ -394,8 +394,8 @@ impl_upgrade!(
         Resources::from_bronze(25), // core upgrade 2
         Resources::from_bronze(250), // core upgrade 5
         Resources::from_bronze(1e3), // core upgrade 6
-        Resources::from_bronze(100e3), // core upgrade 8
-        Resources::from_bronze(100e3), // core upgrade 10
+        Resources::from_bronze(2e3), // core upgrade 8
+        Resources::from_bronze(4e3), // core upgrade 10
         Resources::from_bronze(10e6), // core upgrade 15
         Resources::from_silver(10.), // core upgrade 16
         Resources::from_silver(10.), // core upgrade 17
@@ -493,41 +493,15 @@ impl_upgrade!(
     level=2,
     values=[
         (100, "100"),
-        (100, "200"),
-        (100, "300"),
-        (100, "400"),
-        (500, "500"),
-        (500, "750"),
-        (500, "1000"),
-        (500, "1250"),
-        (500, "1500"),
-        (2000, "2000"),
-        (2000, "2500"),
-        (2000, "3000"),
-        (2000, "4000"),
-        (2000, "5000"),
-        (2000, "6000"),
-        (2000, "8000"),
-        (10_000, "10000"),
-        (100_000, "10000"),
-        (1_000_000, "10000"),
-        (100_000_000, "10000"),
-        (1_000_000_000, "100000"),
+        (1000, "1000"),
+        (5000, "5 k"),
+        (10_000, "10 k"),
+        (100_000, "100 k"),
+        (1_000_000, "1 M"),
+        (100_000_000, "100 M"),
+        (1_000_000_000, "1 B"),
     ],
-    costs=[[
-        Resources::from_bronze(50.),
-        Resources::from_bronze(50.),
-        Resources::from_bronze(50.),
-        Resources::from_bronze(50.),
-        Resources::from_bronze(1e3),
-        Resources::from_bronze(1e3),
-        Resources::from_bronze(1e3),
-        Resources::from_bronze(1e3),
-        Resources::from_bronze(1e3),
-        Resources::from_bronze(50e3),
-        Resources::from_bronze(50e3),
-        Resources::from_bronze(50e3),
-        Resources::from_bronze(50e3),
+    costs=[[  // TODO
         Resources::from_bronze(50e3),
         Resources::from_bronze(50e3),
         Resources::from_bronze(50e3),
@@ -560,10 +534,10 @@ impl_upgrade!(
         ((true, 255), "numbers to 255"),
     ],
     costs=[[
-        Resources::from_bronze(200.), // core upgrade 7
-        Resources::from_bronze(200.), // core upgrade 9
-        Resources::from_bronze(200.), // core upgrade 12
-        Resources::from_bronze(200.), // core upgrade 12.5
+        Resources::from_bronze(1e3), // core upgrade 7
+        Resources::from_bronze(3e3), // core upgrade 9
+        Resources::from_bronze(10e3), // core upgrade 12
+        Resources::from_silver(100), // core upgrade 12.5
         Resources::zero(), // core upgrade 14
         Resources::zero(), // core upgrade 27
     ]]
@@ -583,8 +557,8 @@ impl_upgrade!(
         (6, "keep L6"),
     ],
     costs=[[
-        Resources::from_bronze(1e3),
-        Resources::from_bronze(10e3),
+        Resources::from_silver(1),
+        Resources::from_silver(10),
         Resources::from_bronze(500.),
         Resources::from_bronze(500.),
         Resources::from_bronze(500.),
@@ -616,7 +590,7 @@ impl_upgrade!(
         (CodeStatementLevels::MultiRecursion, "multi recursion"),
     ],
     costs=[[
-        Resources::from_bronze(500e3), // core upgrade 11
+        Resources::from_silver(13), // core upgrade 11
         Resources::from_bronze(500e3), // core upgrade 18
         Resources::from_bronze(500e3), // core upgrade 20
         Resources::from_bronze(500e3),
@@ -630,7 +604,7 @@ impl_upgrade!(
     type=bool,
     level=2,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_silver(1e3)]]
+    costs=[[Resources::from_bronze(10e3)]]
 );
 
 // Level 3
@@ -648,7 +622,7 @@ impl_upgrade!(
     type=bool,
     level=3,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_gold(50.)]]
+    costs=[[Resources::new(1., 1., 0., 0., 0.)]]
 );
 
 /*

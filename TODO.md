@@ -2,5 +2,6 @@
 - remove debugging info from compile output
 - upgrade: remember cursor position when coming back
 - upgrade: show icon for completely finished levels
-- upgrade: path shows cheapest upgrade cost instead of in order?
-- prestige/reboot: show resource gain on confirmation
+- 'run' should show a warning if the newest program has not been compiled
+- some text in the upgrade screen break the overlay?
+- upgrade: only show missing resource numbers in red, not all of them

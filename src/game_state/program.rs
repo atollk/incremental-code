@@ -24,7 +24,7 @@ impl CompiledProgram {
         }
     }
 
-    pub fn instr_to_execution_time(instruction_counts: &Vec<Vec<u64>>) -> Duration {
+    pub(crate) fn instr_to_execution_time(instruction_counts: &Vec<Vec<u64>>) -> Duration {
         struct Upgrades {
             instruction_execution_speed: (f64, f64),
             sleep_speed_reset: f64,
@@ -37,66 +37,78 @@ impl CompiledProgram {
             min_instruction_duration: game_state.upgrades.min_instruction_duration.value(),
             brk_slowdown: game_state.upgrades.brk_slowdown.value(),
         });
-        /*
-        Math time:
-        speed(s, n, k) : The instruction duration after n instructions, beginning from s, with k brks active. (not considering the min_instruction_duration)
-        x,y: instruction_execution_speed
-        b: brk_slowdown
-        speed(s, n, k) = s * x * n^y / b^k
 
-        Sum:
-        duration(s, n, k) = sum_{i=1}^n speed(s, i, k) = s * x / b^k * sum_{i=1}^n i^y
+        let instruction_exec_duration = {
+            /*
+            Math time:
+            speed(s, n, k) : The instruction duration after n instructions, beginning from s, with k brks active. (not considering the min_instruction_duration)
+            x,y: instruction_execution_speed
+            b: brk_slowdown
+            speed(s, n, k) = s * x * n^y / b^k
 
-        Inverse:
-        n(speed, s, k) = (b^k * speed / s / x)^(1/y)
-         */
-        // Instruction Speed after n instructions and k brks: x*n^y / k^b (x,y: instruction_execution speed, b: brk_slowdown)
-        let (instruction_speed_const, instruction_speed_exp) = upgrades.instruction_execution_speed;
-        let mut speed = 1.0;
-        let mut duration = 0.0;
-        for (n_brks, brk_split) in instruction_counts.iter().enumerate() {
-            let b_pow_k = upgrades.brk_slowdown.powi(n_brks as i32);
-            for sleep_split in brk_split {
-                let sleep_split = *sleep_split as f64;
+            Sum:
+            duration(s, n, k) = sum_{i=1}^n speed(s, i, k) = s * x / b^k * sum_{i=1}^n i^y
 
-                // Find the number of instructions at which min_instruction_duration is reached, if any.
-                let min_duration_reached_at = if instruction_speed_exp == 0.0 {
-                    f64::INFINITY
-                } else {
-                    (b_pow_k * upgrades.min_instruction_duration / speed / instruction_speed_const)
-                        .powf(1. / instruction_speed_exp)
-                };
-                let min_duration_reached = min_duration_reached_at < sleep_split;
+            Inverse:
+            n(speed, s, k) = (b^k * speed / s / x)^(1/y)
+             */
+            // Instruction Speed after n instructions and k brks: x*n^y / k^b (x,y: instruction_execution speed, b: brk_slowdown)
+            let (instruction_speed_const, instruction_speed_exp) =
+                upgrades.instruction_execution_speed;
+            let mut speed = 1.0;
+            let mut duration = 0.0;
+            for (n_brks, brk_split) in instruction_counts.iter().enumerate() {
+                let b_pow_k = upgrades.brk_slowdown.powi(n_brks as i32);
+                for sleep_split in brk_split {
+                    let sleep_split = *sleep_split as f64;
 
-                // Compute the time taken
-                let sleep_cycle_duration = if min_duration_reached {
-                    let before_min = hurwitz(min_duration_reached_at, instruction_speed_exp)
-                        * (speed)
-                        * (instruction_speed_const)
-                        / b_pow_k;
-                    let after_min =
-                        (sleep_split - min_duration_reached_at) * upgrades.min_instruction_duration;
-                    before_min + after_min
-                } else {
-                    hurwitz(sleep_split, instruction_speed_exp) * speed * instruction_speed_const
-                        / b_pow_k
-                };
-                duration += sleep_cycle_duration;
+                    // Find the number of instructions at which min_instruction_duration is reached, if any.
+                    let min_duration_reached_at = if instruction_speed_exp == 0.0 {
+                        f64::INFINITY
+                    } else {
+                        (b_pow_k * upgrades.min_instruction_duration
+                            / speed
+                            / instruction_speed_const)
+                            .powf(1. / instruction_speed_exp)
+                    };
+                    let min_duration_reached = min_duration_reached_at < sleep_split;
 
-                // Compute new speed
-                let pre_sleep_speed =
-                    (speed * instruction_speed_const * sleep_split.powf(instruction_speed_exp)
-                        / b_pow_k)
-                        .max(upgrades.min_instruction_duration);
-                speed = pre_sleep_speed.powf(upgrades.sleep_speed_reset);
+                    // Compute the time taken
+                    let sleep_cycle_duration = if min_duration_reached {
+                        let before_min = hurwitz(min_duration_reached_at, instruction_speed_exp)
+                            * (speed)
+                            * (instruction_speed_const)
+                            / b_pow_k;
+                        let after_min = (sleep_split - min_duration_reached_at)
+                            * upgrades.min_instruction_duration;
+                        before_min + after_min
+                    } else {
+                        hurwitz(sleep_split, instruction_speed_exp)
+                            * speed
+                            * instruction_speed_const
+                            / b_pow_k
+                    };
+                    duration += sleep_cycle_duration;
+
+                    // Compute new speed
+                    let pre_sleep_speed =
+                        (speed * instruction_speed_const * sleep_split.powf(instruction_speed_exp)
+                            / b_pow_k)
+                            .max(upgrades.min_instruction_duration);
+                    speed = pre_sleep_speed.powf(upgrades.sleep_speed_reset);
+                }
             }
-        }
 
-        Duration::from_millis(1000).mul_f64(duration)
+            Duration::from_millis(1000).mul_f64(duration)
+        };
+
+        instruction_exec_duration
     }
 
     pub fn execution_time(&self) -> Duration {
-        Self::instr_to_execution_time(&self.instruction_counts)
+        let instruction_duration = Self::instr_to_execution_time(&self.instruction_counts);
+        let sleep_duration = Duration::from_secs(1).mul_f64(self.sleep_calls.iter().sum());
+        instruction_duration + sleep_duration
     }
 
     pub fn resource_gain(&self) -> Resources {

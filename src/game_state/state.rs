@@ -83,30 +83,36 @@ impl GameState {
         self.carryover_resources += resources;
     }
 
-    fn prestige_currency(&mut self) {
+    pub fn prestige_currency(&self) -> (Resources, Resources) {
         // Convert currency
-        let convert = |x| {
-            let y = f64::log10(x).round();
-            if y.is_finite() { y } else { 0.0 }
+        let convert = |x, min| {
+            if x < min {
+                0.0
+            } else {
+                let y = f64::log2(x).floor();
+                if y.is_finite() { y } else { 0.0 }
+            }
         };
         let current_stars = self.current_resources.stars + self.carryover_resources.stars;
 
-        self.carryover_resources = Resources::new(
+        let carryover_resources = Resources::new(
             0.0,
-            convert(self.current_resources.bronze.0),
-            convert(self.current_resources.silver.0),
-            convert(self.current_resources.gold.0),
-            convert(self.current_resources.diamond.0),
+            convert(self.current_resources.bronze.0, 1.),
+            convert(self.current_resources.silver.0, 10.),
+            convert(self.current_resources.gold.0, 100.),
+            convert(self.current_resources.diamond.0, 1000.),
         );
 
-        self.current_resources = Resources::zero();
-        self.current_resources.stars = current_stars;
+        let mut current_resources = Resources::zero();
+        current_resources.stars = current_stars;
 
         // Add currency from upgrades
-        self.current_resources += self.upgrades.resources_after_reboot.value();
+        current_resources += self.upgrades.resources_after_reboot.value();
+
+        (current_resources, carryover_resources)
     }
 
-    fn prestige_upgrades(&mut self) {
+    fn prestige_upgrades(&self) -> Upgrades {
         // Reset upgrades
         let old_upgrades = self.upgrades.clone();
         let mut prestiged_upgrades = Upgrades::default();
@@ -139,12 +145,14 @@ impl GameState {
         restore_upgrade!(old_upgrades.unlock_level5, prestiged_upgrades.unlock_level5);
         restore_upgrade!(old_upgrades.unlock_level6, prestiged_upgrades.unlock_level6);
 
-        self.upgrades = prestiged_upgrades;
+        prestiged_upgrades
     }
 
     pub fn prestige(&mut self) {
-        self.prestige_currency();
-        self.prestige_upgrades();
+        (self.current_resources, self.carryover_resources) = self.prestige_currency();
+        self.upgrades = self.prestige_upgrades();
+        self.program_code = String::new();
+        self.compiled_program = None;
         self.on_upgrades_commit();
     }
 

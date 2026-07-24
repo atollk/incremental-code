@@ -2,7 +2,7 @@ use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::reboot::RebootScene;
-use crate::game_state::with_game_state_mut;
+use crate::game_state::{with_game_state, with_game_state_mut};
 use crate::widgets::terminal::RunningCommand;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
@@ -56,13 +56,18 @@ impl RunningCommand<SceneSwitch> for RebootCmd {
         }
     }
 
+    // TODO: this is not displayed multi-line for some reason
     fn render(&self, area: Rect, buf: &mut Buffer) {
         let text = match self.state {
             RebootState::Asking => {
-                "Reboot? This will reset all upgrades but give additional resources. [y/N]"
+                let resource_gain = with_game_state(|game_state| game_state.prestige_currency()).1;
+                format!(
+                    "This will reset all upgrades but give additional resources.\nWith your current resources, you will restart with {}\nReboot?  [y/N]",
+                    resource_gain.fmt_oneline()
+                )
             }
-            RebootState::Confirmed => "Rebooting...",
-            RebootState::Cancelled => "Reboot cancelled.",
+            RebootState::Confirmed => "Rebooting...".to_string(),
+            RebootState::Cancelled => "Reboot cancelled.".to_string(),
         };
         buf.set_string(area.x, area.y, text, Style::default());
     }
