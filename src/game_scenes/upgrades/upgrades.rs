@@ -252,38 +252,5 @@ impl<'a> Scene for UpgradesScene<'a> {
 }
 
 pub fn on_upgrades_commit() {
-    // If music was unlocked, start the music.
-    let unlock_music = with_game_state(|game_state| game_state.upgrades.unlock_music.value());
-    with_audio_backend_mut(|audio| {
-        if let Some(audio) = audio {
-            if unlock_music {
-                let _ = audio
-                    .start_bgm_loop()
-                    .map_err(|e| log::warn!("Error starting bgm: {}", e));
-            } else {
-                audio.stop_bgm();
-            }
-        }
-    });
-
-    // If the instruction limit changed and the program was compiled already, re-compile it to recount the instructions
-    if with_game_state(|game_state| matches!(game_state.compiled_program, Some(Err(_)))) {
-        // TODO: for the moment, we just force the user to recompile manually
-        with_game_state_mut(|game_state| game_state.compiled_program = None);
-    }
-
-    // Update the auto runner
-    let auto_run_duration = with_game_state(|game_state| game_state.upgrades.auto_run.value());
-    with_auto_run_mut(|auto_run| {
-        if let Some(auto_run_duration) = auto_run_duration {
-            auto_run.set_period(auto_run_duration);
-        } else {
-            auto_run.stop();
-        }
-    });
-
-    // If the win condition was bought, win
-    if with_game_state(|game_state| game_state.upgrades.win_condition.value()) {
-        todo!()
-    }
+    with_game_state_mut(|game_state| game_state.on_upgrades_commit());
 }

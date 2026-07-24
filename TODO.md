@@ -1,5 +1,6 @@
-- update docs
-- compile output
-- upgrade: remember cursor position
-- upgrade: show finished levels
+- update docs command to reflect recent changes to the language
+- remove debugging info from compile output
+- upgrade: remember cursor position when coming back
+- upgrade: show icon for completely finished levels
 - upgrade: path shows cheapest upgrade cost instead of in order?
+- prestige/reboot: show resource gain on confirmation
