@@ -56,7 +56,7 @@ pub struct Upgrades {
     // Level 4
     pub unlock_print: UnlockPrint,
     pub min_instruction_duration: MinInstructionDuration,
-    pub gold_per_print_character: GoldPerPrintCharacter,
+    pub gold_print_log_nesting: GoldPrintLogNesting,
     pub unlock_level5: UnlockLevel5,
     // Level 5
     pub auto_run: AutoRun,
@@ -780,7 +780,7 @@ impl_upgrade!(
 );
 
 impl_upgrade!(
-    GoldPerPrintCharacter,
+    GoldPrintLogNesting,
     type=u8,
     level=4,
     values=[

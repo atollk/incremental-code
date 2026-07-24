@@ -450,6 +450,8 @@ mod tests {
         let gain = program.resource_gain();
         assert!(gain.bronze.0 > 0.0, "stage A should earn bronze");
         assert_eq!(gain.silver.0, 0.0, "stage A has no sleep");
+        assert_eq!(gain.gold.0, 0.0, "stage A has no print");
+        assert_eq!(gain.diamond.0, 0.0, "stage A has no brk");
     }
 
     #[test]
@@ -472,6 +474,8 @@ mod tests {
         let gain = run_pd_program(&u).resource_gain();
         assert!(gain.silver.0 > 0.0, "stage D should earn silver from sleep");
         assert!(gain.bronze.0 > 0.0, "stage D should still earn bronze");
+        assert_eq!(gain.gold.0, 0.0, "stage D has no print");
+        assert_eq!(gain.diamond.0, 0.0, "stage D has no brk");
     }
 
     #[test]
@@ -483,7 +487,8 @@ mod tests {
             "stage E program should have a non-empty print"
         );
         let gain = program.resource_gain();
-        assert!(gain.silver.0 > 0.0, "stage E should earn silver");
+        assert!(gain.gold.0 > 0.0, "stage E should earn gold");
+        assert_eq!(gain.diamond.0, 0.0, "stage E has no brk");
     }
 
     #[test]
@@ -492,7 +497,7 @@ mod tests {
         // Level it up to 3 (1 iteration = min(log2(n), 1.)) so gold is well-behaved.
         with_game_state_mut(|state| {
             for _ in 0..3 {
-                state.upgrades.gold_per_print_character.track_level_up(0);
+                state.upgrades.gold_print_log_nesting.track_level_up(0);
             }
         });
         let u = make_upgrades(6, 3, 9, 4, true, true, true);
@@ -500,16 +505,13 @@ mod tests {
         // Restore global state
         with_game_state_mut(|state| {
             for _ in 0..3 {
-                state.upgrades.gold_per_print_character.track_level_down(0);
+                state.upgrades.gold_print_log_nesting.track_level_down(0);
             }
         });
         assert!(
             gain.diamond.0.is_finite(),
             "stage H diamond should be finite"
         );
-        assert!(
-            gain.diamond.0 != 0.0,
-            "stage H should earn diamond from brk"
-        );
+        assert_ne!(gain.diamond.0, 0.0, "stage H should earn diamond from brk");
     }
 }

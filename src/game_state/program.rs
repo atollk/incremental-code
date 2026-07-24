@@ -101,13 +101,13 @@ impl CompiledProgram {
         struct ResourceUpgrades {
             bronze_per_instruction: (u8, f32),
             silver_per_sleep_second: u8,
-            gold_per_print_character: u8,
+            gold_print_log_nesting: u8,
             diamond_per_brk: u16,
         }
         let upgrades = with_game_state(|game_state| ResourceUpgrades {
             bronze_per_instruction: game_state.upgrades.bronze_per_instruction.value(),
             silver_per_sleep_second: game_state.upgrades.silver_per_sleep_second.value(),
-            gold_per_print_character: game_state.upgrades.gold_per_print_character.value(),
+            gold_print_log_nesting: game_state.upgrades.gold_print_log_nesting.value(),
             diamond_per_brk: game_state.upgrades.diamond_per_brk.value(),
         });
         let instruction_counts_between_brk = self
@@ -128,18 +128,27 @@ impl CompiledProgram {
             .map(|secs| secs * upgrades.silver_per_sleep_second as f64)
             .sum();
         // Gold is awarded based on the last print statement and its argument length.
-        let gold: f64 = (0..upgrades.gold_per_print_character)
-            .fold(self.print_len.unwrap_or(0) as f64, |acc, _| {
-                acc.log2().min(1.)
-            });
+        let gold: f64 = (0..upgrades.gold_print_log_nesting).fold(
+            self.print_len.unwrap_or(0) as f64,
+            |acc, _| {
+                let x = acc.log2();
+                if x.is_finite() && x.is_sign_positive() {
+                    x
+                } else {
+                    0.
+                }
+            },
+        );
         // Brk is awarded based on the other three resources, scaled by the point where the brk was called relative to all instructions.
         let diamond = {
             let brk_relatives = instruction_counts_between_brk
                 .iter()
+                .dropping_back(1)
                 .scan(0., |acc, x| Some(*acc + x))
                 .map(|inst_cnt| 1. - (inst_cnt / total_instruction_count))
                 .product::<f64>();
-            bronze.min(silver.min(gold)).log2() * brk_relatives * upgrades.diamond_per_brk as f64
+            let min_others = bronze.min(silver.min(gold)).max(1.);
+            min_others.log2() * brk_relatives * upgrades.diamond_per_brk as f64
         };
         Resources::new(bronze, silver, gold, diamond, 0.)
     }
