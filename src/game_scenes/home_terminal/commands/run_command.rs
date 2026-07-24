@@ -49,12 +49,16 @@ fn run_cmd_without_auto_compile() -> Box<dyn RunningCommand<SceneSwitch>> {
                     false,
                 ))
             }
-            Err((err, instructions)) => {
+            Err((err, instruction_counts)) => {
                 // Display error
                 Box::new(ChainCmd::new(
-                    Box::new(RunCmd::new(CompiledProgram::instr_to_execution_time(
-                        &instructions,
-                    ))),
+                    Box::new(RunCmd::new(
+                        CompiledProgram {
+                            instruction_counts,
+                            ..CompiledProgram::new()
+                        }
+                        .execution_time(),
+                    )),
                     Box::new(move |_| Box::new(ParagraphCmd::new(Paragraph::new(Text::from(err))))),
                     false,
                 ))

@@ -1,7 +1,8 @@
 - update docs command to reflect recent changes to the language
-- remove debugging info from compile output
 - upgrade: remember cursor position when coming back
 - upgrade: show icon for completely finished levels
 - 'run' should show a warning if the newest program has not been compiled
 - some text in the upgrade screen break the overlay?
 - upgrade: only show missing resource numbers in red, not all of them
+- text editor currently allows making lines too long by typing in the middle of a line instead of the end
+- add upgrade to keep code after prestige

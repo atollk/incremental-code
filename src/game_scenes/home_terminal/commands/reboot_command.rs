@@ -7,6 +7,8 @@ use crate::widgets::terminal::RunningCommand;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
 use ratatui_core::style::Style;
+use ratatui_core::widgets::Widget;
+use ratatui_widgets::paragraph::Paragraph;
 use std::time::Duration;
 
 enum RebootState {
@@ -23,6 +25,22 @@ pub(super) fn reboot_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
     Box::new(RebootCmd {
         state: RebootState::Asking,
     })
+}
+
+impl RebootCmd {
+    fn current_text(&self) -> String {
+        match self.state {
+            RebootState::Asking => {
+                let resource_gain = with_game_state(|game_state| game_state.prestige_currency()).1;
+                format!(
+                    "This will reset all upgrades but give additional resources.\nWith your current resources, you will restart with {}\nReboot?  [y/N]",
+                    resource_gain.fmt_oneline()
+                )
+            }
+            RebootState::Confirmed => "Rebooting...".to_string(),
+            RebootState::Cancelled => "Reboot cancelled.".to_string(),
+        }
+    }
 }
 
 impl RunningCommand<SceneSwitch> for RebootCmd {
@@ -56,24 +74,14 @@ impl RunningCommand<SceneSwitch> for RebootCmd {
         }
     }
 
-    // TODO: this is not displayed multi-line for some reason
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        let text = match self.state {
-            RebootState::Asking => {
-                let resource_gain = with_game_state(|game_state| game_state.prestige_currency()).1;
-                format!(
-                    "This will reset all upgrades but give additional resources.\nWith your current resources, you will restart with {}\nReboot?  [y/N]",
-                    resource_gain.fmt_oneline()
-                )
-            }
-            RebootState::Confirmed => "Rebooting...".to_string(),
-            RebootState::Cancelled => "Reboot cancelled.".to_string(),
-        };
-        buf.set_string(area.x, area.y, text, Style::default());
+        let text = self.current_text();
+        let paragraph = Paragraph::new(text);
+        paragraph.render(area, buf);
     }
 
     fn height(&self, _columns: u16) -> u16 {
-        1
+        self.current_text().lines().count() as u16
     }
 
     fn get_metadata(&self) -> SceneSwitch {

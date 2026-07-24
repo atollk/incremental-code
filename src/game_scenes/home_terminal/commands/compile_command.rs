@@ -1,6 +1,7 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::logic::compilation::compile_thread;
+use crate::game_state;
 use crate::game_state::with_game_state;
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
 use anyhow::anyhow;
@@ -29,11 +30,11 @@ pub(super) fn compile_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
                     let paragraph: Paragraph<'static> = if let Err(e) = result {
                         Paragraph::new(e.to_string())
                     } else {
-                        let text = with_game_state(|game_state| {
-                            format!("Compilation successful., {:?}", game_state.compiled_program)
-                        });
-                        Paragraph::new(text)
+                        Paragraph::new("Compilation successful.")
                     };
+                    with_game_state(|game_state| {
+                        log::info!("Compiled program: {:?}", game_state.compiled_program)
+                    });
                     Box::new(ParagraphCmd::new(paragraph))
                 }),
                 true,

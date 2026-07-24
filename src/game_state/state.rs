@@ -85,8 +85,8 @@ impl GameState {
 
     pub fn prestige_currency(&self) -> (Resources, Resources) {
         // Convert currency
-        let convert = |x, min| {
-            if x < min {
+        let convert = |x, min: u64| {
+            if x < min as f64 {
                 0.0
             } else {
                 let y = f64::log2(x).floor();
@@ -97,10 +97,10 @@ impl GameState {
 
         let carryover_resources = Resources::new(
             0.0,
-            convert(self.current_resources.bronze.0, 1.),
-            convert(self.current_resources.silver.0, 10.),
-            convert(self.current_resources.gold.0, 100.),
-            convert(self.current_resources.diamond.0, 1000.),
+            convert(self.current_resources.bronze.0, 1),
+            convert(self.current_resources.silver.0, 100),
+            convert(self.current_resources.gold.0, 1000),
+            convert(self.current_resources.diamond.0, 100_000),
         );
 
         let mut current_resources = Resources::zero();
