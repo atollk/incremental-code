@@ -2,6 +2,7 @@ use crate::game_state::{Resources, with_game_state};
 use itertools::Itertools;
 use language::{CompileError, CompileResult, CompilingMetadata};
 use serde::{Deserialize, Serialize};
+use serial_test::serial;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -59,10 +60,13 @@ impl CompiledProgram {
                 let sleep_split = *sleep_split as f64;
 
                 // Find the number of instructions at which min_instruction_duration is reached, if any.
-                let min_duration_reached_at =
+                let min_duration_reached_at = if instruction_speed_exp == 0.0 {
+                    f64::INFINITY
+                } else {
                     (b_pow_k * upgrades.min_instruction_duration / speed / instruction_speed_const)
-                        .powf(1. / instruction_speed_exp);
-                let min_duration_reached = min_duration_reached_at > sleep_split;
+                        .powf(1. / instruction_speed_exp)
+                };
+                let min_duration_reached = min_duration_reached_at < sleep_split;
 
                 // Compute the time taken
                 let sleep_cycle_duration = if min_duration_reached {
@@ -74,9 +78,7 @@ impl CompiledProgram {
                         (sleep_split - min_duration_reached_at) * upgrades.min_instruction_duration;
                     before_min + after_min
                 } else {
-                    hurwitz(sleep_split, instruction_speed_exp)
-                        * (speed)
-                        * (instruction_speed_const)
+                    hurwitz(sleep_split, instruction_speed_exp) * speed * instruction_speed_const
                         / b_pow_k
                 };
                 duration += sleep_cycle_duration;
@@ -158,6 +160,145 @@ impl CompiledProgram {
 fn hurwitz(n: f64, k: f64) -> f64 {
     let z = spfunc::zeta::zeta(-k);
     z + n.powf(k + 1.) / (k + 1.) + n.powf(k) / 2.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game_state::{Upgrade, with_game_state_mut};
+
+    /// Levels up (and, after `f` runs, levels back down) the four upgrades that
+    /// `instr_to_execution_time` reads from global game state, then runs `f`.
+    fn with_levels<T>(
+        speed_level: u8,
+        min_duration_level: u8,
+        brk_slowdown_level: u8,
+        sleep_reset_level: u8,
+        f: impl FnOnce() -> T,
+    ) -> T {
+        with_game_state_mut(|state| {
+            for _ in 0..speed_level {
+                state.upgrades.instruction_execution_speed.track_level_up(0);
+            }
+            for _ in 0..min_duration_level {
+                state.upgrades.min_instruction_duration.track_level_up(0);
+            }
+            for _ in 0..brk_slowdown_level {
+                state.upgrades.brk_slowdown.track_level_up(0);
+            }
+            for _ in 0..sleep_reset_level {
+                state.upgrades.sleep_speed_reset.track_level_up(0);
+            }
+        });
+        let result = f();
+        with_game_state_mut(|state| {
+            for _ in 0..speed_level {
+                state
+                    .upgrades
+                    .instruction_execution_speed
+                    .track_level_down(0);
+            }
+            for _ in 0..min_duration_level {
+                state.upgrades.min_instruction_duration.track_level_down(0);
+            }
+            for _ in 0..brk_slowdown_level {
+                state.upgrades.brk_slowdown.track_level_down(0);
+            }
+            for _ in 0..sleep_reset_level {
+                state.upgrades.sleep_speed_reset.track_level_down(0);
+            }
+        });
+        result
+    }
+
+    fn assert_close(actual: Duration, expected_secs: f64) {
+        let actual_secs = actual.as_secs_f64();
+        assert!(
+            (actual_secs - expected_secs).abs() < 1e-6,
+            "expected {expected_secs}s, got {actual_secs}s"
+        );
+    }
+
+    // Level 1 of instruction_execution_speed (0.9x) with everything else at
+    // its default level.
+    #[test]
+    #[serial]
+    fn speed_level_1_only() {
+        let counts = vec![vec![10]];
+        let duration = with_levels(1, 0, 0, 0, || {
+            CompiledProgram::instr_to_execution_time(&counts)
+        });
+        assert_close(duration, 9.);
+    }
+
+    // With min_instruction_duration lowered so the floor never binds, and the
+    // default instruction_execution_speed exponent of 0, hurwitz(n, 0) == n
+    // exactly (zeta(0) == -1/2 cancels the correction terms), so duration
+    // should scale linearly with instruction count.
+    #[test]
+    #[serial]
+    fn linear_scaling_with_default_speed_upgrade() {
+        let (d10, d25) = with_levels(0, 2, 0, 0, || {
+            let d10 = CompiledProgram::instr_to_execution_time(&vec![vec![10]]);
+            let d25 = CompiledProgram::instr_to_execution_time(&vec![vec![25]]);
+            (d10, d25)
+        });
+        assert_close(d10, 10.0);
+        assert_close(d25, 25.0);
+    }
+
+    // instruction_execution_speed's constant factor directly scales duration
+    // when the exponent stays 0 and the min-duration floor doesn't bind.
+    #[test]
+    #[serial]
+    fn faster_instruction_speed_reduces_execution_time() {
+        let counts = vec![vec![10]];
+        let default_duration = with_levels(0, 2, 0, 0, || {
+            CompiledProgram::instr_to_execution_time(&counts)
+        });
+        let upgraded_duration = with_levels(5, 2, 0, 0, || {
+            CompiledProgram::instr_to_execution_time(&counts)
+        });
+        assert_close(default_duration, 10.0);
+        assert_close(upgraded_duration, 5.0);
+    }
+
+    // brk_slowdown divides the per-instruction duration by brk_slowdown^k, so
+    // for a program with a brk (k=1 in its second block), leveling up
+    // brk_slowdown makes that block *faster*, not slower.
+    #[test]
+    #[serial]
+    fn brk_slowdown_level_divides_second_block_duration() {
+        let counts = vec![vec![10], vec![10]];
+        let default_duration = with_levels(0, 2, 0, 0, || {
+            CompiledProgram::instr_to_execution_time(&counts)
+        });
+        let upgraded_duration = with_levels(0, 2, 1, 0, || {
+            CompiledProgram::instr_to_execution_time(&counts)
+        });
+        // Block 1 (k=0) always takes 10s; block 2 (k=1) takes 10/brk_slowdown seconds.
+        assert_close(default_duration, 10.0 + 10.0 * 10.);
+        assert_close(upgraded_duration, 10.0 + 10.0 * 5.);
+    }
+
+    // sleep_speed_reset controls whether the speed accumulated by one
+    // sleep-segment carries into the next. At level 0 ("^0") it fully resets
+    // to baseline (x^0 == 1); at its max level ("none") it fully carries over.
+    #[test]
+    #[serial]
+    fn sleep_speed_reset_controls_carryover_between_segments() {
+        let counts = vec![vec![10, 10]];
+        let full_reset_duration = with_levels(5, 2, 0, 0, || {
+            CompiledProgram::instr_to_execution_time(&counts)
+        });
+        let full_carryover_duration = with_levels(5, 2, 0, 10, || {
+            CompiledProgram::instr_to_execution_time(&counts)
+        });
+        // Segment 1 always takes 5s (10 * 0.5). Segment 2 takes 5s again if
+        // speed was reset to baseline, or 2.5s if the 0.5x speedup carried over.
+        assert_close(full_reset_duration, 5.0 + 5.0);
+        assert_close(full_carryover_duration, 5.0 + 2.5);
+    }
 }
 
 impl CompilingMetadata for CompiledProgram {

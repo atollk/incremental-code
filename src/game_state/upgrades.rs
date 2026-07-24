@@ -769,9 +769,9 @@ impl_upgrade!(
     type=f64,
     level=4,
     values=[
-        (1.0, "1ms"),
-        (0.1, "0.1ms"),
-        (0.01, "0.01ms"),
+        (1e-3, "1ms"),
+        (1e-4, "0.1ms"),
+        (1e-5, "0.01ms"),
     ],
     costs=[[
         Resources::from_gold(100.),
@@ -838,9 +838,9 @@ impl_upgrade!(
     type=f64,
     level=5,
     values=[
-        (2.0, "2x"),
-        (5.0, "5x"),
-        (10.0, "10x"),
+        (0.1, "10%"),
+        (0.2, "20%"),
+        (0.5, "50%"),
     ],
     costs=[[
         Resources::from_gold(500e3),
