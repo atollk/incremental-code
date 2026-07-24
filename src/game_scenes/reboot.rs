@@ -13,7 +13,7 @@ use ratatui_core::terminal::Frame;
 use web_time::Duration;
 
 const BOOT_LINES: &[&str] = &[
-    "INCREMENTAL-CODE BIOS v1.0",
+    "BUSY BEAVER GAME v1.0",
     "(C) 2026",
     "Game by Andreas Tollkötter",
     "Music by Purrplecat",

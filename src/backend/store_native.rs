@@ -35,6 +35,7 @@ impl StorageBackend for StoreNative {
 
     fn load<T: for<'a> Deserialize<'a>>(&self, key: &str) -> anyhow::Result<Option<T>> {
         let path = self.directory.join(format!("{key}.json"));
+        log::info!("loading save state from {}", path.display());
         if !path.exists() {
             return Ok(None);
         }

@@ -1,4 +1,5 @@
-- variable memory limit to prevent oom
 - update docs
-- better help start
-- compile & run output
+- compile output
+- upgrade: remember cursor position
+- upgrade: show finished levels
+- upgrade: path shows cheapest upgrade cost instead of in order?

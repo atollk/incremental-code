@@ -30,9 +30,14 @@ fn run_cmd_without_auto_compile() -> Box<dyn RunningCommand<SceneSwitch>> {
     if let Some(compiled_program) = compiled_program {
         match compiled_program {
             Ok(compiled_program) => {
+                let execution_time = compiled_program.execution_time();
+                log::info!(
+                    "Running with execution time: {} ms",
+                    execution_time.as_millis()
+                );
                 // Successful run
                 Box::new(ChainCmd::new(
-                    Box::new(RunCmd::new(compiled_program.execution_time())),
+                    Box::new(RunCmd::new(execution_time)),
                     Box::new(move |_| {
                         let resource_gain = compiled_program.resource_gain();
                         with_game_state_mut(|game_state| {

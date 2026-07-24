@@ -293,21 +293,14 @@ impl_upgrade!(
     level=1,
     values=[
         ((1., 0.), "100 %"),
-        ((0.9, 0.), "90 %"),
         ((0.8, 0.), "80 %"),
-        ((0.7, 0.), "70 %"),
         ((0.6, 0.), "60 %"),
-        ((0.5, 0.), "50 %"),
         ((0.4, 0.), "40 %"),
         ((0.3, 0.), "30 %"),
-        ((0.25, 0.), "25 %"),
-        ((0.2, 0.), "20 %"),
         ((0.15, 0.), "15 %"),
-        ((0.1, 0.), "10 %"),
         ((0.05, 0.), "5 %"),
         ((0.025, 0.), "2.5 %"),
         ((0.01, 0.), "1 %"),
-        ((0.005, 0.), "0.5 %"),
         ((0.0025, 0.), "0.25 %"),
         ((0.001, 0.), "0.1 %"),
         ((0.001, -0.1), "n ^ -0.1"),
@@ -328,21 +321,14 @@ impl_upgrade!(
             Resources::from_bronze(10),
             Resources::from_bronze(20),
             Resources::from_bronze(30),
-            Resources::from_bronze(40),
-            Resources::from_bronze(50),
-            Resources::from_bronze(100),
+            Resources::from_bronze(200),
             Resources::from_bronze(1000),
-            Resources::from_bronze(30e3),
             Resources::from_bronze(30e3),
         ],
         [
             Resources::from_silver(1),
             Resources::from_silver(1),
             Resources::from_silver(1),
-            Resources::from_silver(1),
-            Resources::from_silver(1),
-            Resources::from_silver(30e3),
-            Resources::from_silver(30e3),
             Resources::from_silver(30e3),
             Resources::from_silver(30e3),
             Resources::from_gold(30e3),
@@ -377,7 +363,7 @@ impl_upgrade!(
         (80, "80"),
     ],
     costs=[[
-        Resources::from_bronze(10), // core upgrade 4
+        Resources::from_bronze(100), // core upgrade 4
         Resources::new(10e7, 100, 0, 0, 0), // core upgrade 13
         Resources::new(10e17, 10e10, 100, 0, 0), // core upgrade 19
         Resources::new(10e200, 10e100, 10e10, 10e3, 0), // core upgrade 22
@@ -393,20 +379,20 @@ impl_upgrade!(
         (1, "1"),
         (2, "2"),
         (4, "4"),
-        (4, "5"),
+        (5, "5"),
         (6, "6"),
-        (6, "7"),
+        (7, "7"),
         (8, "8"),
         (10, "10"),
-        (10, "15"),
+        (15, "15"),
         (20, "20"),
         (30, "30"),
         (40, "40"),
     ],
     costs=[[
-        Resources::from_bronze(5.), // core upgrade 1
-        Resources::from_bronze(25.), // core upgrade 2
-        Resources::from_bronze(1e3), // core upgrade 5
+        Resources::from_bronze(5), // core upgrade 1
+        Resources::from_bronze(25), // core upgrade 2
+        Resources::from_bronze(250), // core upgrade 5
         Resources::from_bronze(1e3), // core upgrade 6
         Resources::from_bronze(100e3), // core upgrade 8
         Resources::from_bronze(100e3), // core upgrade 10
@@ -423,7 +409,7 @@ impl_upgrade!(
     type=bool,
     level=1,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_bronze(100e3)]]
+    costs=[[Resources::from_bronze(50)]]
 );
 
 // Level 2
@@ -464,37 +450,41 @@ impl_upgrade!(
         ((100, 9.), "n ^ 9"),
         ((100, 10.), "n ^ 10"),
     ],
-    costs=[[
-        Resources::from_bronze(10.),
-        Resources::from_bronze(10.),
-        Resources::from_bronze(10.),
-        Resources::from_bronze(10.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-        Resources::from_bronze(100.),
-    ]]
+    costs=[
+        [
+            Resources::from_bronze(20),
+            Resources::from_bronze(30),
+            Resources::from_bronze(40),
+            Resources::from_bronze(50),
+            Resources::from_bronze(70),
+            Resources::from_bronze(90),
+            Resources::from_bronze(120),
+            Resources::from_bronze(150),
+            Resources::from_bronze(180),
+            Resources::from_bronze(400),
+            Resources::from_bronze(1e3),
+            Resources::from_bronze(2e3),
+            Resources::from_bronze(4e3),
+            Resources::from_bronze(10e3),
+            Resources::from_bronze(100e3),
+        ],
+        [
+            Resources::from_silver(1),
+            Resources::from_silver(1),
+            Resources::from_silver(10),
+            Resources::from_silver(100),
+            Resources::from_bronze(100),
+            Resources::from_bronze(100),
+            Resources::from_bronze(100),
+            Resources::from_bronze(100),
+            Resources::from_bronze(100),
+            Resources::from_bronze(100),
+            Resources::from_bronze(100),
+            Resources::from_bronze(100),
+            Resources::from_bronze(100),
+            Resources::from_bronze(100),
+        ]
+    ]
 );
 
 impl_upgrade!(
@@ -553,7 +543,7 @@ impl_upgrade!(
     type=bool,
     level=2,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_silver(100.)]]
+    costs=[[Resources::from_bronze(500)]]
 );
 
 impl_upgrade!(
@@ -593,8 +583,8 @@ impl_upgrade!(
         (6, "keep L6"),
     ],
     costs=[[
-        Resources::from_bronze(500.),
-        Resources::from_bronze(500.),
+        Resources::from_bronze(1e3),
+        Resources::from_bronze(10e3),
         Resources::from_bronze(500.),
         Resources::from_bronze(500.),
         Resources::from_bronze(500.),
