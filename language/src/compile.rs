@@ -10,6 +10,8 @@ use std::collections::HashMap;
 #[derive(thiserror::Error, Debug, Clone)]
 #[error("{msg}")]
 pub struct CompileError {
+    // Box the String to reduce size of this struct to one word
+    #[allow(clippy::box_collection)]
     msg: Box<String>,
 }
 

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::ops::Add;
 
 const M: u64 = (1 << 61) - 1; // Mersenne prime 2^61 - 1

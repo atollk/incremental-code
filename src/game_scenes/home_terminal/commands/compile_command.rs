@@ -1,7 +1,6 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::logic::compilation::compile_thread;
-use crate::game_state;
 use crate::game_state::with_game_state;
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
 use anyhow::anyhow;

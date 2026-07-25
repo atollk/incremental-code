@@ -53,6 +53,7 @@ impl AppStartScene {
             let is_interaction = match event {
                 Event::KeyEvent(e) => e.kind == KeyEventKind::Press,
                 Event::MouseEvent(e) => matches!(e.kind, MouseEventKind::Down(_)),
+                Event::MetaEvent(_) => false,
             };
             if is_interaction {
                 return self.finish();

@@ -2,7 +2,6 @@ use crate::game_state::{Resources, with_game_state};
 use itertools::Itertools;
 use language::{CompileError, CompileResult, CompilingMetadata};
 use serde::{Deserialize, Serialize};
-use serial_test::serial;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

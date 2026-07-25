@@ -35,10 +35,6 @@ impl AutoSaver {
         self.save_period = Some(period);
         self.since_last_save = Duration::from_millis(0);
     }
-
-    pub fn stop(&mut self) {
-        self.save_period = None;
-    }
 }
 
 global_variable!(auto_saver, AutoSaver);

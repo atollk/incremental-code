@@ -6,7 +6,6 @@ use crate::game_state::{with_game_state, with_game_state_mut};
 use crate::widgets::terminal::RunningCommand;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
-use ratatui_core::style::Style;
 use ratatui_core::widgets::Widget;
 use ratatui_widgets::paragraph::Paragraph;
 use std::time::Duration;
