@@ -187,6 +187,12 @@ fn parse_code(program_code: &str) -> CompileResult<NotPythonProgram> {
     }
 }
 
+/// Folds constant arithmetic (e.g. `255 * 255`) after verification, so the literal-limit
+/// checks in `verify_unlocks` only ever see the raw literals the player typed.
+fn compress_code(program: &mut NotPythonProgram) {
+    language::fold_stmt(&mut program.statement);
+}
+
 /// Compiles the given code and returns compile errors in the outer result, or runtime errors in the inner result.
 fn compile_code(
     parsed_program: &NotPythonProgram,
@@ -211,7 +217,7 @@ fn compile_code(
 }
 
 pub mod compile_thread {
-    use crate::game_scenes::logic::compilation::{compile_code, parse_code};
+    use crate::game_scenes::logic::compilation::{compile_code, compress_code, parse_code};
     use crate::game_scenes::logic::verification::verify_unlocks;
     use crate::game_state::{with_game_state, with_game_state_mut};
     use crate::global_variable;
@@ -263,9 +269,10 @@ pub mod compile_thread {
                 let get_compile_result = || -> CompileResult<_> {
                     let program_code =
                         with_game_state(|game_state| game_state.program_code.clone());
-                    let parsed_code = parse_code(&program_code)?;
+                    let mut parsed_code = parse_code(&program_code)?;
                     verify_unlocks(&program_code, &parsed_code)
                         .map_err(|e| CompileError::new(e.to_string()))?;
+                    compress_code(&mut parsed_code);
                     compile_code(&parsed_code, is_cancelled)
                 };
                 let thread_result = match get_compile_result() {

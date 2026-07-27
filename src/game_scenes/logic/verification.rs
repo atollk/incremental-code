@@ -236,3 +236,56 @@ fn verify_stmt(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game_state::{Upgrade, with_game_state_mut};
+    use serial_test::serial;
+
+    /// Levels up (and, after `f` runs, levels back down) the upgrades that
+    /// `verify_unlocks` reads from global game state, then runs `f`.
+    fn with_levels<T>(literals_level: u8, line_width_level: u8, f: impl FnOnce() -> T) -> T {
+        with_game_state_mut(|state| {
+            for _ in 0..literals_level {
+                state.upgrades.literals.track_level_up(0);
+            }
+            for _ in 0..line_width_level {
+                state.upgrades.code_line_width.track_level_up(0);
+            }
+        });
+        let result = f();
+        with_game_state_mut(|state| {
+            for _ in 0..literals_level {
+                state.upgrades.literals.track_level_down(0);
+            }
+            for _ in 0..line_width_level {
+                state.upgrades.code_line_width.track_level_down(0);
+            }
+        });
+        result
+    }
+
+    #[test]
+    #[serial]
+    fn folded_literal_product_exceeding_limit_is_allowed() {
+        // Each raw literal (255) is within the max_int=255 limit even though the
+        // folded product (65025) would exceed it. Verification must run on the
+        // unfolded AST, so this must be accepted.
+        with_levels(6, 3, || {
+            let source = "x := 255 * 255;\n";
+            let parsed = language::parse_program(source).unwrap();
+            assert!(verify_unlocks(source, &parsed).is_ok());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn raw_literal_exceeding_limit_is_still_rejected() {
+        with_levels(6, 3, || {
+            let source = "x := 999;\n";
+            let parsed = language::parse_program(source).unwrap();
+            assert!(verify_unlocks(source, &parsed).is_err());
+        });
+    }
+}

@@ -202,8 +202,10 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                 }
                 let meta_clone = meta.clone();
                 state.call_stack.push(frame);
-                compile_stmt(body, state, meta)?;
+                let body_result =
+                    stacker::maybe_grow(32 * 1024, 1024 * 1024, || compile_stmt(body, state, meta));
                 state.call_stack.pop();
+                body_result?;
                 let return_value = match std::mem::replace(
                     &mut state.control_flow,
                     ProgramExecutionControlFlow::Normal,
@@ -965,6 +967,12 @@ mod tests {
     #[test]
     fn pure_local_decl_and_assign_ok() {
         let src = "def pure f(x):\ny := x + 1;\ny = y + 1;\nreturn y;\nend\nz := f(5);\n";
+        compiled(src);
+    }
+
+    #[test]
+    fn deep_recursion_does_not_stack_overflow() {
+        let src = "def f(n):\nif n <= 0:\nreturn 0;\nelse:\nreturn f(n - 1);\nend\nend\nx := f(300000);\n";
         compiled(src);
     }
 }

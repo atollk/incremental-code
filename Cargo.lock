@@ -1603,6 +1603,7 @@ dependencies = [
  "logos",
  "serde",
  "smallvec",
+ "stacker",
  "thiserror 2.0.18",
 ]
 

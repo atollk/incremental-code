@@ -10,6 +10,7 @@ pub use compile::{
     CompileError, CompileResult, CompilingMetadata, FnArgVec, HashableProgramValue,
     PredefinedFunction, ProgramValue, compile_with_meta,
 };
+pub use fold_constants::fold_stmt;
 pub use lexer::NotPythonLangToken;
 pub use parser::{
     BinaryOp, NotPythonExpr, NotPythonProgram, NotPythonStmt, UnaryOp, parse_program,

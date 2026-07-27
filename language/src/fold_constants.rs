@@ -162,7 +162,8 @@ mod tests {
     use crate::parser::{NotPythonProgram, NotPythonStmt, parse_program};
 
     fn parsed_decl_expr(src: &str) -> NotPythonExpr {
-        let prog: NotPythonProgram = parse_program(src).unwrap();
+        let mut prog: NotPythonProgram = parse_program(src).unwrap();
+        fold_stmt(&mut prog.statement);
         let NotPythonStmt::Block(stmts) = prog.statement else {
             panic!("expected top-level Block");
         };
