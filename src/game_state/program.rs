@@ -170,10 +170,132 @@ fn hurwitz(n: f64, k: f64) -> f64 {
     z + n.powf(k + 1.) / (k + 1.) + n.powf(k) / 2.
 }
 
+impl CompilingMetadata for CompiledProgram {
+    type Diff = CompiledProgram;
+
+    fn log_zero_instruction(&mut self) -> CompileResult<()> {
+        Ok(())
+    }
+
+    fn log_atomic_instruction(&mut self) -> CompileResult<()> {
+        *self
+            .instruction_counts
+            .last_mut()
+            .unwrap()
+            .last_mut()
+            .unwrap() += 1;
+        Ok(())
+    }
+
+    fn diff(&self, other: &Self) -> CompileResult<Self::Diff> {
+        let instruction_counts = {
+            let self_brk_len = self.instruction_counts.len();
+            let other_brk_len = other.instruction_counts.len();
+            if other_brk_len < self_brk_len {
+                return Err(CompileError::new(
+                    "instruction_counts brk-block count mismatch".to_string(),
+                ));
+            }
+            // All but the last brk-block must match exactly
+            for (i, (l, r)) in self
+                .instruction_counts
+                .iter()
+                .zip(other.instruction_counts.iter())
+                .enumerate()
+                .take(self_brk_len - 1)
+            {
+                if l != r {
+                    return Err(CompileError::new(format!(
+                        "instruction_counts brk-block {i} mismatch"
+                    )));
+                }
+            }
+            let self_last = self.instruction_counts.last().unwrap();
+            let other_last = &other.instruction_counts[self_brk_len - 1];
+            if other_last.len() < self_last.len() {
+                return Err(CompileError::new(
+                    "instruction_counts sleep-block count mismatch".to_string(),
+                ));
+            }
+            // All but the last sleep-block in the last brk-block must match
+            for (j, (l, r)) in self_last
+                .iter()
+                .zip(other_last.iter())
+                .enumerate()
+                .take(self_last.len() - 1)
+            {
+                if l != r {
+                    return Err(CompileError::new(format!(
+                        "instruction_counts sleep-block {j} mismatch"
+                    )));
+                }
+            }
+            let delta = other_last[self_last.len() - 1] - self_last.last().unwrap();
+            let mut first_block = vec![delta];
+            first_block.extend_from_slice(&other_last[self_last.len()..]);
+            let mut result = vec![first_block];
+            result.extend_from_slice(&other.instruction_counts[self_brk_len..]);
+            result
+        };
+        let sleep_calls = {
+            for (l, r) in self.sleep_calls.iter().zip(other.sleep_calls.iter()) {
+                if *l != *r {
+                    return Err(CompileError::new("sleep_calls mismatch".to_string()));
+                }
+            }
+            if self.sleep_calls.len() <= other.sleep_calls.len() {
+                other.sleep_calls[self.sleep_calls.len()..].to_vec()
+            } else {
+                self.sleep_calls[other.sleep_calls.len()..].to_vec()
+            }
+        };
+        let print_len = {
+            if let Some(l) = self.print_len
+                && other.print_len.map(|r| r < l).unwrap_or(true)
+            {
+                return Err(CompileError::new("print_len mismatch".to_string()));
+            }
+            other.print_len
+        };
+        Ok(CompiledProgram {
+            instruction_counts,
+            sleep_calls,
+            print_len,
+        })
+    }
+
+    fn add_assign(&mut self, diff: &Self::Diff) -> CompileResult<()> {
+        {
+            let (head, tail) = diff.instruction_counts.split_at(1);
+            let head = head.iter().exactly_one().unwrap();
+            let (h, t) = head.split_at(1);
+            let h = *h.iter().exactly_one().unwrap();
+            *self
+                .instruction_counts
+                .last_mut()
+                .unwrap()
+                .last_mut()
+                .unwrap() += h;
+            self.instruction_counts
+                .last_mut()
+                .unwrap()
+                .extend_from_slice(t);
+            self.instruction_counts.extend_from_slice(tail);
+        };
+        self.sleep_calls.extend(diff.sleep_calls.iter());
+        self.print_len = self
+            .print_len
+            .map(|l| l.max(diff.print_len.unwrap_or(0)))
+            .or(diff.print_len);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::game_state::{Upgrade, with_game_state_mut};
+    use serial_test::serial;
 
     /// Levels up (and, after `f` runs, levels back down) the four upgrades that
     /// `execution_time` reads from global game state, then runs `f`.
@@ -301,126 +423,5 @@ mod tests {
         // speed was reset to baseline, or 0.225s if the 0.15x speedup carried over.
         assert_close(full_reset_duration, 1.5 + 1.5);
         assert_close(full_carryover_duration, 1.5 + 0.225);
-    }
-}
-
-impl CompilingMetadata for CompiledProgram {
-    type Diff = CompiledProgram;
-
-    fn log_zero_instruction(&mut self) -> CompileResult<()> {
-        Ok(())
-    }
-
-    fn log_atomic_instruction(&mut self) -> CompileResult<()> {
-        *self
-            .instruction_counts
-            .last_mut()
-            .unwrap()
-            .last_mut()
-            .unwrap() += 1;
-        Ok(())
-    }
-
-    fn diff(&self, other: &Self) -> CompileResult<Self::Diff> {
-        let instruction_counts = {
-            let self_brk_len = self.instruction_counts.len();
-            let other_brk_len = other.instruction_counts.len();
-            if other_brk_len < self_brk_len {
-                return Err(CompileError::new(
-                    "instruction_counts brk-block count mismatch".to_string(),
-                ));
-            }
-            // All but the last brk-block must match exactly
-            for (i, (l, r)) in self
-                .instruction_counts
-                .iter()
-                .zip(other.instruction_counts.iter())
-                .enumerate()
-                .take(self_brk_len - 1)
-            {
-                if l != r {
-                    return Err(CompileError::new(format!(
-                        "instruction_counts brk-block {i} mismatch"
-                    )));
-                }
-            }
-            let self_last = self.instruction_counts.last().unwrap();
-            let other_last = &other.instruction_counts[self_brk_len - 1];
-            if other_last.len() < self_last.len() {
-                return Err(CompileError::new(
-                    "instruction_counts sleep-block count mismatch".to_string(),
-                ));
-            }
-            // All but the last sleep-block in the last brk-block must match
-            for (j, (l, r)) in self_last
-                .iter()
-                .zip(other_last.iter())
-                .enumerate()
-                .take(self_last.len() - 1)
-            {
-                if l != r {
-                    return Err(CompileError::new(format!(
-                        "instruction_counts sleep-block {j} mismatch"
-                    )));
-                }
-            }
-            let delta = other_last[self_last.len() - 1] - self_last.last().unwrap();
-            let mut first_block = vec![delta];
-            first_block.extend_from_slice(&other_last[self_last.len()..]);
-            let mut result = vec![first_block];
-            result.extend_from_slice(&other.instruction_counts[self_brk_len..]);
-            result
-        };
-        let sleep_calls = {
-            for (l, r) in self.sleep_calls.iter().zip(other.sleep_calls.iter()) {
-                if *l != *r {
-                    return Err(CompileError::new("sleep_calls mismatch".to_string()));
-                }
-            }
-            if self.sleep_calls.len() <= other.sleep_calls.len() {
-                other.sleep_calls[self.sleep_calls.len()..].to_vec()
-            } else {
-                self.sleep_calls[other.sleep_calls.len()..].to_vec()
-            }
-        };
-        let print_len = {
-            if let Some(l) = self.print_len
-                && other.print_len.map(|r| r < l).unwrap_or(true)
-            {
-                return Err(CompileError::new("print_len mismatch".to_string()));
-            }
-            other.print_len
-        };
-        Ok(CompiledProgram {
-            instruction_counts,
-            sleep_calls,
-            print_len,
-        })
-    }
-
-    fn add_assign(&mut self, diff: &Self::Diff) -> CompileResult<()> {
-        {
-            let (head, tail) = diff.instruction_counts.split_at(1);
-            let head = head.iter().exactly_one().unwrap();
-            let (h, t) = head.split_at(1);
-            let h = *h.iter().exactly_one().unwrap();
-            *self
-                .instruction_counts
-                .last_mut()
-                .unwrap()
-                .last_mut()
-                .unwrap() += h;
-            self.instruction_counts
-                .last_mut()
-                .unwrap()
-                .extend_from_slice(t);
-            self.instruction_counts.extend_from_slice(tail);
-        };
-        self.sleep_calls.extend(diff.sleep_calls.iter());
-        self.print_len = self
-            .print_len
-            .map(|l| l.max(diff.print_len.unwrap_or(0)))
-            .or(diff.print_len);
-        Ok(())
     }
 }

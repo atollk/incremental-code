@@ -3,7 +3,7 @@ use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::Scene;
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::home_terminal::commands::{command_list, unknown_cmd};
-use crate::game_state::with_game_state;
+use crate::game_state::{with_game_state, with_game_state_mut};
 use crate::widgets::hud::draw_hud;
 use crate::widgets::terminal::{RunningCommand, TerminalWidget};
 use itertools::Itertools;
@@ -24,8 +24,11 @@ impl Default for HomeTerminalScene {
 
 impl HomeTerminalScene {
     pub fn new() -> Self {
+        let mut terminal_widget = TerminalWidget::new();
+        let history = with_game_state(|gs| gs.ephemeral.terminal_history.clone());
+        terminal_widget.set_input_history(history);
         HomeTerminalScene {
-            terminal_widget: TerminalWidget::new(),
+            terminal_widget,
             autocomplete_cycle: None,
             height: 0,
         }
@@ -68,6 +71,9 @@ impl Scene for HomeTerminalScene {
         // Execute command
         let cmd = self.terminal_widget.update(events, time_delta);
         if let Some(cmd) = cmd {
+            with_game_state_mut(|gs| {
+                gs.ephemeral.terminal_history = self.terminal_widget.input_history().to_vec()
+            });
             self.terminal_widget
                 .set_running(&cmd, self.handle_terminal_command(&cmd));
         }

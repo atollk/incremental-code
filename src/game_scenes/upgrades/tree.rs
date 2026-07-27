@@ -88,11 +88,11 @@ fn render_track_items(upgrade: &dyn Upgrade) -> Vec<TreeItem<'static, usize>> {
         .filter(|&track| upgrade.track_next_cost(track).is_some())
         .map(|track| {
             let track_level = upgrade.track_get_level(track);
-            let max_level = upgrade.max_level();
+            let track_max_level = upgrade.track_max_level(track);
             let cost = upgrade.track_next_cost(track);
             let mut spans = vec![Span::raw(format!(
                 "-  {:>3}/{:<3}  ",
-                track_level, max_level
+                track_level, track_max_level
             ))];
             match &cost {
                 None => spans.push(Span::styled("maxed", Style::default().fg(Color::Gray))),

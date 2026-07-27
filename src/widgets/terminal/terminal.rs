@@ -54,6 +54,16 @@ impl<Meta: 'static> TerminalWidget<Meta> {
         }
     }
 
+    /// Submitted command history, oldest first.
+    pub fn input_history(&self) -> &[String] {
+        &self.input_history
+    }
+
+    /// Replace the command history (e.g. restored from persistent state).
+    pub fn set_input_history(&mut self, history: Vec<String>) {
+        self.input_history = history;
+    }
+
     /// Register a command to run, wrapping it with a prompt-echo line.
     ///
     /// Call this instead of setting `running` directly after receiving a command

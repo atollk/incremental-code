@@ -25,7 +25,7 @@ impl<'a> Default for UpgradesScene<'a> {
                     game_state.upgrades.clone(),
                     game_state.current_resources.clone(),
                     game_state.carryover_resources.clone(),
-                    game_state.upgrade_tree_selected.clone(),
+                    game_state.ephemeral.upgrade_tree_selected.clone(),
                 )
             });
         let mut tree_widget = create_tree_widget(&upgrades);
@@ -49,22 +49,44 @@ impl<'a> UpgradesScene<'a> {
         let selected = self
             .tree_widget
             .with_tree_state(|ts| ts.selected().to_vec());
-        with_game_state_mut(|gs| gs.upgrade_tree_selected = selected);
+        with_game_state_mut(|gs| gs.ephemeral.upgrade_tree_selected = selected);
+    }
+
+    fn upgrade_pos(&self, group: usize, upgrade_idx: usize) -> usize {
+        self.upgrades_working_copy
+            .upgrades()
+            .into_iter()
+            .enumerate()
+            .filter(|(_, u)| u.group() == group)
+            .nth(upgrade_idx)
+            .unwrap_or_else(|| {
+                panic!("upgrade index out of bounds: group={group} idx={upgrade_idx}")
+            })
+            .0
+    }
+
+    /// Resolves a tree selection path to a triggerable `[group, upgrade_idx, track]` path.
+    /// An upgrade node (len 2) resolves to its sole track when it has exactly one.
+    fn track_trigger_path(&self, selected: &[usize]) -> Option<[usize; 3]> {
+        match *selected {
+            [group, upgrade_idx, track] => Some([group, upgrade_idx, track]),
+            [group, upgrade_idx] => {
+                let pos = self.upgrade_pos(group, upgrade_idx);
+                (self.upgrades_working_copy.upgrades()[pos].count_tracks() == 1).then_some([
+                    group,
+                    upgrade_idx,
+                    0,
+                ])
+            }
+            _ => None,
+        }
     }
 
     fn level(&mut self, identifier_path: &[usize; 3], level_up: bool) {
         let &[group, upgrade_idx, track] = identifier_path;
 
         // Find the upgrade instance from the tree identifier
-        let pos = self
-            .upgrades_working_copy
-            .upgrades()
-            .into_iter()
-            .enumerate()
-            .filter(|(_, u)| u.group() == group)
-            .nth(upgrade_idx)
-            .unwrap_or_else(|| panic!("identifier_path out of bounds: {:?}", identifier_path))
-            .0;
+        let pos = self.upgrade_pos(group, upgrade_idx);
         let upgrade = self.upgrades_working_copy.upgrade_at_mut(pos);
 
         // Perform the leveling
@@ -139,6 +161,8 @@ impl<'a> UpgradesScene<'a> {
                     if selected.len() == 1 {
                         self.tree_widget
                             .with_tree_state_mut(|ts| ts.toggle_selected());
+                    } else if let Some(path) = self.track_trigger_path(&selected) {
+                        self.level(&path, true);
                     }
                 }
                 KeyCode::Left | KeyCode::Right => {
@@ -146,16 +170,15 @@ impl<'a> UpgradesScene<'a> {
                         .tree_widget
                         .with_tree_state(|ts| ts.selected().to_vec());
                     let level_up = key.code == KeyCode::Right;
-                    if selected.len() == 3 {
-                        self.level(selected.as_slice().try_into().unwrap(), level_up);
-                    } else if selected.len() == 1 {
+                    if selected.len() == 1 {
                         if level_up {
                             self.tree_widget.with_tree_state_mut(|ts| ts.key_right());
                         } else {
                             self.tree_widget.with_tree_state_mut(|ts| ts.key_left());
                         }
+                    } else if let Some(path) = self.track_trigger_path(&selected) {
+                        self.level(&path, level_up);
                     }
-                    // len == 2 (upgrade node): do nothing — stays open
                 }
                 KeyCode::Down => {
                     self.tree_widget.with_tree_state_mut(|ts| ts.key_down());

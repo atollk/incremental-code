@@ -24,9 +24,17 @@ pub struct GameState {
     pub carryover_resources: Resources,
     // Upgrades
     pub upgrades: Upgrades,
+    // Ephemerals
+    #[serde(skip)]
+    pub ephemeral: EphemeralGameState,
+}
+
+#[derive(Default)]
+pub struct EphemeralGameState {
     /// Identifier path of the last-selected node in the upgrade tree, restored on scene re-entry.
-    #[serde(default)]
     pub upgrade_tree_selected: Vec<usize>,
+    /// Submitted terminal command history, restored on scene re-entry.
+    pub terminal_history: Vec<String>,
 }
 
 impl Default for GameState {
@@ -41,7 +49,7 @@ impl Default for GameState {
             current_resources: start_resources,
             carryover_resources: Resources::default(),
             upgrades: Upgrades::default(),
-            upgrade_tree_selected: Vec::new(),
+            ephemeral: EphemeralGameState::default(),
         }
     }
 }

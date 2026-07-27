@@ -18,6 +18,8 @@ pub trait Upgrade: dyn_clone::DynClone {
 
     fn count_tracks(&self) -> usize;
     fn track_get_level(&self, track: usize) -> u8;
+    /// The highest level this specific track can reach on its own.
+    fn track_max_level(&self, track: usize) -> u8;
     fn track_next_cost(&self, track: usize) -> Option<Resources>;
     fn track_level_up(&mut self, track: usize);
     fn track_level_down(&mut self, track: usize);
@@ -139,6 +141,17 @@ macro_rules! impl_upgrade {
                 None
             }
 
+            pub(crate) fn track_len(track: usize) -> u8 {
+                let mut __t: usize = 0;
+                $(
+                    if track == __t {
+                        return [ $( impl_upgrade!(@unit $cost) ),+ ].len() as u8;
+                    }
+                    __t += 1;
+                )+
+                0
+            }
+
             pub(crate) fn value_text_at(level: u8) -> Option<Cow<'static, str>> {
                 let mut __i: u8 = 0;
                 $(
@@ -193,6 +206,10 @@ macro_rules! impl_upgrade {
 
             fn track_get_level(&self, track: usize) -> u8 {
                 self.0[track]
+            }
+
+            fn track_max_level(&self, track: usize) -> u8 {
+                Self::track_len(track)
             }
 
             fn track_next_cost(&self, track: usize) -> Option<Resources> {
