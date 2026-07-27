@@ -29,6 +29,16 @@ impl AutoRunner {
     pub fn stop(&mut self) {
         self.period = None;
     }
+
+    /// Progress (0.0-1.0) toward the next autorun reward, or `None` if autorun is inactive.
+    pub fn get_progress(&self) -> Option<f64> {
+        let period = self.period?;
+        let deadline = period + self.run_duration.unwrap_or_default();
+        if deadline.is_zero() {
+            return Some(0.0);
+        }
+        Some((self.since_last_run.as_secs_f64() / deadline.as_secs_f64()).clamp(0.0, 1.0))
+    }
 }
 
 impl TickerMut for AutoRunner {

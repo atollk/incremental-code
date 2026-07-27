@@ -225,8 +225,6 @@ pub mod compile_thread {
     use std::sync::{Arc, Mutex};
     #[cfg(not(target_arch = "wasm32"))]
     use std::thread;
-    #[cfg(target_arch = "wasm32")]
-    use wasm_thread as thread;
 
     #[derive(Debug, Clone)]
     pub enum CompileThreadStatus {
@@ -239,6 +237,7 @@ pub mod compile_thread {
 
     pub struct CompileThread {
         status: Arc<Mutex<CompileThreadStatus>>,
+        #[cfg(not(target_arch = "wasm32"))]
         join_handle: Option<thread::JoinHandle<()>>,
     }
 
@@ -287,8 +286,17 @@ pub mod compile_thread {
                 };
                 *status.lock().unwrap() = CompileThreadStatus::Idle(thread_result);
             };
-            let t = thread::spawn(f);
-            self.join_handle = Some(t);
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let t = thread::spawn(f);
+                self.join_handle = Some(t);
+            }
+            #[cfg(target_arch = "wasm32")]
+            {
+                // wasm32 has no working thread support in this build (no shared-memory/atomics
+                // target features configured), so compile synchronously on the main thread.
+                f();
+            }
         }
 
         pub fn status(&self) -> CompileThreadStatus {
@@ -307,6 +315,7 @@ pub mod compile_thread {
         fn default() -> Self {
             CompileThread {
                 status: Arc::new(Mutex::new(CompileThreadStatus::Idle(Ok(())))),
+                #[cfg(not(target_arch = "wasm32"))]
                 join_handle: None,
             }
         }

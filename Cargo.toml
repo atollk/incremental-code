@@ -39,7 +39,6 @@ ratzilla = { git = "https://github.com/atollk/ratzilla", rev = "373a39b17d0fbf5d
 beamterm-renderer = { version = "^1.0", optional = true }
 web-sys = { version = "0.3.97", features = ["Storage", "Window"], optional = true }
 console_log = { version = "1.0", optional = true }
-wasm_thread = { version = "0.3.3", optional = true }
 wasm-bindgen-futures = { version = "0.4", optional = true }
 js-sys = { version = "0.3", optional = true }
 
@@ -103,7 +102,6 @@ ratzilla = [
     "dep:ratzilla",
     "dep:web-sys",
     "dep:console_log",
-    "dep:wasm_thread",
     "dep:wasm-bindgen-futures",
     "dep:js-sys",
     "tachyonfx/wasm",

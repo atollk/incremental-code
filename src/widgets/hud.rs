@@ -1,3 +1,5 @@
+use crate::game_scenes::logic::auto_run::with_auto_run;
+use crate::game_scenes::upgrades::count_buyable;
 use crate::game_state::{with_auto_saver_mut, with_game_state};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use ratatui_core::buffer::Buffer;
@@ -5,6 +7,7 @@ use ratatui_core::layout::{Constraint, Layout, Rect};
 use ratatui_core::terminal::Frame;
 use ratatui_core::text::Text;
 use ratatui_core::widgets::Widget;
+use ratatui_widgets::gauge::LineGauge;
 
 /// Fixed width (in terminal columns) reserved for the HUD panel.
 pub const HUD_WIDTH: u16 = 22;
@@ -16,8 +19,14 @@ impl Widget for HudWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut text = Text::default();
 
-        let resources = with_game_state(|s| format!("{}", s.total_resources().fmt_multiline()));
-        text.extend(Some(resources));
+        let resources = with_game_state(|s| s.total_resources().fmt_multiline().to_string());
+        text.extend(resources.lines().map(String::from));
+
+        let buyable = with_game_state(|s| {
+            let resources = s.total_resources();
+            count_buyable(&s.upgrades, &resources)
+        });
+        text.extend(Some(format!("Buyable upgrades: {buyable}")));
 
         let time_since_last_save = with_auto_saver_mut(|auto_saver| auto_saver.since_last_save());
         text.extend(Some(format!(
@@ -29,9 +38,28 @@ impl Widget for HudWidget {
         let inner = block.inner(area);
         block.render(area, buf);
 
-        Paragraph::new(text)
-            .wrap(Wrap { trim: false })
-            .render(inner, buf);
+        let autorun_progress = with_auto_run(|ar| ar.get_progress());
+        let text_height = text.height() as u16;
+
+        match autorun_progress {
+            Some(ratio) => {
+                let [text_area, gauge_area] =
+                    Layout::vertical([Constraint::Length(text_height), Constraint::Length(1)])
+                        .areas(inner);
+                Paragraph::new(text)
+                    .wrap(Wrap { trim: false })
+                    .render(text_area, buf);
+                LineGauge::default()
+                    .ratio(ratio)
+                    .label("")
+                    .render(gauge_area, buf);
+            }
+            None => {
+                Paragraph::new(text)
+                    .wrap(Wrap { trim: false })
+                    .render(inner, buf);
+            }
+        }
     }
 }
 

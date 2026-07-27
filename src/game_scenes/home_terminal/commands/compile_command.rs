@@ -13,33 +13,32 @@ use std::cell::RefCell;
 use std::time::Duration;
 
 pub(super) fn compile_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    with_game_state(|game_state| -> Box<dyn RunningCommand<SceneSwitch>> {
-        if game_state.program_code.is_empty() {
-            let text = "There is no program to compile. Use 'code' to open the code editor and write a program before compiling.";
-            let text = Text::raw(text);
-            Box::new(ParagraphCmd::new(Paragraph::new(text)))
-        } else {
-            Box::new(ChainCmd::new(
-                Box::new(CompileCmd::new()),
-                Box::new(|compile_cmd| {
-                    let result = compile_cmd
-                        .result
-                        .as_ref()
-                        .expect("compile command to finish");
-                    let paragraph: Paragraph<'static> = if let Err(e) = result {
-                        Paragraph::new(e.to_string())
-                    } else {
-                        Paragraph::new("Compilation successful.")
-                    };
-                    with_game_state(|game_state| {
-                        log::info!("Compiled program: {:?}", game_state.compiled_program)
-                    });
-                    Box::new(ParagraphCmd::new(paragraph))
-                }),
-                true,
-            ))
-        }
-    })
+    let program_is_empty = with_game_state(|game_state| game_state.program_code.is_empty());
+    if program_is_empty {
+        let text = "There is no program to compile. Use 'code' to open the code editor and write a program before compiling.";
+        let text = Text::raw(text);
+        Box::new(ParagraphCmd::new(Paragraph::new(text)))
+    } else {
+        Box::new(ChainCmd::new(
+            Box::new(CompileCmd::new()),
+            Box::new(|compile_cmd| {
+                let result = compile_cmd
+                    .result
+                    .as_ref()
+                    .expect("compile command to finish");
+                let paragraph: Paragraph<'static> = if let Err(e) = result {
+                    Paragraph::new(e.to_string())
+                } else {
+                    Paragraph::new("Compilation successful.")
+                };
+                with_game_state(|game_state| {
+                    log::info!("Compiled program: {:?}", game_state.compiled_program)
+                });
+                Box::new(ParagraphCmd::new(paragraph))
+            }),
+            true,
+        ))
+    }
 }
 
 struct CompileCmd {

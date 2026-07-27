@@ -153,6 +153,18 @@ fn render_group_items(upgrades: &[&dyn Upgrade], group_i: usize) -> Vec<TreeItem
         .collect()
 }
 
+/// Counts purchasable tracks, across unlocked groups, affordable with `resources`.
+pub(crate) fn count_buyable(upgrades: &Upgrades, resources: &Resources) -> usize {
+    let group_unlocks = groups_are_unlocked(upgrades);
+    upgrades
+        .upgrades()
+        .into_iter()
+        .filter(|u| group_unlocks[u.group()])
+        .flat_map(|u| (0..u.count_tracks()).filter_map(|t| u.track_next_cost(t)))
+        .filter(|cost| cost <= resources)
+        .count()
+}
+
 fn groups_are_unlocked(upgrades: &Upgrades) -> [bool; 7] {
     [
         true,
