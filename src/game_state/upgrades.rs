@@ -713,6 +713,25 @@ impl_upgrade!(
 // Level 4
 
 impl_upgrade!(
+    AutoRun,
+    type=Option<Duration>,
+    level=5,
+    values=[
+        (None, LOCKED),
+        (Some(Duration::from_secs(18)), "18s"),
+        (Some(Duration::from_secs(6)), "6s"),
+        (Some(Duration::from_secs(2)), "2s"),
+        (Some(Duration::from_secs(1)), "0s"),
+    ],
+    costs=[[
+        Resources::gold(1),
+        Resources::zero(),
+        Resources::zero(),
+        Resources::zero(),
+    ]]
+);
+
+impl_upgrade!(
     UnlockPrint,
     type=bool,
     level=4,
@@ -769,25 +788,6 @@ impl_upgrade!(
 );
 
 // Level 5
-
-impl_upgrade!(
-    AutoRun,
-    type=Option<Duration>,
-    level=5,
-    values=[
-        (None, LOCKED),
-        (Some(Duration::from_secs(18)), "18s"),
-        (Some(Duration::from_secs(6)), "6s"),
-        (Some(Duration::from_secs(2)), "2s"),
-        (Some(Duration::from_secs(1)), "0s"),
-    ],
-    costs=[[
-        Resources::gold(50e3),
-        Resources::zero(),
-        Resources::zero(),
-        Resources::zero(),
-    ]]
-);
 
 impl_upgrade!(
     UnlockBrk,
