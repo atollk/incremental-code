@@ -242,7 +242,7 @@ impl<'a> Scene for UpgradesScene<'a> {
                     with_game_state_mut(|game_state| {
                         game_state.upgrades = self.upgrades_working_copy.clone()
                     });
-                    on_upgrades_commit();
+                    with_game_state_mut(|game_state| game_state.on_upgrades_commit());
                     self.save_tree_selection();
                     SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
                 }
@@ -287,8 +287,4 @@ impl<'a> Scene for UpgradesScene<'a> {
         frame.render_widget(&mut self.tree_widget, content_area);
         SceneSwitch::NoSwitch
     }
-}
-
-pub fn on_upgrades_commit() {
-    with_game_state_mut(|game_state| game_state.on_upgrades_commit());
 }

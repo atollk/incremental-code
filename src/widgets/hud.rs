@@ -19,20 +19,25 @@ impl Widget for HudWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let mut text = Text::default();
 
-        let resources = with_game_state(|s| s.total_resources().fmt_multiline().to_string());
-        text.extend(resources.lines().map(String::from));
+        let resource_string = with_game_state(|s| s.total_resources().fmt_multiline().to_string());
+        resource_string
+            .lines()
+            .for_each(|line| text.push_line(line));
+        text.push_line("");
 
         let buyable = with_game_state(|s| {
             let resources = s.total_resources();
             count_buyable(&s.upgrades, &resources)
         });
-        text.extend(Some(format!("Buyable upgrades: {buyable}")));
+        text.push_line(format!("Buyable upgrades: {buyable}"));
+        text.push_line("");
 
         let time_since_last_save = with_auto_saver_mut(|auto_saver| auto_saver.since_last_save());
-        text.extend(Some(format!(
+        text.push_line(format!(
             "Time since last save: {}s",
             time_since_last_save.as_secs()
-        )));
+        ));
+        text.push_line("");
 
         let block = Block::new().borders(Borders::ALL).title(" HUD ");
         let inner = block.inner(area);

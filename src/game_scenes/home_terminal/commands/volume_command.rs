@@ -16,9 +16,7 @@ struct VolumeCmd {
 }
 
 pub(super) fn volume_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    let initial = with_audio_backend(|audio| audio.as_ref().map(|audio| audio.get_volume()))
-        .map(|v| (v * 100.) as u8)
-        .unwrap_or(100);
+    let initial = with_audio_backend(|audio| audio.get_volume() * 100.) as u8;
     Box::new(VolumeCmd {
         original: initial,
         current: initial,
@@ -40,11 +38,7 @@ impl VolumeCmd {
     }
 
     fn sync_volume(&self) {
-        with_audio_backend_mut(|audio| {
-            audio
-                .as_mut()
-                .map(|audio| audio.set_volume(self.current as f32 / 100.))
-        });
+        with_audio_backend_mut(|audio| audio.set_volume(self.current as f32 / 100.));
     }
 }
 

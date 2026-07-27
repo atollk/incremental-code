@@ -8,11 +8,30 @@ use rand::{random_range, rng};
 use rodio::{MixerDeviceSink, Player};
 use std::io::Cursor;
 use std::time::Duration;
+use tap::TapFallible;
 
-pub struct AudioBackend {
-    _sink: MixerDeviceSink,
+struct AudioBackendInner {
+    #[allow(unused)]
+    sink: MixerDeviceSink,
     player: Player,
     bgm_silence: Option<Duration>,
+}
+
+impl AudioBackendInner {
+    fn new() -> anyhow::Result<Self> {
+        let sink = rodio::DeviceSinkBuilder::open_default_sink()?;
+        let player = Player::connect_new(sink.mixer());
+        player.set_volume(STARTING_VOLUME);
+        Ok(AudioBackendInner {
+            sink,
+            player,
+            bgm_silence: None,
+        })
+    }
+}
+
+pub struct AudioBackend {
+    inner: Option<AudioBackendInner>,
 }
 
 const MUSIC_ASSETS: Dir = include_dir!("$CARGO_MANIFEST_DIR/assets/music");
@@ -20,27 +39,29 @@ const MUSIC_ASSETS: Dir = include_dir!("$CARGO_MANIFEST_DIR/assets/music");
 const STARTING_VOLUME: f32 = 0.01;
 
 impl AudioBackend {
-    pub fn new() -> anyhow::Result<Self> {
-        let sink = rodio::DeviceSinkBuilder::open_default_sink()?;
-        let player = Player::connect_new(sink.mixer());
-        player.set_volume(STARTING_VOLUME);
-        Ok(Self {
-            _sink: sink,
-            player,
-            bgm_silence: None,
-        })
+    pub fn new() -> Self {
+        let inner = AudioBackendInner::new()
+            .tap_err(|err| log::warn!("Failed to open sound device: {}", err.to_string()))
+            .ok();
+        Self { inner }
     }
 
     pub fn start_bgm_loop(&mut self) -> anyhow::Result<()> {
-        with_settings(|settings| self.player.set_volume(settings.bgm_volume));
-        if self.bgm_silence.is_none() && self.player.empty() {
+        let Some(inner) = &mut self.inner else {
+            return Ok(());
+        };
+        with_settings(|settings| inner.player.set_volume(settings.bgm_volume));
+        if inner.bgm_silence.is_none() && inner.player.empty() {
             self.start_bgm()?;
         }
         Ok(())
     }
 
     fn start_bgm(&mut self) -> anyhow::Result<()> {
-        self.bgm_silence = None;
+        let Some(inner) = &mut self.inner else {
+            return Ok(());
+        };
+        inner.bgm_silence = None;
         let [asset] = MUSIC_ASSETS
             .files()
             .sample(&mut rng(), 1)
@@ -48,41 +69,50 @@ impl AudioBackend {
             .collect_array()
             .unwrap();
         let source = rodio::Decoder::try_from(Cursor::new(asset.contents()))?;
-        self.player.append(source);
+        inner.player.append(source);
         Ok(())
     }
 
     pub fn stop_bgm(&mut self) {
-        self.player.clear();
+        let Some(inner) = &mut self.inner else { return };
+        inner.player.clear();
     }
 
     pub fn get_volume(&self) -> f32 {
-        self.player.volume()
+        let Some(inner) = &self.inner else { return 0. };
+        inner.player.volume()
     }
 
     pub fn set_volume(&mut self, volume: f32) {
-        self.player.set_volume(volume);
+        let Some(inner) = &mut self.inner else { return };
+        inner.player.set_volume(volume);
         with_settings_mut(|settings| settings.bgm_volume = volume);
     }
 }
 
-impl TickerMut for Option<AudioBackend> {
+impl Default for AudioBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TickerMut for AudioBackend {
     fn tick(&mut self, elapsed: Duration) {
-        let Some(s) = self else { return };
-        match (s.player.empty(), s.bgm_silence) {
+        let Some(inner) = &mut self.inner else { return };
+        match (inner.player.empty(), inner.bgm_silence) {
             (true, None) => {
                 let silence = Duration::from_secs(random_range(10..20));
-                s.bgm_silence = Some(silence);
+                inner.bgm_silence = Some(silence);
             }
             (false, None) => {}
             (true, Some(_)) => {
-                s.bgm_silence = if let Some(bgm_silence) = &mut s.bgm_silence {
+                inner.bgm_silence = if let Some(bgm_silence) = &mut inner.bgm_silence {
                     bgm_silence.checked_sub(elapsed)
                 } else {
                     None
                 };
-                if s.bgm_silence.is_none() {
-                    if let Err(e) = s.start_bgm() {
+                if inner.bgm_silence.is_none() {
+                    if let Err(e) = self.start_bgm() {
                         log::error!("Error starting bgm: {:?}", e);
                     }
                 }
@@ -94,4 +124,4 @@ impl TickerMut for Option<AudioBackend> {
     }
 }
 
-global_variable!(audio_backend, Option<AudioBackend>);
+global_variable!(audio_backend, AudioBackend);

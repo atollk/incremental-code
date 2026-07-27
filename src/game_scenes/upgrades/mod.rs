@@ -3,4 +3,3 @@ mod upgrades;
 
 pub(crate) use tree::count_buyable;
 pub use upgrades::UpgradesScene;
-pub use upgrades::on_upgrades_commit;

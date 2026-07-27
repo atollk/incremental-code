@@ -179,14 +179,12 @@ impl GameState {
         // If music was unlocked, start the music.
         let unlock_music = self.upgrades.unlock_music.value();
         with_audio_backend_mut(|audio| {
-            if let Some(audio) = audio {
-                if unlock_music {
-                    let _ = audio
-                        .start_bgm_loop()
-                        .map_err(|e| log::warn!("Error starting bgm: {}", e));
-                } else {
-                    audio.stop_bgm();
-                }
+            if unlock_music {
+                let _ = audio
+                    .start_bgm_loop()
+                    .map_err(|e| log::warn!("Error starting bgm: {}", e));
+            } else {
+                audio.stop_bgm();
             }
         });
 

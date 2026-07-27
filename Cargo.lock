@@ -1356,6 +1356,7 @@ dependencies = [
  "simple_logger",
  "spfunc",
  "tachyonfx",
+ "tap",
  "throbber-widgets-tui",
  "unicode-segmentation",
  "unicode-width",
