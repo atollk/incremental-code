@@ -234,13 +234,13 @@ mod tests {
     #[test]
     fn currency_shifts_each_denomination_up_one_tier_1() {
         let mut state = GameState::default();
-        state.current_resources = Resources::from_bronze(64); // 2^6
+        state.current_resources = Resources::bronze(64); // 2^6
         state.carryover_resources = Resources::zero();
 
         (state.current_resources, state.carryover_resources) = state.prestige_currency();
 
         assert_resources_close(&state.current_resources, &Resources::zero());
-        assert_resources_close(&state.carryover_resources, &Resources::from_silver(6));
+        assert_resources_close(&state.carryover_resources, &Resources::silver(6));
     }
 
     // Each denomination's log2 is written one tier up (bronze -> new silver,

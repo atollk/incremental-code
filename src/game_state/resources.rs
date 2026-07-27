@@ -75,21 +75,21 @@ impl Resources {
     }
 
     /// Creates a `Resources` with only the bronze denomination set.
-    pub const fn from_bronze(bronze: impl [const] Into<f64>) -> Self {
+    pub const fn bronze(bronze: impl [const] Into<f64>) -> Self {
         Resources::new(bronze, 0.0, 0.0, 0.0, 0.0)
     }
 
     /// Creates a `Resources` with only the silver denomination set.
-    pub const fn from_silver(silver: impl [const] Into<f64>) -> Self {
+    pub const fn silver(silver: impl [const] Into<f64>) -> Self {
         Resources::new(0.0, silver, 0.0, 0.0, 0.0)
     }
 
     /// Creates a `Resources` with only the gold denomination set.
-    pub const fn from_gold(gold: impl [const] Into<f64>) -> Self {
+    pub const fn gold(gold: impl [const] Into<f64>) -> Self {
         Resources::new(0.0, 0.0, gold, 0.0, 0.0)
     }
 
-    pub const fn from_diamond(diamond: impl [const] Into<f64>) -> Self {
+    pub const fn diamond(diamond: impl [const] Into<f64>) -> Self {
         Resources::new(0.0, 0.0, 0.0, diamond, 0.0)
     }
 

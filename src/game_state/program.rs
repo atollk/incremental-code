@@ -135,17 +135,16 @@ impl CompiledProgram {
             .map(|secs| secs.sqrt() * upgrades.silver_per_sleep_second as f64)
             .sum();
         // Gold is awarded based on the last print statement and its argument length.
-        let gold: f64 = (0..upgrades.gold_print_log_nesting).fold(
-            self.print_len.unwrap_or(0) as f64,
-            |acc, _| {
+        let gold: f64 = (0..upgrades.gold_print_log_nesting)
+            .fold(self.print_len.unwrap_or(0) as f64, |acc, _| {
                 let x = acc.log2();
                 if x.is_finite() && x.is_sign_positive() {
                     x
                 } else {
                     0.
                 }
-            },
-        );
+            })
+            .max(1.);
         // Brk is awarded based on the other three resources, scaled by the point where the brk was called relative to all instructions.
         // Without an actual brk() call there's only one block, so no diamond is earned.
         let diamond = if instruction_counts_between_brk.len() <= 1 {

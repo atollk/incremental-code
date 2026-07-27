@@ -246,7 +246,7 @@ impl_upgrade!(
     level=0,
     values=[(false, LOCKED), (true, UNLOCKED)],
     costs=[[
-        Resources::from_bronze(0)
+        Resources::bronze(0)
     ]]
 );
 
@@ -256,7 +256,7 @@ impl_upgrade!(
     level=0,
     values=[(false, LOCKED), (true, UNLOCKED)],
     costs=[[
-        Resources::from_bronze(1)
+        Resources::bronze(1)
     ]]
 );
 
@@ -266,7 +266,7 @@ impl_upgrade!(
     level=0,
     values=[(false, LOCKED), (true, UNLOCKED)],
     costs=[[
-        Resources::from_bronze(5)
+        Resources::bronze(5)
     ]]
 );
 
@@ -276,7 +276,7 @@ impl_upgrade!(
     level=0,
     values=[(false, LOCKED), (true, UNLOCKED)],
     costs=[[
-        Resources::from_bronze(5)
+        Resources::bronze(5)
     ]]
 );
 
@@ -296,10 +296,10 @@ impl_upgrade!(
         (0.1, "0.1s"),
     ],
     costs=[[
-        Resources::from_bronze(10),
-        Resources::from_bronze(100),
-        Resources::from_bronze(1e3),
-        Resources::from_silver(200),
+        Resources::bronze(10),
+        Resources::bronze(100),
+        Resources::bronze(1e3),
+        Resources::silver(200),
         Resources::new(20e3, 1e3, 0, 0, 0),
         Resources::zero(),
     ]]
@@ -336,18 +336,18 @@ impl_upgrade!(
     ],
     costs=[
         [
-            Resources::from_bronze(10),
-            Resources::from_bronze(20),
-            Resources::from_bronze(30),
-            Resources::from_bronze(200),
-            Resources::from_bronze(1000),
-            Resources::from_bronze(10e3),
+            Resources::bronze(10),
+            Resources::bronze(20),
+            Resources::bronze(30),
+            Resources::bronze(200),
+            Resources::bronze(1000),
+            Resources::bronze(10e3),
         ],
         [
-            Resources::from_silver(1),
-            Resources::from_silver(5),
-            Resources::from_silver(100),
-            Resources::zero(),
+            Resources::silver(1),
+            Resources::silver(5),
+            Resources::silver(100),
+            Resources::silver(2e3),
             Resources::zero(),
             Resources::zero(),
         ],
@@ -381,8 +381,8 @@ impl_upgrade!(
         (80, "80"),
     ],
     costs=[[
-        Resources::from_bronze(100), // core upgrade 4
-        Resources::zero(), // core upgrade 13
+        Resources::bronze(100), // core upgrade 4
+        Resources::silver(200), // core upgrade 13
         Resources::zero(), // core upgrade 19
         Resources::zero(), // core upgrade 22
         Resources::zero(), // core upgrade 24
@@ -408,15 +408,15 @@ impl_upgrade!(
         (40, "40"),
     ],
     costs=[[
-        Resources::from_bronze(5), // core upgrade 1
-        Resources::from_bronze(25), // core upgrade 2
-        Resources::from_bronze(250), // core upgrade 5
-        Resources::from_bronze(1e3), // core upgrade 6
-        Resources::from_bronze(2e3), // core upgrade 8
-        Resources::from_bronze(4e3), // core upgrade 10
-        Resources::zero(), // core upgrade 15
-        Resources::zero(), // core upgrade 16
-        Resources::zero(), // core upgrade 17
+        Resources::bronze(5), // core upgrade 1
+        Resources::bronze(25), // core upgrade 2
+        Resources::bronze(250), // core upgrade 5
+        Resources::bronze(1e3), // core upgrade 6
+        Resources::bronze(2e3), // core upgrade 8
+        Resources::bronze(4e3), // core upgrade 10
+        Resources::silver(300) + Resources::bronze(30e3), // core upgrade 15
+        Resources::silver(1200) + Resources::bronze(70e3), // core upgrade 16
+        Resources::silver(700) + Resources::bronze(70e3), // core upgrade 17
         Resources::zero(), // core upgrade 21
         Resources::zero(), // core upgrade 23
     ]]
@@ -427,7 +427,7 @@ impl_upgrade!(
     type=bool,
     level=1,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_bronze(50)]]
+    costs=[[Resources::bronze(50)]]
 );
 
 // Level 2
@@ -470,27 +470,27 @@ impl_upgrade!(
     ],
     costs=[
         [
-            Resources::from_bronze(20),
-            Resources::from_bronze(30),
-            Resources::from_bronze(40),
-            Resources::from_bronze(50),
-            Resources::from_bronze(70),
-            Resources::from_bronze(90),
-            Resources::from_bronze(120),
-            Resources::from_bronze(150),
-            Resources::from_bronze(180),
-            Resources::from_bronze(400),
-            Resources::from_bronze(1e3),
-            Resources::from_bronze(4e3),
-            Resources::from_bronze(10e3),
-            Resources::from_bronze(100e3),
-            Resources::from_bronze(1e6),
+            Resources::bronze(20),
+            Resources::bronze(30),
+            Resources::bronze(40),
+            Resources::bronze(50),
+            Resources::bronze(70),
+            Resources::bronze(90),
+            Resources::bronze(120),
+            Resources::bronze(150),
+            Resources::bronze(180),
+            Resources::bronze(400),
+            Resources::bronze(1e3),
+            Resources::bronze(4e3),
+            Resources::bronze(10e3),
+            Resources::bronze(100e3),
+            Resources::bronze(1e6),
         ],
         [
-            Resources::from_silver(1),
-            Resources::from_silver(1),
-            Resources::from_silver(10),
-            Resources::from_silver(300),
+            Resources::silver(1),
+            Resources::silver(1),
+            Resources::silver(10),
+            Resources::silver(8e3),
             Resources::zero(),
             Resources::zero(),
             Resources::zero(),
@@ -519,8 +519,8 @@ impl_upgrade!(
         (100_000_000, "100 M"),
         (1_000_000_000, "1 B"),
     ],
-    costs=[[  // TODO
-        Resources::zero(),
+    costs=[[
+        Resources::silver(1000) + Resources::bronze(50e3),
         Resources::zero(),
         Resources::zero(),
         Resources::zero(),
@@ -535,7 +535,7 @@ impl_upgrade!(
     type=bool,
     level=2,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_bronze(500)]]
+    costs=[[Resources::bronze(500)]]
 );
 
 impl_upgrade!(
@@ -552,10 +552,10 @@ impl_upgrade!(
         ((true, 255), "numbers to 255"),
     ],
     costs=[[
-        Resources::from_bronze(1e3), // core upgrade 7
-        Resources::from_bronze(3e3), // core upgrade 9
-        Resources::from_bronze(10e3), // core upgrade 12
-        Resources::from_silver(1e3), // core upgrade 12.5
+        Resources::bronze(1e3), // core upgrade 7
+        Resources::bronze(3e3), // core upgrade 9
+        Resources::bronze(10e3), // core upgrade 12
+        Resources::silver(1e3), // core upgrade 12.5
         Resources::zero(), // core upgrade 14
         Resources::zero(), // core upgrade 27
     ]]
@@ -575,9 +575,9 @@ impl_upgrade!(
         (6, "keep L6"),
     ],
     costs=[[
-        Resources::from_silver(1),
-        Resources::from_silver(10),
-        Resources::from_silver(10e3),
+        Resources::silver(1),
+        Resources::silver(10),
+        Resources::silver(10e3),
         Resources::zero(),
         Resources::zero(),
         Resources::zero(),
@@ -608,7 +608,7 @@ impl_upgrade!(
         (CodeStatementLevels::MultiRecursion, "multi recursion"),
     ],
     costs=[[
-        Resources::from_silver(13), // core upgrade 11
+        Resources::silver(13), // core upgrade 11
         Resources::zero(), // core upgrade 18
         Resources::zero(), // core upgrade 20
         Resources::zero(),
@@ -622,7 +622,7 @@ impl_upgrade!(
     type=bool,
     level=2,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_bronze(10e3)]]
+    costs=[[Resources::bronze(10e3)]]
 );
 
 // Level 3
@@ -632,7 +632,7 @@ impl_upgrade!(
     type=bool,
     level=3,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_silver(5e3)]]
+    costs=[[Resources::silver(5e3)]]
 );
 
 impl_upgrade!(
@@ -657,7 +657,7 @@ impl_upgrade!(
         (1.0, "none"),
     ],
     costs=[[
-        Resources::from_silver(100),
+        Resources::bronze(80e3),
         Resources::zero(),
         Resources::zero(),
         Resources::zero(),
@@ -678,7 +678,7 @@ impl_upgrade!(
         (10, "32"),
     ],
     costs=[[
-        Resources::from_silver(150),
+        Resources::bronze(100e3),
         Resources::zero(),
         Resources::zero(),
         Resources::zero(),
@@ -692,13 +692,13 @@ impl_upgrade!(
     values=[
         (Resources::zero(), "0"),
         (Resources::new(1000, 0, 0, 0, 0), format!("{}", Resources::new(1000, 0, 0, 0, 0).fmt_oneline())),
-        (Resources::new(10_000.0, 100.0, 0.0, 0.0, 0.0), format!("{}", Resources::new(10_000.0, 100.0, 0.0, 0.0, 0.0).fmt_oneline())),
+        (Resources::new(50_000, 1000, 0, 0, 0), format!("{}", Resources::new(50_000, 1000, 0, 0, 0).fmt_oneline())),
         (Resources::new(1e6, 10_000., 100., 0.0, 0.0), format!("{}", Resources::new(1e6, 10_000., 100., 0.0, 0.0).fmt_oneline())),
     ],
     costs=[[
-        Resources::from_silver(100),
-        Resources::from_gold(100),
-        Resources::from_diamond(100),
+        Resources::silver(100),
+        Resources::gold(100),
+        Resources::diamond(100),
     ]]
 );
 
@@ -707,7 +707,7 @@ impl_upgrade!(
     type=bool,
     level=3,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_gold(10)]]
+    costs=[[Resources::gold(12)]]
 );
 
 // Level 4
@@ -730,8 +730,8 @@ impl_upgrade!(
         (1e-5, "0.01ms"),
     ],
     costs=[[
-        Resources::from_gold(100.),
-        Resources::from_gold(1e3),
+        Resources::gold(100.),
+        Resources::gold(1e3),
     ]]
 );
 
@@ -740,7 +740,7 @@ impl_upgrade!(
     type=bool,
     level=4,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_gold(1e3)]]
+    costs=[[Resources::gold(1e3)]]
 );
 
 impl_upgrade!(
@@ -754,8 +754,8 @@ impl_upgrade!(
         (1, "log(n)"),
     ],
     costs=[[
-        Resources::from_gold(500.),
-        Resources::from_gold(5e3),
+        Resources::gold(500.),
+        Resources::gold(5e3),
         Resources::zero(),
     ]]
 );
@@ -765,7 +765,7 @@ impl_upgrade!(
     type=bool,
     level=4,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_gold(10e3)]]
+    costs=[[Resources::gold(10e3)]]
 );
 
 // Level 5
@@ -782,7 +782,7 @@ impl_upgrade!(
         (Some(Duration::from_secs(1)), "0s"),
     ],
     costs=[[
-        Resources::from_gold(50e3),
+        Resources::gold(50e3),
         Resources::zero(),
         Resources::zero(),
         Resources::zero(),
@@ -794,7 +794,7 @@ impl_upgrade!(
     type=bool,
     level=5,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_gold(100e3)]]
+    costs=[[Resources::gold(100e3)]]
 );
 
 impl_upgrade!(
@@ -807,8 +807,8 @@ impl_upgrade!(
         (0.5, "50%"),
     ],
     costs=[[
-        Resources::from_gold(500e3),
-        Resources::from_gold(5e6),
+        Resources::gold(500e3),
+        Resources::gold(5e6),
     ]]
 );
 
@@ -824,10 +824,10 @@ impl_upgrade!(
         (1000, "1000"),
     ],
     costs=[[
-        Resources::from_gold(1e6),
-        Resources::from_gold(10e6),
-        Resources::from_gold(10e6),
-        Resources::from_gold(10e6),
+        Resources::gold(1e6),
+        Resources::gold(10e6),
+        Resources::gold(10e6),
+        Resources::gold(10e6),
     ]]
 );
 
@@ -836,7 +836,7 @@ impl_upgrade!(
     type=bool,
     level=5,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_gold(100e6)]]
+    costs=[[Resources::gold(100e6)]]
 );
 
 // Level 6
@@ -856,5 +856,5 @@ impl_upgrade!(
     type=bool,
     level=6,
     values=[(false, "not won"), (true, "won")],
-    costs=[[Resources::from_gold(1e12)]]
+    costs=[[Resources::gold(1e12)]]
 );
