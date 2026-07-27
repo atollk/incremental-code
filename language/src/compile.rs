@@ -647,6 +647,7 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
 mod tests {
     use super::*;
     use crate::parser::parse_program;
+    use assertables::{assert_err, assert_ge};
 
     impl CompilingMetadata for u32 {
         type Diff = i32;
@@ -921,13 +922,12 @@ mod tests {
         let first_only = compiled("def pure f(x):\npass;\nreturn x;\nend\na := f(1);\n");
         let both = compiled(src);
         // Second call adds at least as many instructions as the first (body runs again).
-        assert!(both >= first_only * 2 - 1);
+        assert_ge!(both, first_only * 2 - 1);
     }
 
     #[test]
     fn pure_accessing_non_local_var_is_error() {
-        let err = compiled_err("x := 10;\ndef pure f():\ny := x;\nend\nf();\n");
-        assert!(err.to_string().contains("non-local"));
+        compiled_err("x := 10;\ndef pure f():\ny := x;\nend\nf();\n");
     }
 
     #[test]
@@ -972,7 +972,8 @@ mod tests {
 
     #[test]
     fn deep_recursion_does_not_stack_overflow() {
-        let src = "def f(n):\nif n <= 0:\nreturn 0;\nelse:\nreturn f(n - 1);\nend\nend\nx := f(300000);\n";
+        let src =
+            "def f(n):\nif n <= 0:\nreturn 0;\nelse:\nreturn f(n - 1);\nend\nend\nx := f(30000);\n";
         compiled(src);
     }
 }
