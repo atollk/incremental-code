@@ -342,6 +342,7 @@ impl_upgrade!(
             Resources::bronze(200),
             Resources::bronze(1000),
             Resources::bronze(10e3),
+            Resources::bronze(500e6),
         ],
         [
             Resources::silver(1),
@@ -353,13 +354,12 @@ impl_upgrade!(
         ],
         [
             Resources::gold(30),
-            Resources::zero(),
+            Resources::gold(200),
             Resources::zero(),
             Resources::zero(),
             Resources::zero(),
         ],
         [
-            Resources::zero(),
             Resources::zero(),
             Resources::zero(),
             Resources::zero(),
@@ -483,7 +483,7 @@ impl_upgrade!(
             Resources::bronze(1e3),
             Resources::bronze(4e3),
             Resources::bronze(10e3),
-            Resources::bronze(1e6),
+            Resources::bronze(1e9),
             Resources::zero(),
         ],
         [
@@ -512,18 +512,16 @@ impl_upgrade!(
     values=[
         (100, "100"),
         (1000, "1000"),
-        (5000, "5 k"),
         (10_000, "10 k"),
         (100_000, "100 k"),
         (1_000_000, "1 M"),
         (100_000_000, "100 M"),
-        (1_000_000_000, "1 B"),
+        (10_000_000_000, "10 B"),
     ],
     costs=[[
         Resources::silver(1000) + Resources::bronze(50e3),
         Resources::new(1e6, 1e3, 10, 0, 0),
-        Resources::zero(),
-        Resources::zero(),
+        Resources::new(300e6, 100e3, 10e3, 0, 0),
         Resources::zero(),
         Resources::zero(),
         Resources::zero(),
@@ -557,7 +555,7 @@ impl_upgrade!(
         Resources::bronze(10e3), // core upgrade 12
         Resources::silver(1e3), // core upgrade 12.5
         Resources::gold(100), // core upgrade 14
-        Resources::diamond(50), // core upgrade 27
+        Resources::zero(), // core upgrade 27
     ]]
 );
 
@@ -577,7 +575,7 @@ impl_upgrade!(
     costs=[[
         Resources::silver(1),
         Resources::silver(10),
-        Resources::silver(10e3),
+        Resources::diamond(1),
         Resources::zero(),
         Resources::zero(),
         Resources::zero(),
@@ -589,6 +587,7 @@ pub enum CodeStatementLevels {
     SimpleLoops,
     NestedLoops,
     Functions,
+    Multiplication,
     PureFunctions,
     SingleRecursion,
     MultiRecursion,
@@ -603,6 +602,7 @@ impl_upgrade!(
         (CodeStatementLevels::SimpleLoops, "simple loops"),
         (CodeStatementLevels::NestedLoops, "nested loops"),
         (CodeStatementLevels::Functions, "functions"),
+        (CodeStatementLevels::Multiplication, "multiplication operations"),
         (CodeStatementLevels::PureFunctions, "pure functions"),
         (CodeStatementLevels::SingleRecursion, "single recursion"),
         (CodeStatementLevels::MultiRecursion, "multi recursion"),
@@ -610,8 +610,9 @@ impl_upgrade!(
     costs=[[
         Resources::silver(13), // core upgrade 11
         Resources::gold(10), // core upgrade 18
-        Resources::zero(), // core upgrade 20
+        Resources::bronze(100e6), // core upgrade 20
         Resources::zero(),
+        Resources::gold(10e3),
         Resources::zero(), // core upgrade 25
         Resources::zero(), // core upgrade 26
     ]]
@@ -659,7 +660,7 @@ impl_upgrade!(
     costs=[[
         Resources::bronze(80e3),
         Resources::bronze(200e3),
-        Resources::zero(),
+        Resources::bronze(300e6) + Resources::gold(1000),
         Resources::zero(),
         Resources::zero(),
         Resources::zero(),
@@ -764,20 +765,33 @@ impl_upgrade!(
     costs=[[Resources::gold(1e3)]]
 );
 
+fn iterated_log2_nonneg(mut x: f64, n: usize) -> f64 {
+    for _ in 0..n {
+        x = x.log2();
+    }
+    if x.is_finite() && x.is_sign_positive() {
+        x.ceil()
+    } else {
+        0.
+    }
+}
+
 impl_upgrade!(
     GoldPrintLogNesting,
-    type=u8,
+    type=fn (f64) -> f64,
     level=4,
     values=[
-        (100, "1"),
-        (3, "log(log(log(n)))"),
-        (2, "log(log(n))"),
-        (1, "log(n)"),
+        (|_| 1., "1"),
+        (|x| iterated_log2_nonneg(x, 3), "log(log(log(n)))"),
+        (|x| iterated_log2_nonneg(x, 2), "log(log(n))"),
+        (|x| iterated_log2_nonneg(x, 1), "log(n)"),
+        (|x| x.sqrt(), "sqrt(n)"),
     ],
     costs=[[
         Resources::silver(5e3) + Resources::bronze(150e3),
         Resources::silver(25e3) + Resources::bronze(300e6),
         Resources::silver(100e3) + Resources::bronze(100e6),
+        Resources::zero(),
     ]]
 );
 

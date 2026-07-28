@@ -1,4 +1,3 @@
-Feedback Fabian:
-- im code editor klarer machen, was line limits sind
-- victory screen
-- max instruction limit anheben
+- victory screen implementieren
+- bug: run cancel still awards the resources
+- bug: auto compile does not work for stale program ? it flashes the warning and then runs the old program

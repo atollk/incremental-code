@@ -69,9 +69,14 @@ impl CompiledProgram {
                         .powf(1. / instruction_speed_exp)
                 };
                 let min_duration_reached = min_duration_reached_at < sleep_split;
+                log::debug!("min_duration_reached at {:.3}", min_duration_reached_at);
 
                 // Compute the time taken for just the instructions by considering
                 // speedup effects and the min duration limit.
+                let cycle_without_min =
+                    hurwitz(sleep_split, instruction_speed_exp) * speed * instruction_speed_const
+                        / b_pow_k;
+                log::debug!("cycle_without_min {:.3}", cycle_without_min);
                 let sleep_cycle_duration = if min_duration_reached {
                     let before_min = hurwitz(min_duration_reached_at, instruction_speed_exp)
                         * (speed)
@@ -81,8 +86,7 @@ impl CompiledProgram {
                         (sleep_split - min_duration_reached_at) * upgrades.min_instruction_duration;
                     before_min + after_min
                 } else {
-                    hurwitz(sleep_split, instruction_speed_exp) * speed * instruction_speed_const
-                        / b_pow_k
+                    cycle_without_min
                 };
                 instructions_duration_sum += sleep_cycle_duration;
 
@@ -108,7 +112,7 @@ impl CompiledProgram {
         struct ResourceUpgrades {
             bronze_per_instruction: (u8, f32),
             silver_per_sleep_second: u32,
-            gold_print_log_nesting: u8,
+            gold_print_log_nesting: fn(f64) -> f64,
             diamond_per_brk: u16,
         }
         let upgrades = with_game_state(|game_state| ResourceUpgrades {
@@ -136,16 +140,7 @@ impl CompiledProgram {
             .sum();
         // Gold is awarded based on the last print statement and its argument length.
         let gold: f64 = if let Some(print_len) = self.print_len {
-            (0..upgrades.gold_print_log_nesting)
-                .fold(print_len as f64, |acc, _| {
-                    let x = acc.log2();
-                    if x.is_finite() && x.is_sign_positive() {
-                        x.ceil()
-                    } else {
-                        0.
-                    }
-                })
-                .max(1.)
+            (upgrades.gold_print_log_nesting)(print_len as f64).max(1.)
         } else {
             0.
         };

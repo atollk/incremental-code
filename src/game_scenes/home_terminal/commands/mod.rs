@@ -5,7 +5,6 @@ use crate::game_scenes::home_terminal::commands::exit_command::exit_cmd;
 use crate::game_scenes::home_terminal::commands::help_command::help_cmd;
 use crate::widgets::terminal::RunningCommand;
 
-mod cheat_pdcode_command;
 mod code_command;
 mod compile_command;
 mod docs_command;
@@ -20,7 +19,6 @@ mod upgrades_command;
 mod volume_command;
 
 use crate::game_scenes::home_terminal::HomeTerminalScene;
-use crate::game_scenes::home_terminal::commands::cheat_pdcode_command::cheat_pdcode_cmd;
 use crate::game_scenes::home_terminal::commands::docs_command::docs_cmd;
 use crate::game_scenes::home_terminal::commands::reboot_command::reboot_cmd;
 use crate::game_scenes::home_terminal::commands::reset_command::reset_cmd;
@@ -30,8 +28,6 @@ use crate::game_scenes::home_terminal::commands::upgrades_command::upgrades_cmd;
 use crate::game_scenes::home_terminal::commands::volume_command::volume_cmd;
 use crate::game_state::with_game_state;
 pub use unknown_command::unknown_cmd;
-
-const ENABLE_CHEATS: bool = true;
 
 /// A terminal command entry: its name, help text, and a factory that creates a runner for it.
 pub struct Command {
@@ -50,14 +46,6 @@ pub fn command_list() -> Vec<Command> {
         )
     });
     let mut commands = Vec::new();
-
-    if ENABLE_CHEATS {
-        commands.push(Command {
-            name: "pdcheat",
-            help_description: "Set the code to something optimal",
-            runner: |_| cheat_pdcode_cmd(),
-        })
-    }
 
     commands.push(Command {
         name: "help",
