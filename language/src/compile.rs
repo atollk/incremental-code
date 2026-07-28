@@ -647,7 +647,7 @@ fn eval_expr<'a, Meta: CompilingMetadata>(
 mod tests {
     use super::*;
     use crate::parser::parse_program;
-    use assertables::{assert_err, assert_ge};
+    use assertables::assert_ge;
 
     impl CompilingMetadata for u32 {
         type Diff = i32;

@@ -293,17 +293,12 @@ mod tests {
         state.carryover_resources = Resources::zero();
         state.upgrades.resources_after_reboot.track_level_up(0);
         state.upgrades.resources_after_reboot.track_level_up(0);
-        assert_eq!(
-            state.upgrades.resources_after_reboot.value(),
-            Resources::new(10_000.0, 100.0, 0.0, 0.0, 0.0)
-        );
+        let expected = Resources::new(50_000, 1000, 0, 0, 0);
+        assert_eq!(state.upgrades.resources_after_reboot.value(), expected);
 
         (state.current_resources, state.carryover_resources) = state.prestige_currency();
 
-        assert_resources_close(
-            &state.current_resources,
-            &Resources::new(10_000.0, 100.0, 0.0, 0.0, 0.0),
-        );
+        assert_resources_close(&state.current_resources, &expected);
     }
 
     // With the default keep_prestige_upgrades level (group 0, "keep L0"),

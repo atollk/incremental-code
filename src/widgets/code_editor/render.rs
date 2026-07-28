@@ -36,6 +36,8 @@ impl Widget for &Editor {
         let line_number_style = Style::default().fg(Color::DarkGray);
         let default_text_style = Style::default().fg(Color::White);
 
+        self.draw_background(area, buf, line_number_width);
+
         self.draw_lines(
             area,
             buf,
@@ -64,6 +66,45 @@ impl Widget for &Editor {
 }
 
 impl Editor {
+    /// Fills the editor background so the region still writable under the current
+    /// `max_lines`/`max_line_width` upgrade limits reads as black, while anything
+    /// beyond those limits reads as a greyish "out of bounds" backdrop.
+    fn draw_background(&self, area: Rect, buf: &mut Buffer, line_number_width: usize) {
+        if self.max_lines.is_none() && self.max_line_width.is_none() {
+            return;
+        }
+
+        const OUT_OF_BOUNDS_BG: Color = Color::Rgb(35, 35, 35);
+        const VALID_BG: Color = Color::Black;
+
+        for screen_y in 0..area.height {
+            let line_idx = self.offset_y + screen_y as usize;
+            let draw_y = area.top() + screen_y;
+
+            let row_within_line_count = self.max_lines.is_none_or(|max_lines| line_idx < max_lines);
+
+            for screen_x in 0..area.width {
+                let draw_x = area.left() + screen_x;
+
+                let col_within_line_width = if (screen_x as usize) < line_number_width {
+                    true
+                } else {
+                    let col = self.offset_x + (screen_x as usize - line_number_width);
+                    self.max_line_width
+                        .is_none_or(|max_line_width| col < max_line_width)
+                };
+
+                let bg = if row_within_line_count && col_within_line_width {
+                    VALID_BG
+                } else {
+                    OUT_OF_BOUNDS_BG
+                };
+
+                buf[(draw_x, draw_y)].set_style(Style::default().bg(bg));
+            }
+        }
+    }
+
     fn draw_lines(
         &self,
         area: Rect,
