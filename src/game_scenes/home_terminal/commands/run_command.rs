@@ -13,7 +13,8 @@ use std::time::Duration;
 
 pub(super) fn run_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
     if with_game_state(|game_state| {
-        game_state.compiled_program.is_none() && game_state.upgrades.auto_compile.value()
+        (game_state.compiled_program.is_none() || game_state.is_stale)
+            && game_state.upgrades.auto_compile.value()
     }) {
         Box::new(ChainCmd::new(
             compile_cmd(),
@@ -54,7 +55,12 @@ fn run_cmd_inner() -> Box<dyn RunningCommand<SceneSwitch>> {
                 // Successful run
                 Box::new(ChainCmd::new(
                     Box::new(RunCmd::new(execution_time)),
-                    Box::new(move |_| {
+                    Box::new(move |run_cmd: &RunCmd| {
+                        if run_cmd.was_cancelled() {
+                            return Box::new(ParagraphCmd::new(Paragraph::new(Text::from(
+                                "Run cancelled.",
+                            ))));
+                        }
                         let resource_gain = compiled_program.resource_gain();
                         with_game_state_mut(|game_state| {
                             game_state.current_resources += resource_gain.clone()
@@ -112,6 +118,10 @@ impl RunCmd {
             throbber_state,
             result: None,
         }
+    }
+
+    fn was_cancelled(&self) -> bool {
+        matches!(self.result, Some(Err(_)))
     }
 }
 

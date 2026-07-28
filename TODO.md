@@ -1,3 +1,1 @@
 - victory screen implementieren
-- bug: run cancel still awards the resources
-- bug: auto compile does not work for stale program ? it flashes the warning and then runs the old program
