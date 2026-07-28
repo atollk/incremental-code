@@ -91,10 +91,14 @@ impl CompiledProgram {
                 instructions_duration_sum += sleep_cycle_duration;
 
                 // Compute new speed
-                let pre_sleep_speed =
-                    (speed * instruction_speed_const * sleep_split.powf(instruction_speed_exp)
-                        / b_pow_k)
-                        .max(upgrades.min_instruction_duration);
+                let pre_sleep_speed_exp = if sleep_split == 0. {
+                    1.
+                } else {
+                    sleep_split.powf(instruction_speed_exp)
+                };
+                let pre_sleep_speed = (speed * instruction_speed_const * pre_sleep_speed_exp
+                    / b_pow_k)
+                    .max(upgrades.min_instruction_duration);
                 speed = pre_sleep_speed.powf(upgrades.sleep_speed_reset);
 
                 // Compute the time taken for the sleep itself.
@@ -104,6 +108,16 @@ impl CompiledProgram {
             }
         }
 
+        // safety:
+        for duration_sum in [&mut instructions_duration_sum, &mut sleep_duration_sum] {
+            if duration_sum.is_infinite() {
+                if duration_sum.is_sign_positive() {
+                    *duration_sum = f64::MAX;
+                } else {
+                    *duration_sum = f64::MIN;
+                }
+            }
+        }
         Duration::from_secs_f64(instructions_duration_sum)
             + Duration::from_secs_f64(sleep_duration_sum)
     }
@@ -164,8 +178,13 @@ impl CompiledProgram {
 
 // Approximates \sum_{i=1}^n i^k
 fn hurwitz(n: f64, k: f64) -> f64 {
+    if n == 0. {
+        return 0.;
+    }
     let z = spfunc::zeta::zeta(-k);
-    z + n.powf(k + 1.) / (k + 1.) + n.powf(k) / 2.
+    let a = n.powf(k + 1.) / (k + 1.);
+    let b = n.powf(k) / 2.;
+    z + a + b
 }
 
 impl CompilingMetadata for CompiledProgram {
