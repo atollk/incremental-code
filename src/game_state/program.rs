@@ -11,7 +11,7 @@ pub struct CompiledProgram {
     /// Calls to `sleep`, with their respective duration.
     pub sleep_calls: Vec<f64>,
     /// Max call to `print` with its string length.
-    pub print_len: Option<u128>,
+    pub print_len: Option<f64>,
 }
 
 impl CompiledProgram {
@@ -302,7 +302,7 @@ impl CompilingMetadata for CompiledProgram {
         self.sleep_calls.extend(diff.sleep_calls.iter());
         self.print_len = self
             .print_len
-            .map(|l| l.max(diff.print_len.unwrap_or(0)))
+            .map(|l| l.max(diff.print_len.unwrap_or(0.)))
             .or(diff.print_len);
         Ok(())
     }

@@ -70,7 +70,6 @@ pub fn compile_with_meta<Meta: CompilingMetadata>(
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub enum HashableProgramValue {
     Int(i64),
-    String(u128),
     Bool(bool),
 }
 
@@ -88,7 +87,6 @@ pub enum ProgramValue {
 fn to_hashable(v: &ProgramValue) -> Option<HashableProgramValue> {
     match v {
         ProgramValue::Int(i) => Some(HashableProgramValue::Int(*i)),
-        ProgramValue::String(s) => Some(HashableProgramValue::String(s.hash())),
         ProgramValue::Bool(b) => Some(HashableProgramValue::Bool(*b)),
         _ => None,
     }

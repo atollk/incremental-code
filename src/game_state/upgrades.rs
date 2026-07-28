@@ -514,15 +514,15 @@ impl_upgrade!(
         (1000, "1000"),
         (10_000, "10 k"),
         (100_000, "100 k"),
-        (1_000_000, "1 M"),
-        (100_000_000, "100 M"),
-        (10_000_000_000, "10 B"),
+        (10_000_000, "10 M"),
+        (1_000_000_000, "1 B"),
+        (1_000_000_000_000, "1 T"),
     ],
     costs=[[
         Resources::silver(1000) + Resources::bronze(50e3),
         Resources::new(1e6, 1e3, 10, 0, 0),
         Resources::new(300e6, 100e3, 10e3, 0, 0),
-        Resources::zero(),
+        Resources::diamond(20),
         Resources::zero(),
         Resources::zero(),
     ]]
@@ -785,13 +785,13 @@ impl_upgrade!(
         (|x| iterated_log2_nonneg(x, 3), "log(log(log(n)))"),
         (|x| iterated_log2_nonneg(x, 2), "log(log(n))"),
         (|x| iterated_log2_nonneg(x, 1), "log(n)"),
-        (|x| x.sqrt(), "sqrt(n)"),
+        (|x| x.log2().powi(2), "log(n)^2"),
     ],
     costs=[[
         Resources::silver(5e3) + Resources::bronze(150e3),
         Resources::silver(25e3) + Resources::bronze(300e6),
         Resources::silver(100e3) + Resources::bronze(100e6),
-        Resources::zero(),
+        Resources::bronze(10e9) + Resources::diamond(100),
     ]]
 );
 

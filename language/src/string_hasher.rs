@@ -5,7 +5,7 @@ use std::ops::Add;
 const M: u64 = (1 << 61) - 1; // Mersenne prime 2^61 - 1
 const B: u64 = 1_000_003;
 
-type LenTyp = u128;
+type LenTyp = f64;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct HashedString {
@@ -29,7 +29,7 @@ impl Add for HashedString {
         self.values.1 += rhs.len();
         self*/
         HashedString {
-            length: self.length.saturating_add(rhs.length),
+            length: self.length + rhs.length,
         }
     }
 }
