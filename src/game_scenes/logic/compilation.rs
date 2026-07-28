@@ -5,7 +5,6 @@ use language::{
     ProgramValue, compile_with_meta,
 };
 use std::cell::RefCell;
-use std::cmp::max;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -22,7 +21,7 @@ fn predefined_function_print(
             "print requires a string argument".to_string(),
         ));
     };
-    meta.program.print_len = Some(max(s.len() as u64, meta.program.print_len.unwrap_or(0)));
+    meta.program.print_len = Some(s.len().max(meta.program.print_len.unwrap_or(0)));
     Ok(ProgramValue::None)
 }
 

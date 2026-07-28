@@ -11,7 +11,7 @@ pub struct CompiledProgram {
     /// Calls to `sleep`, with their respective duration.
     pub sleep_calls: Vec<f64>,
     /// Max call to `print` with its string length.
-    pub print_len: Option<u64>,
+    pub print_len: Option<u128>,
 }
 
 impl CompiledProgram {
@@ -107,7 +107,7 @@ impl CompiledProgram {
     pub fn resource_gain(&self) -> Resources {
         struct ResourceUpgrades {
             bronze_per_instruction: (u8, f32),
-            silver_per_sleep_second: u8,
+            silver_per_sleep_second: u32,
             gold_print_log_nesting: u8,
             diamond_per_brk: u16,
         }
@@ -139,7 +139,7 @@ impl CompiledProgram {
             .fold(self.print_len.unwrap_or(0) as f64, |acc, _| {
                 let x = acc.log2();
                 if x.is_finite() && x.is_sign_positive() {
-                    x
+                    x.ceil()
                 } else {
                     0.
                 }

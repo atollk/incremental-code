@@ -5,15 +5,17 @@ use std::ops::Add;
 const M: u64 = (1 << 61) - 1; // Mersenne prime 2^61 - 1
 const B: u64 = 1_000_003;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+type LenTyp = u128;
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct HashedString {
-    length: u64,
+    length: LenTyp,
 }
 
 impl From<&str> for HashedString {
     fn from(value: &str) -> Self {
         Self {
-            length: value.len() as u64,
+            length: value.len() as LenTyp,
         }
     }
 }
@@ -27,7 +29,7 @@ impl Add for HashedString {
         self.values.1 += rhs.len();
         self*/
         HashedString {
-            length: self.length + rhs.length,
+            length: self.length.saturating_add(rhs.length),
         }
     }
 }
@@ -41,11 +43,11 @@ impl HashedString {
         value
     }
 
-    pub fn hash(&self) -> u64 {
+    pub fn hash(&self) -> LenTyp {
         self.length
     }
 
-    pub fn len(&self) -> u64 {
+    pub fn len(&self) -> LenTyp {
         self.length
     }
 }

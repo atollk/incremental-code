@@ -70,7 +70,7 @@ pub fn compile_with_meta<Meta: CompilingMetadata>(
 #[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub enum HashableProgramValue {
     Int(i64),
-    String(u64),
+    String(u128),
     Bool(bool),
 }
 
