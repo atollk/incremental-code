@@ -4,10 +4,11 @@ use crate::game_state::{with_auto_saver_mut, with_game_state};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::{Constraint, Layout, Rect};
+use ratatui_core::style::Style;
 use ratatui_core::terminal::Frame;
 use ratatui_core::text::Text;
 use ratatui_core::widgets::Widget;
-use ratatui_widgets::gauge::LineGauge;
+use ratatui_widgets::gauge::Gauge;
 
 /// Fixed width (in terminal columns) reserved for the HUD panel.
 pub const HUD_WIDTH: u16 = 22;
@@ -17,53 +18,70 @@ pub struct HudWidget;
 
 impl Widget for HudWidget {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let mut text = Text::default();
+        let text_lines = {
+            let mut lines: Vec<String> = Vec::new();
 
-        let resource_string = with_game_state(|s| s.total_resources().fmt_multiline().to_string());
-        resource_string
-            .lines()
-            .for_each(|line| text.push_line(line));
-        text.push_line("");
+            // Currency / Resources
+            let resource_string =
+                with_game_state(|s| s.total_resources().fmt_multiline().to_string());
+            resource_string
+                .lines()
+                .for_each(|line| lines.push(line.to_string()));
+            lines.push("".to_string());
 
-        let buyable = with_game_state(|s| {
-            let resources = s.total_resources();
-            count_buyable(&s.upgrades, &resources)
-        });
-        text.push_line(format!("Buyable upgrades: {buyable}"));
-        text.push_line("");
+            // Buyable upgrades
+            let buyable = with_game_state(|s| {
+                let resources = s.total_resources();
+                count_buyable(&s.upgrades, &resources)
+            });
+            lines.push(format!("Buyable upgrades: {buyable}"));
+            lines.push("".to_string());
 
-        let time_since_last_save = with_auto_saver_mut(|auto_saver| auto_saver.since_last_save());
-        text.push_line(format!(
-            "Time since last save: {}s",
-            time_since_last_save.as_secs()
-        ));
-        text.push_line("");
+            // Auto save timer
+            let time_since_last_save =
+                with_auto_saver_mut(|auto_saver| auto_saver.since_last_save());
+            lines.push(format!(
+                "Time since last save: {}s",
+                time_since_last_save.as_secs()
+            ));
+            lines.push("".to_string());
 
+            lines
+        };
+
+        let text = {
+            let mut text = Text::default();
+            for line in text_lines {
+                text.push_line(line);
+            }
+            text
+        };
+
+        // Outer border
         let block = Block::new().borders(Borders::ALL).title(" HUD ");
         let inner = block.inner(area);
         block.render(area, buf);
 
-        let autorun_progress = with_auto_run(|ar| ar.get_progress());
+        // Prepare content layout
         let text_height = text.height() as u16;
+        let [text_area, gauge_area] =
+            Layout::vertical([Constraint::Length(text_height), Constraint::Length(1)]).areas(inner);
 
-        match autorun_progress {
-            Some(ratio) => {
-                let [text_area, gauge_area] =
-                    Layout::vertical([Constraint::Length(text_height), Constraint::Length(1)])
-                        .areas(inner);
-                Paragraph::new(text)
-                    .wrap(Wrap { trim: false })
-                    .render(text_area, buf);
-                LineGauge::default()
-                    .ratio(ratio)
-                    .label("")
-                    .render(gauge_area, buf);
-            }
-            None => {
-                Paragraph::new(text)
-                    .wrap(Wrap { trim: false })
-                    .render(inner, buf);
-            }
+        // Render text
+        Paragraph::new(text)
+            .wrap(Wrap { trim: false })
+            .render(text_area, buf);
+
+        // Render autorun progress bar
+        if let Some(mut autorun_progress) = with_auto_run(|ar| ar.get_progress()) {
+            // Rescale the progress to make it more visually pleasing at the end.
+            autorun_progress =
+                autorun_progress / (gauge_area.width as f64) * (gauge_area.width as f64 + 1.);
+            let gauge = Gauge::default()
+                .ratio(autorun_progress.clamp(0., 1.))
+                .label("Autorun")
+                .gauge_style(Style::new().white().on_black().italic());
+            gauge.render(gauge_area, buf);
         }
     }
 }
