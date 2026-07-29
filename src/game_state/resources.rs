@@ -32,6 +32,9 @@ impl Currency {
 impl Display for Currency {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let value = self.0;
+        if value.is_infinite() {
+            return write!(f, "∞");
+        }
         if value.abs() < 1000.0 {
             write!(f, "{}", value as i64)
         } else {
@@ -72,6 +75,16 @@ impl Resources {
     /// Returns a `Resources` with all denominations set to zero.
     pub const fn zero() -> Self {
         Resources::new(0.0, 0.0, 0.0, 0.0, 0.0)
+    }
+
+    pub const fn inf() -> Self {
+        Resources::new(
+            f64::INFINITY,
+            f64::INFINITY,
+            f64::INFINITY,
+            f64::INFINITY,
+            f64::INFINITY,
+        )
     }
 
     /// Creates a `Resources` with only the bronze denomination set.

@@ -350,20 +350,20 @@ impl_upgrade!(
             Resources::silver(100),
             Resources::silver(2e3),
             Resources::silver(20e3),
-            Resources::zero(),
+            Resources::inf(),
         ],
         [
             Resources::gold(30),
             Resources::gold(200),
-            Resources::zero(),
-            Resources::zero(),
-            Resources::zero(),
+            Resources::gold(10e3),
+            Resources::inf(),
+            Resources::inf(),
         ],
         [
-            Resources::zero(),
-            Resources::zero(),
-            Resources::zero(),
-            Resources::zero(),
+            Resources::inf(),
+            Resources::inf(),
+            Resources::inf(),
+            Resources::inf(),
         ]
     ]
 );
@@ -384,8 +384,8 @@ impl_upgrade!(
         Resources::bronze(100), // core upgrade 4
         Resources::silver(200), // core upgrade 13
         Resources::gold(300), // core upgrade 19
-        Resources::zero(), // core upgrade 22
-        Resources::zero(), // core upgrade 24
+        Resources::inf(), // core upgrade 22
+        Resources::inf(), // core upgrade 24
     ]]
 );
 
@@ -417,8 +417,8 @@ impl_upgrade!(
         Resources::silver(300) + Resources::bronze(30e3), // core upgrade 15
         Resources::silver(1200) + Resources::bronze(70e3), // core upgrade 16
         Resources::silver(700) + Resources::bronze(70e3), // core upgrade 17
-        Resources::zero(), // core upgrade 21
-        Resources::zero(), // core upgrade 23
+        Resources::inf(), // core upgrade 21
+        Resources::inf(), // core upgrade 23
     ]]
 );
 
@@ -484,7 +484,7 @@ impl_upgrade!(
             Resources::bronze(4e3),
             Resources::bronze(10e3),
             Resources::bronze(1e9),
-            Resources::zero(),
+            Resources::inf(),
         ],
         [
             Resources::silver(1),
@@ -492,15 +492,15 @@ impl_upgrade!(
             Resources::silver(10),
             Resources::silver(10e3),
             Resources::gold(50) + Resources::silver(100e3),
-            Resources::zero(),
-            Resources::zero(),
-            Resources::zero(),
-            Resources::zero(),
-            Resources::zero(),
-            Resources::zero(),
-            Resources::zero(),
-            Resources::zero(),
-            Resources::zero(),
+            Resources::diamond(300),
+            Resources::inf(),
+            Resources::inf(),
+            Resources::inf(),
+            Resources::inf(),
+            Resources::inf(),
+            Resources::inf(),
+            Resources::inf(),
+            Resources::inf(),
         ]
     ]
 );
@@ -523,8 +523,8 @@ impl_upgrade!(
         Resources::new(1e6, 1e3, 10, 0, 0),
         Resources::new(300e6, 100e3, 10e3, 0, 0),
         Resources::diamond(20),
-        Resources::zero(),
-        Resources::zero(),
+        Resources::inf(),
+        Resources::inf(),
     ]]
 );
 
@@ -555,7 +555,7 @@ impl_upgrade!(
         Resources::bronze(10e3), // core upgrade 12
         Resources::silver(1e3), // core upgrade 12.5
         Resources::gold(100), // core upgrade 14
-        Resources::zero(), // core upgrade 27
+        Resources::inf(), // core upgrade 27
     ]]
 );
 
@@ -576,9 +576,9 @@ impl_upgrade!(
         Resources::silver(1),
         Resources::silver(10),
         Resources::diamond(1),
-        Resources::zero(),
-        Resources::zero(),
-        Resources::zero(),
+        Resources::inf(),
+        Resources::inf(),
+        Resources::inf(),
     ]]
 );
 
@@ -611,10 +611,10 @@ impl_upgrade!(
         Resources::silver(13), // core upgrade 11
         Resources::gold(10), // core upgrade 18
         Resources::bronze(100e6), // core upgrade 20
-        Resources::zero(),
-        Resources::gold(10e3),
-        Resources::zero(), // core upgrade 25
-        Resources::zero(), // core upgrade 26
+        Resources::gold(1e6),
+        Resources::inf(),
+        Resources::inf(), // core upgrade 25
+        Resources::inf(), // core upgrade 26
     ]]
 );
 
@@ -661,9 +661,9 @@ impl_upgrade!(
         Resources::bronze(80e3),
         Resources::bronze(200e3),
         Resources::bronze(300e6) + Resources::gold(1000),
-        Resources::zero(),
-        Resources::zero(),
-        Resources::zero(),
+        Resources::gold(11e3),
+        Resources::inf(),
+        Resources::inf(),
     ]]
 );
 
@@ -682,9 +682,9 @@ impl_upgrade!(
     costs=[[
         Resources::bronze(100e3),
         Resources::gold(40) + Resources::bronze(300e3),
-        Resources::zero(),
-        Resources::zero(),
-        Resources::zero(),
+        Resources::gold(2e6),
+        Resources::inf(),
+        Resources::inf(),
     ]]
 );
 
@@ -729,8 +729,8 @@ impl_upgrade!(
     costs=[[
         Resources::gold(1),
         Resources::gold(100),
-        Resources::zero(),
-        Resources::zero(),
+        Resources::inf(),
+        Resources::inf(),
     ]]
 );
 
@@ -752,8 +752,8 @@ impl_upgrade!(
         (1e-6, "1 ns"),
     ],
     costs=[[
-        Resources::zero(),
-        Resources::zero(),
+        Resources::gold(1e6),
+        Resources::inf(),
     ]]
 );
 
@@ -823,8 +823,8 @@ impl_upgrade!(
         (0.5, "50%"),
     ],
     costs=[[
-        Resources::zero(),
-        Resources::zero(),
+        Resources::inf(),
+        Resources::inf(),
     ]]
 );
 
@@ -840,10 +840,10 @@ impl_upgrade!(
         (1000, "1000"),
     ],
     costs=[[
-        Resources::zero(),
-        Resources::zero(),
-        Resources::zero(),
-        Resources::zero(),
+        Resources::inf(),
+        Resources::inf(),
+        Resources::inf(),
+        Resources::inf(),
     ]]
 );
 
@@ -852,7 +852,7 @@ impl_upgrade!(
     type=bool,
     level=5,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::zero()]]
+    costs=[[Resources::inf()]]
 );
 
 // Level 6
@@ -863,7 +863,7 @@ impl_upgrade!(
     type=bool,
     level=6,
     values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::from_gold(1e9), Resources::zero()]]
+    costs=[[Resources::from_gold(1e9), Resources::inf()]]
 );
  */
 
@@ -872,5 +872,5 @@ impl_upgrade!(
     type=bool,
     level=6,
     values=[(false, "not won"), (true, "won")],
-    costs=[[Resources::zero()]]
+    costs=[[Resources::inf()]]
 );
