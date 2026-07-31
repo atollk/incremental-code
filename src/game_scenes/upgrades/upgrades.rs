@@ -3,6 +3,7 @@ use crate::backend::input::{KeyCode, KeyEventKind, MouseEventKind};
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
 use crate::game_scenes::upgrades::tree::{TreeWidget, create_tree_widget, open_all_upgrade_nodes};
+use crate::game_scenes::victory::VictoryScene;
 use crate::game_state::{Resources, Upgrades, with_game_state, with_game_state_mut};
 use crate::widgets::dialog::{ConfirmDialog, ConfirmResult};
 use crate::widgets::hud::draw_hud;
@@ -239,12 +240,17 @@ impl<'a> Scene for UpgradesScene<'a> {
             let result = self.confirm_dialog.as_ref().unwrap().result();
             let dialog_scene_switch = match result {
                 Some(ConfirmResult::Yes) => {
-                    with_game_state_mut(|game_state| {
-                        game_state.upgrades = self.upgrades_working_copy.clone()
+                    let won = with_game_state_mut(|game_state| {
+                        game_state.upgrades = self.upgrades_working_copy.clone();
+                        game_state.on_upgrades_commit();
+                        game_state.upgrades.win_condition.value()
                     });
-                    with_game_state_mut(|game_state| game_state.on_upgrades_commit());
                     self.save_tree_selection();
-                    SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
+                    if won {
+                        SceneSwitch::SwitchTo(Box::new(VictoryScene::new()))
+                    } else {
+                        SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()))
+                    }
                 }
                 Some(ConfirmResult::No) => {
                     with_game_state_mut(|game_state| {

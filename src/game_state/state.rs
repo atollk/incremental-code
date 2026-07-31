@@ -209,11 +209,6 @@ impl GameState {
                 auto_run.stop();
             }
         });
-
-        // If the win condition was bought, win
-        if self.upgrades.win_condition.value() {
-            todo!()
-        }
     }
 
     pub(crate) fn get_or_compute_program_stats(&mut self) -> Option<(Resources, Duration)> {

@@ -5,3 +5,4 @@ pub mod home_terminal;
 pub mod logic;
 pub mod reboot;
 pub mod upgrades;
+pub mod victory;

@@ -77,6 +77,7 @@ impl Resources {
         Resources::new(0.0, 0.0, 0.0, 0.0, 0.0)
     }
 
+    #[allow(dead_code)]
     pub const fn inf() -> Self {
         Resources::new(
             f64::INFINITY,

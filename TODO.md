@@ -1,3 +1,0 @@
-- victory screen implementieren
-- bug: cancelling 'compile' displays a success message (or doesnt work at all?)
-- github workflow to release binaries

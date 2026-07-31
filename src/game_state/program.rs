@@ -427,7 +427,7 @@ impl CompilingMetadata for CompiledProgram {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::game_state::{Upgrade, with_game_state_mut};
+    use crate::game_state::{Upgrade, with_game_state, with_game_state_mut};
     use serial_test::serial;
 
     /// Levels up (and, after `f` runs, levels back down) the four upgrades that

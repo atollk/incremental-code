@@ -2,6 +2,7 @@ use crate::backend::events::Event;
 use crate::game_scenes::base::{Scene, SceneSwitch};
 use crate::game_scenes::home_terminal::HomeTerminalScene;
 use crate::game_scenes::reboot::RebootScene;
+use crate::game_scenes::victory::VictoryScene;
 use crate::game_state::{load_game_state, load_settings, with_auto_saver_mut, with_game_state_mut};
 use ratatui_core::terminal::Frame;
 use web_time::Duration;
@@ -21,9 +22,11 @@ impl AppStartScene {
         if let Err(e) = load_settings() {
             log::error!("{e}");
         }
-        with_game_state_mut(|game_state| game_state.on_upgrades_commit());
+        let won = with_game_state_mut(|game_state| game_state.upgrades.win_condition.value());
         with_auto_saver_mut(|auto_saver| auto_saver.start(Duration::from_secs(60)));
-        let scene: Box<dyn Scene> = if loaded_state {
+        let scene: Box<dyn Scene> = if won {
+            Box::new(VictoryScene::new())
+        } else if loaded_state {
             Box::new(HomeTerminalScene::new())
         } else {
             Box::new(RebootScene::new(true, 20))

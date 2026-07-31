@@ -47,6 +47,7 @@ struct CompileCmd {
     running_duration: Duration,
     compile_duration: Duration,
     throbber_state: RefCell<throbber_widgets_tui::ThrobberState>,
+    cancelled: bool,
     // after waiting
     result: Option<anyhow::Result<()>>,
 }
@@ -68,6 +69,7 @@ impl CompileCmd {
             running_duration: Duration::from_millis(0),
             compile_duration,
             throbber_state,
+            cancelled: false,
             result: None,
         }
     }
@@ -79,6 +81,12 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
     }
 
     fn update(&mut self, _events: &[Event], time_delta: Duration) {
+        if self.cancelled {
+            if self.result.is_none() {
+                self.result = Some(Err(anyhow!("Compilation cancelled")));
+            }
+            return;
+        }
         let waiting_for_compilation = self.compile_duration > self.running_duration
             || compile_thread::with_compile_thread(|compile_thread| {
                 !matches!(
@@ -113,6 +121,7 @@ impl RunningCommand<SceneSwitch> for CompileCmd {
     }
 
     fn cancel(&mut self) {
+        self.cancelled = true;
         compile_thread::with_compile_thread_mut(|compile_thread| compile_thread.cancel());
     }
 
