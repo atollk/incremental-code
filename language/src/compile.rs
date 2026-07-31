@@ -661,7 +661,7 @@ mod tests {
         }
 
         fn diff(&self, other: &Self) -> CompileResult<Self::Diff> {
-            Ok((*self as i32) - (*other as i32))
+            Ok((*other as i32) - (*self as i32))
         }
 
         fn add_assign(&mut self, diff: &Self::Diff) -> CompileResult<()> {

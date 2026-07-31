@@ -41,7 +41,7 @@ const STARTING_VOLUME: f32 = 0.01;
 impl AudioBackend {
     pub fn new() -> Self {
         let inner = AudioBackendInner::new()
-            .tap_err(|err| log::warn!("Failed to open sound device: {}", err.to_string()))
+            .tap_err(|err| log::warn!("Failed to open sound device: {}", err))
             .ok();
         Self { inner }
     }
