@@ -213,10 +213,12 @@ impl<'a, Meta: CompilingMetadata> Callable<'a, Meta> {
                 };
 
                 if *is_pure {
-                    // Store in cache.
+                    // Store in cache. `meta_clone` was snapshotted before the body ran, so
+                    // it is the earlier state; `meta` (now mutated by the body) is the
+                    // later one. `diff` requires self to be the earlier snapshot.
                     state.pure_caches.insert(
                         (fn_name.as_str(), cache_key.unwrap()),
-                        (return_value.clone(), meta.diff(&meta_clone)?),
+                        (return_value.clone(), meta_clone.diff(meta)?),
                     );
                 }
 

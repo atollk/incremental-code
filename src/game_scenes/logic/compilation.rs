@@ -193,8 +193,8 @@ impl CompilingMetadata for WipCompilingProgram {
     fn diff(&self, other: &Self) -> CompileResult<Self::Diff> {
         Ok(WipCompilingProgramDiff {
             program: self.program.diff(&other.program)?,
-            instruction_count: (other.left_to_instruction_limit - self.left_to_instruction_limit)
-                as i64,
+            instruction_count: self.left_to_instruction_limit as i64
+                - other.left_to_instruction_limit as i64,
         })
     }
 
@@ -363,5 +363,42 @@ pub mod compile_thread {
                 join_handle: None,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game_state::{Upgrade, with_game_state_mut};
+    use serial_test::serial;
+
+    fn with_sleep_unlocked<T>(f: impl FnOnce() -> T) -> T {
+        with_game_state_mut(|state| state.upgrades.unlock_sleep.track_level_up(0));
+        let result = f();
+        with_game_state_mut(|state| state.upgrades.unlock_sleep.track_level_down(0));
+        result
+    }
+
+    // A pure function is allowed to call `sleep`, which pushes a new sleep-block
+    // onto `instruction_counts` while the function body runs. The pure-call cache
+    // then diffs the post-call metadata against the pre-call snapshot to store the
+    // incremental effect of the call. That diff must be computed as
+    // "pre-call".diff("post-call") (the earlier snapshot has fewer blocks), not the
+    // other way around, or `CompiledProgram::diff` rejects it as a block-count
+    // mismatch.
+    #[test]
+    #[serial]
+    fn pure_function_calling_sleep_does_not_trigger_diff_mismatch() {
+        with_sleep_unlocked(|| {
+            let source = "def pure a(n):\n sleep(n);\nend\na(1);\n";
+            let mut parsed = parse_code(source).unwrap();
+            compress_code(&mut parsed);
+            let result = compile_code(&parsed, || false).unwrap();
+            assert!(
+                result.is_ok(),
+                "expected successful compilation, got runtime error: {:?}",
+                result.err()
+            );
+        });
     }
 }
