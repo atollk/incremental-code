@@ -75,9 +75,8 @@ pub fn command_list() -> Vec<CommandListItem> {
             help_description: "Reset all upgrades but gain additional currency",
             runner: |_| reboot_cmd(),
         });
+        add_cmd!();
     }
-
-    add_cmd!();
 
     if unlock_code {
         add_cmd!(Command {
@@ -100,16 +99,14 @@ pub fn command_list() -> Vec<CommandListItem> {
             help_description: "Runs the program code after compiling",
             runner: |_| run_cmd(),
         });
+        add_cmd!();
     }
-
-    add_cmd!();
 
     add_cmd!(Command {
         name: "upgrades",
         help_description: "Opens the upgrade tree",
         runner: |_| upgrades_cmd(),
     });
-
     add_cmd!();
 
     if unlock_music {
@@ -118,9 +115,8 @@ pub fn command_list() -> Vec<CommandListItem> {
             help_description: "Control the music volume",
             runner: |_| volume_cmd(),
         });
+        add_cmd!();
     }
-
-    add_cmd!();
 
     add_cmd!(Command {
         name: "save",

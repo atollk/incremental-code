@@ -42,7 +42,7 @@ pub struct EphemeralGameState {
 
 impl Default for GameState {
     fn default() -> Self {
-        let start_code = r#""#;
+        let start_code = "x:=0;";
         let start_resources = Resources::zero();
         GameState {
             program_code: start_code.to_string(),
