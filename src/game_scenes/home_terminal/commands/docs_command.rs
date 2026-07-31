@@ -46,6 +46,13 @@ fn get_docs_lines() -> Vec<Line<'static>> {
             | CodeStatementLevels::SingleRecursion
             | CodeStatementLevels::MultiRecursion
     );
+    let allows_multiplication = matches!(
+        statements,
+        CodeStatementLevels::Multiplication
+            | CodeStatementLevels::PureFunctions
+            | CodeStatementLevels::SingleRecursion
+            | CodeStatementLevels::MultiRecursion
+    );
     let max_recursion = match statements {
         CodeStatementLevels::SingleRecursion => 1,
         CodeStatementLevels::MultiRecursion => usize::MAX,
@@ -90,8 +97,11 @@ fn get_docs_lines() -> Vec<Line<'static>> {
     ln!("  {\"k\": \"v\"}      dict");
     ln!();
     ln!("OPERATORS");
-    // TODO: only show mult and div if unlocked
-    ln!("  + - * / %         arithmetic");
+    if allows_multiplication {
+        ln!("  + - * / %         arithmetic");
+    } else {
+        ln!("  + - %             arithmetic");
+    }
     ln!("  == != < > <= >=   comparison");
     ln!("  and  or  not      boolean");
     ln!("  in                membership test");

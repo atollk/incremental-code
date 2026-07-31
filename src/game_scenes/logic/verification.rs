@@ -49,7 +49,20 @@ pub fn verify_unlocks(source: &str, parsed_program: &NotPythonProgram) -> anyhow
     )
 }
 
-fn verify_expr(expr: &NotPythonExpr, strings_allowed: bool, max_int: i64) -> anyhow::Result<()> {
+fn verify_expr(
+    expr: &NotPythonExpr,
+    strings_allowed: bool,
+    max_int: i64,
+    level: &CodeStatementLevels,
+) -> anyhow::Result<()> {
+    let allows_multiplication = matches!(
+        level,
+        CodeStatementLevels::Multiplication
+            | CodeStatementLevels::PureFunctions
+            | CodeStatementLevels::SingleRecursion
+            | CodeStatementLevels::MultiRecursion
+    );
+
     match expr {
         NotPythonExpr::Int(n) => {
             let abs = n.unsigned_abs();
@@ -68,27 +81,32 @@ fn verify_expr(expr: &NotPythonExpr, strings_allowed: bool, max_int: i64) -> any
         | NotPythonExpr::Variable(_) => {}
         NotPythonExpr::List(elems) => {
             for e in elems {
-                verify_expr(e, strings_allowed, max_int)?;
+                verify_expr(e, strings_allowed, max_int, level)?;
             }
         }
         NotPythonExpr::Dict(pairs) => {
             for (k, v) in pairs {
-                verify_expr(k, strings_allowed, max_int)?;
-                verify_expr(v, strings_allowed, max_int)?;
+                verify_expr(k, strings_allowed, max_int, level)?;
+                verify_expr(v, strings_allowed, max_int, level)?;
             }
         }
-        NotPythonExpr::BinaryOp(_, a, b) => {
-            verify_expr(a, strings_allowed, max_int)?;
-            verify_expr(b, strings_allowed, max_int)?;
+        NotPythonExpr::BinaryOp(op, a, b) => {
+            if matches!(op, language::BinaryOp::Mul | language::BinaryOp::Div)
+                && !allows_multiplication
+            {
+                bail!("Multiplication/division is not unlocked yet");
+            }
+            verify_expr(a, strings_allowed, max_int, level)?;
+            verify_expr(b, strings_allowed, max_int, level)?;
         }
-        NotPythonExpr::UnaryOp(_, e) => verify_expr(e, strings_allowed, max_int)?,
+        NotPythonExpr::UnaryOp(_, e) => verify_expr(e, strings_allowed, max_int, level)?,
         NotPythonExpr::Call(_, args) => {
             for a in args {
-                verify_expr(a, strings_allowed, max_int)?;
+                verify_expr(a, strings_allowed, max_int, level)?;
             }
         }
         NotPythonExpr::Index(_, idx) => {
-            verify_expr(idx, strings_allowed, max_int)?;
+            verify_expr(idx, strings_allowed, max_int, level)?;
         }
     }
     Ok(())
@@ -145,7 +163,7 @@ fn verify_stmt(
     match stmt {
         NotPythonStmt::Call(_, args) => {
             for a in args {
-                verify_expr(a, strings_allowed, max_int)?;
+                verify_expr(a, strings_allowed, max_int, level)?;
             }
         }
         NotPythonStmt::Pass | NotPythonStmt::Break | NotPythonStmt::Continue => {
@@ -159,14 +177,14 @@ fn verify_stmt(
             }
         }
         NotPythonStmt::Decl(_, expr) | NotPythonStmt::Assign(_, expr) => {
-            verify_expr(expr, strings_allowed, max_int)?;
+            verify_expr(expr, strings_allowed, max_int, level)?;
         }
         NotPythonStmt::If {
             condition,
             then,
             else_,
         } => {
-            verify_expr(condition, strings_allowed, max_int)?;
+            verify_expr(condition, strings_allowed, max_int, level)?;
             verify_stmt(
                 then,
                 strings_allowed,
@@ -200,7 +218,7 @@ fn verify_stmt(
                 bail!("return requires the functions upgrade");
             }
             if let Some(e) = expr {
-                verify_expr(e, strings_allowed, max_int)?;
+                verify_expr(e, strings_allowed, max_int, level)?;
             }
         }
         NotPythonStmt::Function {
@@ -246,12 +264,26 @@ mod tests {
     /// Levels up (and, after `f` runs, levels back down) the upgrades that
     /// `verify_unlocks` reads from global game state, then runs `f`.
     fn with_levels<T>(literals_level: u8, line_width_level: u8, f: impl FnOnce() -> T) -> T {
+        with_levels_and_statements(literals_level, line_width_level, 0, f)
+    }
+
+    /// Same as `with_levels`, but also levels up the `statements` (`CodeStatementLevels`)
+    /// upgrade by `statements_level` steps.
+    fn with_levels_and_statements<T>(
+        literals_level: u8,
+        line_width_level: u8,
+        statements_level: u8,
+        f: impl FnOnce() -> T,
+    ) -> T {
         with_game_state_mut(|state| {
             for _ in 0..literals_level {
                 state.upgrades.literals.track_level_up(0);
             }
             for _ in 0..line_width_level {
                 state.upgrades.code_line_width.track_level_up(0);
+            }
+            for _ in 0..statements_level {
+                state.upgrades.statements.track_level_up(0);
             }
         });
         let result = f();
@@ -261,6 +293,9 @@ mod tests {
             }
             for _ in 0..line_width_level {
                 state.upgrades.code_line_width.track_level_down(0);
+            }
+            for _ in 0..statements_level {
+                state.upgrades.statements.track_level_down(0);
             }
         });
         result
@@ -272,7 +307,7 @@ mod tests {
         // Each raw literal (255) is within the max_int=255 limit even though the
         // folded product (65025) would exceed it. Verification must run on the
         // unfolded AST, so this must be accepted.
-        with_levels(6, 3, || {
+        with_levels_and_statements(6, 3, 4, || {
             let source = "x := 255 * 255;\n";
             let parsed = language::parse_program(source).unwrap();
             assert!(verify_unlocks(source, &parsed).is_ok());
@@ -286,6 +321,47 @@ mod tests {
             let source = "x := 999;\n";
             let parsed = language::parse_program(source).unwrap();
             assert!(verify_unlocks(source, &parsed).is_err());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn multiplication_is_rejected_when_not_unlocked() {
+        with_levels(6, 3, || {
+            let source = "x := 2 * 3;\n";
+            let parsed = language::parse_program(source).unwrap();
+            assert!(verify_unlocks(source, &parsed).is_err());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn division_is_rejected_when_not_unlocked() {
+        with_levels(6, 3, || {
+            let source = "x := 6 / 2;\n";
+            let parsed = language::parse_program(source).unwrap();
+            assert!(verify_unlocks(source, &parsed).is_err());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn multiplication_is_allowed_once_unlocked() {
+        // statements level 4 == CodeStatementLevels::Multiplication.
+        with_levels_and_statements(6, 3, 4, || {
+            let source = "x := 2 * 3;\n";
+            let parsed = language::parse_program(source).unwrap();
+            assert!(verify_unlocks(source, &parsed).is_ok());
+        });
+    }
+
+    #[test]
+    #[serial]
+    fn addition_and_subtraction_are_unaffected_by_multiplication_lock() {
+        with_levels(6, 3, || {
+            let source = "x := 2 + 3 - 1;\n";
+            let parsed = language::parse_program(source).unwrap();
+            assert!(verify_unlocks(source, &parsed).is_ok());
         });
     }
 }
