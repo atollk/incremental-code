@@ -177,33 +177,43 @@ fn groups_are_unlocked(upgrades: &Upgrades) -> [bool; 7] {
     ]
 }
 
-const GROUP_FINISHED_ICON: &str = "✅";
+fn group_item_label(index: usize, upgrades: &Upgrades, available_resources: &Resources) -> String {
+    let group_upgrades = upgrades
+        .upgrades()
+        .into_iter()
+        .filter(|u| u.group() == index);
+    let track_costs =
+        group_upgrades.flat_map(|u| (0..u.count_tracks()).map(|t| u.track_next_cost(t)));
 
-/// A group is "finished" once every upgrade in it has no purchasable track left.
-fn group_is_finished(upgrade_list: &[&dyn Upgrade], group_i: usize) -> bool {
-    let mut any = false;
-    let all_maxed = upgrade_list
-        .iter()
-        .filter(|u| u.group() == group_i)
-        .all(|u| {
-            any = true;
-            (0..u.count_tracks()).all(|t| u.track_next_cost(t).is_none())
-        });
-    any && all_maxed
+    let group_is_finished = track_costs.clone().all(|c| c.is_none());
+
+    let group_has_buyable = track_costs
+        .clone()
+        .any(|c| c.map(|r| r <= *available_resources).unwrap_or(false));
+
+    let mut label = format!("Level {index} upgrades");
+    if group_has_buyable {
+        label.push_str(" 💰");
+    }
+    if group_is_finished {
+        label.push_str(" ✅");
+    }
+
+    label
 }
 
 fn build_tree_items(upgrades: &Upgrades) -> Vec<TreeItem<'static, usize>> {
     let upgrade_list = upgrades.upgrades();
     let group_unlocks = groups_are_unlocked(upgrades);
+    let available_resources = with_game_state(|game_state| game_state.total_resources());
     let groups = (0..group_unlocks.len())
         .filter(|i| group_unlocks[*i])
         .map(|group_i| {
-            let label = if group_is_finished(&upgrade_list, group_i) {
-                format!("Level {group_i} upgrades {GROUP_FINISHED_ICON}")
-            } else {
-                format!("Level {group_i} upgrades")
-            };
-            TreeItem::new(group_i, label, render_group_items(&upgrade_list, group_i))
+            TreeItem::new(
+                group_i,
+                group_item_label(group_i, upgrades, &available_resources),
+                render_group_items(&upgrade_list, group_i),
+            )
         });
     groups.map(|item| item.unwrap()).collect()
 }
