@@ -1,7 +1,7 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::home_terminal::commands::compile_command::compile_cmd;
-use crate::game_state::{CompiledProgram, with_game_state, with_game_state_mut};
+use crate::game_state::{with_game_state, with_game_state_mut};
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
@@ -67,16 +67,10 @@ fn run_cmd_inner() -> Box<dyn RunningCommand<SceneSwitch>> {
                     false,
                 ))
             }
-            Err((err, instruction_counts)) => {
+            Err((err, exec_duration)) => {
                 // Display error
                 Box::new(ChainCmd::new(
-                    Box::new(RunCmd::new(
-                        CompiledProgram {
-                            instruction_counts,
-                            ..CompiledProgram::new()
-                        }
-                        .execution_time(),
-                    )),
+                    Box::new(RunCmd::new(exec_duration)),
                     Box::new(move |_| Box::new(ParagraphCmd::new(Paragraph::new(Text::from(err))))),
                     false,
                 ))

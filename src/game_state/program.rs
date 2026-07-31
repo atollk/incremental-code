@@ -9,6 +9,7 @@ use std::time::Duration;
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct CompiledProgram {
     /// Number of instructions that were executed, separated by each call to `sleep`, respectively seperated by each call to `brk`.
+    #[serde(with = "instruction_counts_serde")]
     pub instruction_counts: Vec<Vec<u64>>,
     /// Calls to `sleep`, with their respective duration.
     pub sleep_calls: Vec<f64>,
@@ -16,6 +17,77 @@ pub struct CompiledProgram {
     pub print_len: Option<f64>,
     /// Gained Resources from calls to "gain".
     pub gain_resources: Resources,
+}
+
+mod instruction_counts_serde {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    /// A run of `count` consecutive occurrences of `value`.
+    #[derive(Serialize, Deserialize)]
+    struct Run(u64, u64); // value, count; as tuple to keep field names out of JSON
+
+    fn run_length_encode(data: &[u64]) -> Vec<Run> {
+        let mut runs = Vec::new();
+        for value in data {
+            match runs.last_mut() {
+                Some(Run(v, count)) if v == value => *count += 1,
+                _ => runs.push(Run(*value, 1)),
+            }
+        }
+        runs
+    }
+
+    fn run_length_decode(runs: &[Run]) -> Vec<u64> {
+        runs.iter()
+            .flat_map(|run| std::iter::repeat_n(run.0, run.1 as usize))
+            .collect()
+    }
+
+    /// Guards against allocation bombs from malformed input.
+    const MAX_ELEMENTS: u64 = 1 << 32;
+
+    pub(super) fn serialize<S: Serializer>(
+        data: &[Vec<u64>], // deref coercion makes this work; satisfies clippy::ptr_arg
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let sub_vec_sizes: Vec<u64> = data.iter().map(|x| x.len() as u64).collect();
+        let flattened: Vec<u64> = data.iter().flatten().copied().collect();
+        (sub_vec_sizes, run_length_encode(&flattened)).serialize(serializer)
+    }
+
+    pub(super) fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Vec<Vec<u64>>, D::Error> {
+        use serde::de::Error as _;
+
+        let (sub_vec_sizes, runs): (Vec<u64>, Vec<Run>) = Deserialize::deserialize(deserializer)?;
+
+        let checked_sum = |acc: Option<u64>, n: u64| acc.and_then(|a| a.checked_add(n));
+        let expected = sub_vec_sizes.iter().copied().fold(Some(0), checked_sum);
+        let total = runs.iter().map(|r| r.1).fold(Some(0), checked_sum);
+
+        let (Some(expected), Some(total)) = (expected, total) else {
+            return Err(D::Error::custom("length overflow"));
+        };
+        if expected != total {
+            return Err(D::Error::custom(format!(
+                "run lengths cover {total} elements, sub-vector sizes require {expected}"
+            )));
+        }
+        if total > MAX_ELEMENTS {
+            return Err(D::Error::custom(format!("{total} elements exceeds limit")));
+        }
+
+        let flattened = run_length_decode(&runs); // now safe: total is validated and bounded
+        let mut remaining = flattened.as_slice();
+        let mut result = Vec::with_capacity(sub_vec_sizes.len());
+        for size in sub_vec_sizes {
+            let (chunk, rest) = remaining.split_at(size as usize); // in-bounds by construction
+            result.push(chunk.to_vec());
+            remaining = rest;
+        }
+        Ok(result)
+    }
 }
 
 struct UpgradesForExecTime {

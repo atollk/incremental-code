@@ -7,6 +7,7 @@ use language::{
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::time::Duration;
 
 fn predefined_function_print(
     meta: &mut WipCompilingProgram,
@@ -236,7 +237,7 @@ fn compress_code(program: &mut NotPythonProgram) {
 fn compile_code(
     parsed_program: &NotPythonProgram,
     is_cancelled: impl FnMut() -> bool + 'static,
-) -> CompileResult<Result<CompiledProgram, (String, Vec<Vec<u64>>)>> {
+) -> CompileResult<Result<CompiledProgram, (String, Duration)>> {
     let instruction_limit =
         with_game_state(|game_state| game_state.upgrades.max_instructions.value());
     let mut compiling_program = WipCompilingProgram::new(is_cancelled, instruction_limit);
@@ -250,7 +251,14 @@ fn compile_code(
     } else {
         Ok(match run_result {
             Ok(()) => Ok(compiling_program.program),
-            Err(e) => Err((e.to_string(), compiling_program.program.instruction_counts)),
+            Err(e) => Err((
+                e.to_string(),
+                CompiledProgram {
+                    instruction_counts: compiling_program.program.instruction_counts,
+                    ..CompiledProgram::new()
+                }
+                .execution_time(),
+            )),
         })
     }
 }

@@ -5,6 +5,7 @@ use crate::game_state::{CompiledProgram, Resources};
 use crate::global_variable;
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
 
 global_variable!(game_state, GameState);
 
@@ -15,7 +16,7 @@ global_variable!(game_state, GameState);
 pub struct GameState {
     // Program
     pub program_code: String,
-    pub compiled_program: Option<Result<CompiledProgram, (String, Vec<Vec<u64>>)>>,
+    pub compiled_program: Option<Result<CompiledProgram, (String, Duration)>>,
     /// Whether `program_code` has changed since `compiled_program` was last produced.
     #[serde(default)]
     pub is_stale: bool,
