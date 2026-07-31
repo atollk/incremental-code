@@ -24,7 +24,7 @@ profile-opengl:
     #!/usr/bin/env bash
     set -x
     cargo build --profile profiling --features opengl
-    BIN_PATH="./target/profiling/incremental-code"
+    BIN_PATH="./target/profiling/busy-incremental-beaver"
     if [[ $(uname -a) == *"Linux"* ]]; then
       echo '-1' | sudo tee /proc/sys/kernel/perf_event_paranoid
     fi

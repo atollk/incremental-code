@@ -18,15 +18,15 @@ jobs:
         include:
           - os: ubuntu-latest
             target-os: linux
-            bin-name: incremental-code
+            bin-name: busy-incremental-beaver
             archive-ext: tar.gz
           - os: macos-latest
             target-os: macos
-            bin-name: incremental-code
+            bin-name: busy-incremental-beaver
             archive-ext: tar.gz
           - os: windows-latest
             target-os: windows
-            bin-name: incremental-code.exe
+            bin-name: busy-incremental-beaver.exe
             archive-ext: zip
     runs-on: ${{ matrix.os }}
     steps:
@@ -47,18 +47,18 @@ jobs:
         if: matrix.target-os != 'windows'
         run: |
           cd target/release
-          tar -czf ../../incremental-code-${{ matrix.target-os }}.${{ matrix.archive-ext }} ${{ matrix.bin-name }}
+          tar -czf ../../busy-incremental-beaver-${{ matrix.target-os }}.${{ matrix.archive-ext }} ${{ matrix.bin-name }}
 
       - name: Package (windows)
         if: matrix.target-os == 'windows'
         run: |
           cd target/release
-          7z a ../../incremental-code-${{ matrix.target-os }}.${{ matrix.archive-ext }} ${{ matrix.bin-name }}
+          7z a ../../busy-incremental-beaver-${{ matrix.target-os }}.${{ matrix.archive-ext }} ${{ matrix.bin-name }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: incremental-code-${{ matrix.target-os }}
-          path: incremental-code-${{ matrix.target-os }}.${{ matrix.archive-ext }}
+          name: busy-incremental-beaver-${{ matrix.target-os }}
+          path: busy-incremental-beaver-${{ matrix.target-os }}.${{ matrix.archive-ext }}
 
   release:
     name: release

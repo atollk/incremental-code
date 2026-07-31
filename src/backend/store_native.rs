@@ -2,7 +2,7 @@ use crate::backend::backend::StorageBackend;
 use serde::{Deserialize, Serialize};
 use std::path;
 
-const APP_NAME: &'static str = "incremental-code";
+const APP_NAME: &'static str = "busy-incremental-beaver";
 
 pub struct StoreNative {
     directory: path::PathBuf,
