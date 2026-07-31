@@ -69,12 +69,11 @@ pub struct Upgrades {
     pub unlock_level6: UnlockLevel6,
     // Level 6
     pub additive_reboot: AdditiveReboot,
-    pub gain_currency_function: GainCurrencyFunction,
     pub win_condition: WinCondition,
 }
 
 impl Upgrades {
-    pub(crate) const UPGRADES_LEN: usize = 35;
+    pub(crate) const UPGRADES_LEN: usize = 34;
 
     /// Returns all upgrades as an array of trait-object references.
     pub fn upgrades(&self) -> [&dyn Upgrade; Self::UPGRADES_LEN] {
@@ -465,7 +464,7 @@ impl_upgrade!(
         ((100, 5.), "n ^ 5"),
         ((100, 7.), "n ^ 7"),
         ((100, 10.), "n ^ 10"),
-        ((100, 50.), "n ^ 50"),
+        ((100, 30.), "n ^ 30"),
     ],
     costs=[
         [
@@ -757,7 +756,7 @@ impl_upgrade!(
         Resources::gold(1e6),
         Resources::new(100e12, 50e6, 1e6, 100, 0),
         Resources::stars(30),
-        Resources::inf(),
+        Resources::stars(10e3),
     ]]
 );
 
@@ -874,10 +873,11 @@ impl_upgrade!(
     ],
     costs=[[
         Resources::new(10e54, 10e21, 10e12, 10e9, 10),
-        Resources::new(1e154, 1e121, 1e45, 10e12, 1000),
+        Resources::new(1e180, 1e130, 1e45, 10e12, 1000),
     ]]
 );
 
+/*
 impl_upgrade!(
     GainCurrencyFunction,
     type=bool,
@@ -885,6 +885,7 @@ impl_upgrade!(
     values=[(false, LOCKED), (true, UNLOCKED)],
     costs=[[Resources::inf()]]
 );
+ */
 
 impl_upgrade!(
     WinCondition,

@@ -101,7 +101,7 @@ fn predefined_functions() -> HashMap<&'static str, PredefinedFunction<WipCompili
             game_state.upgrades.unlock_print.value(),
             game_state.upgrades.unlock_sleep.value(),
             game_state.upgrades.unlock_brk.value(),
-            game_state.upgrades.gain_currency_function.value(),
+            false,
         )
     });
     let mut functions = HashMap::new();
