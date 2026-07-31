@@ -13,6 +13,10 @@ const MESSAGE_LINES: &[&str] = &[
     "You have completed the game.",
     "",
     "Thank you for playing :)",
+    "",
+    "",
+    "",
+    "Busy Incremental Beaver - by Andreas Tollkötter",
 ];
 
 pub struct VictoryScene;

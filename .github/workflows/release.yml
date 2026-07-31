@@ -41,7 +41,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build
-        run: cargo build --release --features tui
+        run: cargo build --release --features opengl
 
       - name: Package (unix)
         if: matrix.target-os != 'windows'
