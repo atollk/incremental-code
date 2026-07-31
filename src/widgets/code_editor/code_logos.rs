@@ -1,5 +1,4 @@
 use crate::widgets::code_editor::code::CodeLanguage;
-use log::debug;
 use logos::Logos;
 use ratatui_core::style::Style;
 use std::collections::HashMap;
@@ -50,7 +49,6 @@ where
             .spanned()
             .filter_map(|(token, span)| token.map(|token| (token, span)).ok())
             .collect();
-        debug!("{:?}", tokens);
         tokens
             .into_iter()
             .filter_map(|(token, span)| {

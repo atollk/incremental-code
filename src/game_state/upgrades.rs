@@ -356,7 +356,7 @@ impl_upgrade!(
             Resources::gold(30),
             Resources::gold(200),
             Resources::gold(10e3),
-            Resources::inf(),
+            Resources::gold(5e6),
             Resources::inf(),
         ],
         [
@@ -384,7 +384,7 @@ impl_upgrade!(
         Resources::bronze(100), // core upgrade 4
         Resources::silver(200), // core upgrade 13
         Resources::gold(300), // core upgrade 19
-        Resources::inf(), // core upgrade 22
+        Resources::diamond(2e3), // core upgrade 22
         Resources::inf(), // core upgrade 24
     ]]
 );
@@ -417,8 +417,8 @@ impl_upgrade!(
         Resources::silver(300) + Resources::bronze(30e3), // core upgrade 15
         Resources::silver(1200) + Resources::bronze(70e3), // core upgrade 16
         Resources::silver(700) + Resources::bronze(70e3), // core upgrade 17
-        Resources::inf(), // core upgrade 21
-        Resources::inf(), // core upgrade 23
+        Resources::diamond(2e3), // core upgrade 21
+        Resources::diamond(10e3), // core upgrade 23
     ]]
 );
 
@@ -493,7 +493,7 @@ impl_upgrade!(
             Resources::silver(10e3),
             Resources::gold(50) + Resources::silver(100e3),
             Resources::diamond(300),
-            Resources::inf(),
+            Resources::gold(1.5e6),
             Resources::inf(),
             Resources::inf(),
             Resources::inf(),
@@ -576,7 +576,7 @@ impl_upgrade!(
         Resources::silver(1),
         Resources::silver(10),
         Resources::diamond(1),
-        Resources::inf(),
+        Resources::new(1e9, 1e6, 1e3, 100, 0),
         Resources::inf(),
         Resources::inf(),
     ]]
@@ -669,21 +669,21 @@ impl_upgrade!(
 
 impl_upgrade!(
     SilverPerSleepSecond,
-    type=u32,  // linear
+    type=fn(f64) -> f64,  // linear
     level=3,
     values=[
-        (1, "1"),
-        (2, "2"),
-        (8, "8"),
-        (128, "128"),
-        (1000, "1000"),
-        (1_000_000, "1,000,000"),
+        (|x| x.sqrt(), "sqrt(n)"),
+        (|x| x.sqrt() * 2., "2 sqrt(n)"),
+        (|x| x.sqrt() * 8., "8 sqrt(n)"),
+        (|x| x.sqrt() * 128., "128 sqrt(n)"),
+        (|x| x.sqrt() * 1e6, "1,000,000 sqrt(n)"),
+        (|x| x, "n"),
     ],
     costs=[[
         Resources::bronze(100e3),
         Resources::gold(40) + Resources::bronze(300e3),
         Resources::gold(2e6),
-        Resources::inf(),
+        Resources::bronze(1e12),
         Resources::inf(),
     ]]
 );
@@ -729,7 +729,7 @@ impl_upgrade!(
     costs=[[
         Resources::gold(1),
         Resources::gold(100),
-        Resources::inf(),
+        Resources::diamond(10e3),
         Resources::inf(),
     ]]
 );
@@ -747,13 +747,13 @@ impl_upgrade!(
     type=f64,
     level=4,
     values=[
-        (1e-4, "100 ns"),
-        (1e-5, "10 ns"),
-        (1e-6, "1 ns"),
+        (1e-4, "100,000 ns"),
+        (1e-5, "10,000 ns"),
+        (1e-6, "100 ns"),
     ],
     costs=[[
         Resources::gold(1e6),
-        Resources::inf(),
+        Resources::new(100e12, 50e6, 1e6, 100, 0),
     ]]
 );
 
@@ -830,18 +830,16 @@ impl_upgrade!(
 
 impl_upgrade!(
     DiamondPerBrk,
-    type=u16,  // linear
+    type=fn(f64) -> f64,  // linear
     level=5,
     values=[
-        (1, "1"),
-        (3, "3"),
-        (5, "5"),
-        (25, "25"),
-        (1000, "1000"),
+        (|x| x, "1"),
+        (|x| x * 100., "100"),
+        (|x| x * 1e6, "1,000,000"),
+        (|x| x * x, "n^2"),
     ],
     costs=[[
-        Resources::inf(),
-        Resources::inf(),
+        Resources::bronze(255e12),
         Resources::inf(),
         Resources::inf(),
     ]]

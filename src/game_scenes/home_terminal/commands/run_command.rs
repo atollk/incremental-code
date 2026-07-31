@@ -48,10 +48,6 @@ fn run_cmd_inner() -> Box<dyn RunningCommand<SceneSwitch>> {
         match compiled_program {
             Ok(compiled_program) => {
                 let execution_time = compiled_program.execution_time();
-                log::info!(
-                    "Running with execution time: {} ms",
-                    execution_time.as_millis()
-                );
                 // Successful run
                 Box::new(ChainCmd::new(
                     Box::new(RunCmd::new(execution_time)),

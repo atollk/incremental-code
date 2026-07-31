@@ -116,7 +116,7 @@ impl GameState {
             convert(self.current_resources.bronze.0, 1),
             convert(self.current_resources.silver.0, 100),
             convert(self.current_resources.gold.0, 1000),
-            convert(self.current_resources.diamond.0, 100_000),
+            convert(self.current_resources.diamond.0, 10_000),
         );
 
         let mut current_resources = Resources::zero();

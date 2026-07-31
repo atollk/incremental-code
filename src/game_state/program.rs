@@ -14,6 +14,24 @@ pub struct CompiledProgram {
     pub print_len: Option<f64>,
 }
 
+struct UpgradesForExecTime {
+    instruction_execution_speed: (f64, f64),
+    sleep_speed_reset: f64,
+    min_instruction_duration: f64,
+    brk_slowdown: f64,
+}
+
+impl UpgradesForExecTime {
+    fn from_game_state() -> Self {
+        with_game_state(|game_state| UpgradesForExecTime {
+            instruction_execution_speed: game_state.upgrades.instruction_execution_speed.value(),
+            sleep_speed_reset: game_state.upgrades.sleep_speed_reset.value(),
+            min_instruction_duration: game_state.upgrades.min_instruction_duration.value(),
+            brk_slowdown: game_state.upgrades.brk_slowdown.value(),
+        })
+    }
+}
+
 impl CompiledProgram {
     pub fn new() -> CompiledProgram {
         CompiledProgram {
@@ -24,19 +42,31 @@ impl CompiledProgram {
     }
 
     pub fn execution_time(&self) -> Duration {
-        struct Upgrades {
-            instruction_execution_speed: (f64, f64),
-            sleep_speed_reset: f64,
-            min_instruction_duration: f64,
-            brk_slowdown: f64,
-        }
-        let upgrades = with_game_state(|game_state| Upgrades {
-            instruction_execution_speed: game_state.upgrades.instruction_execution_speed.value(),
-            sleep_speed_reset: game_state.upgrades.sleep_speed_reset.value(),
-            min_instruction_duration: game_state.upgrades.min_instruction_duration.value(),
-            brk_slowdown: game_state.upgrades.brk_slowdown.value(),
-        });
+        let upgrades = UpgradesForExecTime::from_game_state();
+        log::debug!(
+            "exec time w/o: min duration | sleep reset | brk slowdown:  {} ms  |  {} ms  |  {} ms",
+            self.execution_time_with_upgrades(&UpgradesForExecTime {
+                min_instruction_duration: 0.,
+                ..upgrades
+            })
+            .as_millis(),
+            self.execution_time_with_upgrades(&UpgradesForExecTime {
+                sleep_speed_reset: 1.,
+                ..upgrades
+            })
+            .as_millis(),
+            self.execution_time_with_upgrades(&UpgradesForExecTime {
+                brk_slowdown: 1.,
+                ..upgrades
+            })
+            .as_millis(),
+        );
+        let time = self.execution_time_with_upgrades(&upgrades);
+        log::info!("exec time: {} ms", time.as_millis());
+        time
+    }
 
+    fn execution_time_with_upgrades(&self, upgrades: &UpgradesForExecTime) -> Duration {
         /*
         Math time:
         speed(s, n, k) : The instruction duration after n instructions, beginning from s, with k brks active. (not considering the min_instruction_duration)
@@ -69,14 +99,9 @@ impl CompiledProgram {
                         .powf(1. / instruction_speed_exp)
                 };
                 let min_duration_reached = min_duration_reached_at < sleep_split;
-                log::debug!("min_duration_reached at {:.3}", min_duration_reached_at);
 
                 // Compute the time taken for just the instructions by considering
                 // speedup effects and the min duration limit.
-                let cycle_without_min =
-                    hurwitz(sleep_split, instruction_speed_exp) * speed * instruction_speed_const
-                        / b_pow_k;
-                log::debug!("cycle_without_min {:.3}", cycle_without_min);
                 let sleep_cycle_duration = if min_duration_reached {
                     let before_min = hurwitz(min_duration_reached_at, instruction_speed_exp)
                         * (speed)
@@ -86,7 +111,8 @@ impl CompiledProgram {
                         (sleep_split - min_duration_reached_at) * upgrades.min_instruction_duration;
                     before_min + after_min
                 } else {
-                    cycle_without_min
+                    hurwitz(sleep_split, instruction_speed_exp) * speed * instruction_speed_const
+                        / b_pow_k
                 };
                 instructions_duration_sum += sleep_cycle_duration;
 
@@ -118,16 +144,17 @@ impl CompiledProgram {
                 }
             }
         }
-        Duration::from_secs_f64(instructions_duration_sum)
-            + Duration::from_secs_f64(sleep_duration_sum)
+
+        Duration::try_from_secs_f64(instructions_duration_sum).unwrap_or_else(|_| Duration::MAX)
+            + Duration::try_from_secs_f64(sleep_duration_sum).unwrap_or_else(|_| Duration::MAX)
     }
 
     pub fn resource_gain(&self) -> Resources {
         struct ResourceUpgrades {
             bronze_per_instruction: (u8, f32),
-            silver_per_sleep_second: u32,
+            silver_per_sleep_second: fn(f64) -> f64,
             gold_print_log_nesting: fn(f64) -> f64,
-            diamond_per_brk: u16,
+            diamond_per_brk: fn(f64) -> f64,
         }
         let upgrades = with_game_state(|game_state| ResourceUpgrades {
             bronze_per_instruction: game_state.upgrades.bronze_per_instruction.value(),
@@ -150,7 +177,7 @@ impl CompiledProgram {
         let silver: f64 = self
             .sleep_calls
             .iter()
-            .map(|secs| secs.sqrt() * upgrades.silver_per_sleep_second as f64)
+            .map(|secs| (upgrades.silver_per_sleep_second)(*secs))
             .sum();
         // Gold is awarded based on the last print statement and its argument length.
         let gold: f64 = if let Some(print_len) = self.print_len {
@@ -170,7 +197,10 @@ impl CompiledProgram {
                 .map(|inst_cnt| 1. - (inst_cnt / total_instruction_count))
                 .product::<f64>();
             let min_others = bronze.min(silver.min(gold)).max(1.);
-            min_others.log2() * brk_relatives * upgrades.diamond_per_brk as f64
+            let diamonds = min_others.log2()
+                * brk_relatives
+                * (instruction_counts_between_brk.len() - 1) as f64;
+            (upgrades.diamond_per_brk)(diamonds)
         };
         Resources::new(bronze, silver, gold, diamond, 0.)
     }

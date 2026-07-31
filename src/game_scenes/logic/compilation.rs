@@ -21,7 +21,14 @@ fn predefined_function_print(
             "print requires a string argument".to_string(),
         ));
     };
-    meta.program.print_len = Some((s.len() as f64).max(meta.program.print_len.unwrap_or(0.)));
+    meta.program.print_len = Some({
+        let mut print_len = meta.program.print_len.unwrap_or(0.);
+        print_len = print_len.max(s.len() as f64);
+        if print_len.is_infinite() {
+            print_len = f64::MAX;
+        }
+        print_len
+    });
     Ok(ProgramValue::None)
 }
 
