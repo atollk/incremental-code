@@ -3,9 +3,10 @@ use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::SceneSwitch;
 use crate::game_scenes::reboot::RebootScene;
 use crate::game_state::{with_game_state, with_game_state_mut};
-use crate::widgets::terminal::RunningCommand;
+use crate::widgets::terminal::{ParagraphCmd, RunningCommand};
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
+use ratatui_core::text::Text;
 use ratatui_core::widgets::Widget;
 use ratatui_widgets::paragraph::Paragraph;
 use std::time::Duration;
@@ -21,9 +22,15 @@ struct RebootCmd {
 }
 
 pub(super) fn reboot_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    Box::new(RebootCmd {
-        state: RebootState::Asking,
-    })
+    if with_game_state(|game_state| game_state.upgrades.additive_reboot.value()) {
+        let resource_gain = with_game_state(|game_state| game_state.prestige_currency()).1;
+        let text = format!("Gained {} from reboot.", resource_gain.fmt_oneline());
+        Box::new(ParagraphCmd::new(Paragraph::new(Text::from(text))))
+    } else {
+        Box::new(RebootCmd {
+            state: RebootState::Asking,
+        })
+    }
 }
 
 impl RebootCmd {

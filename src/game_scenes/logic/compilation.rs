@@ -1,4 +1,4 @@
-use crate::game_state::{CompiledProgram, with_game_state};
+use crate::game_state::{CompiledProgram, Resources, with_game_state};
 use itertools::Itertools;
 use language::{
     CompileError, CompileResult, CompilingMetadata, NotPythonProgram, PredefinedFunction,
@@ -69,12 +69,38 @@ fn predefined_function_brk(
     Ok(ProgramValue::None)
 }
 
+fn predefined_function_gain(
+    meta: &mut WipCompilingProgram,
+    args: &[ProgramValue],
+) -> CompileResult<ProgramValue> {
+    if args.len() != 5 {
+        return Err(CompileError::new(
+            "gain takes exactly 5 arguments".to_string(),
+        ));
+    }
+    let values = args
+        .iter()
+        .map(|x| match x {
+            ProgramValue::Int(i) => Ok(*i as f64),
+            ProgramValue::Float(f) => Ok(*f),
+            _ => Err(CompileError::new(format!(
+                "gain expects numeric arguments but got: {:?}",
+                x
+            ))),
+        })
+        .collect::<Result<Vec<f64>, CompileError>>()?;
+    let (bronze, silver, gold, diamond, stars) = values.into_iter().collect_tuple().unwrap();
+    meta.program.gain_resources += Resources::new(bronze, silver, gold, diamond, stars);
+    Ok(ProgramValue::None)
+}
+
 fn predefined_functions() -> HashMap<&'static str, PredefinedFunction<WipCompilingProgram>> {
-    let (unlock_print, unlock_sleep, unlock_brk) = with_game_state(|game_state| {
+    let (unlock_print, unlock_sleep, unlock_brk, unlock_gain) = with_game_state(|game_state| {
         (
             game_state.upgrades.unlock_print.value(),
             game_state.upgrades.unlock_sleep.value(),
             game_state.upgrades.unlock_brk.value(),
+            game_state.upgrades.gain_currency_function.value(),
         )
     });
     let mut functions = HashMap::new();
@@ -97,6 +123,13 @@ fn predefined_functions() -> HashMap<&'static str, PredefinedFunction<WipCompili
         functions.insert(
             "brk",
             predefined_function_brk as PredefinedFunction<WipCompilingProgram>,
+        );
+    }
+
+    if unlock_gain {
+        functions.insert(
+            "gain",
+            predefined_function_gain as PredefinedFunction<WipCompilingProgram>,
         );
     }
 

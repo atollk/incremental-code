@@ -12,6 +12,8 @@ pub struct CompiledProgram {
     pub sleep_calls: Vec<f64>,
     /// Max call to `print` with its string length.
     pub print_len: Option<f64>,
+    /// Gained Resources from calls to "gain".
+    pub gain_resources: Resources,
 }
 
 struct UpgradesForExecTime {
@@ -38,6 +40,7 @@ impl CompiledProgram {
             instruction_counts: vec![vec![0]],
             sleep_calls: vec![],
             print_len: None,
+            gain_resources: Resources::zero(),
         }
     }
 
@@ -202,7 +205,8 @@ impl CompiledProgram {
                 * (instruction_counts_between_brk.len() - 1) as f64;
             (upgrades.diamond_per_brk)(diamonds)
         };
-        Resources::new(bronze, silver, gold, diamond, 0.)
+
+        Resources::new(bronze, silver, gold, diamond, 0.) + self.gain_resources.clone()
     }
 }
 
@@ -304,10 +308,20 @@ impl CompilingMetadata for CompiledProgram {
             }
             other.print_len
         };
+        let gain_resources = {
+            Resources {
+                bronze: self.gain_resources.bronze - other.gain_resources.bronze,
+                silver: self.gain_resources.silver - other.gain_resources.silver,
+                gold: self.gain_resources.gold - other.gain_resources.gold,
+                diamond: self.gain_resources.diamond - other.gain_resources.diamond,
+                stars: self.gain_resources.stars - other.gain_resources.stars,
+            }
+        };
         Ok(CompiledProgram {
             instruction_counts,
             sleep_calls,
             print_len,
+            gain_resources,
         })
     }
 

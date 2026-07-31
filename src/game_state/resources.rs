@@ -87,23 +87,24 @@ impl Resources {
         )
     }
 
-    /// Creates a `Resources` with only the bronze denomination set.
     pub const fn bronze(bronze: impl [const] Into<f64>) -> Self {
         Resources::new(bronze, 0.0, 0.0, 0.0, 0.0)
     }
 
-    /// Creates a `Resources` with only the silver denomination set.
     pub const fn silver(silver: impl [const] Into<f64>) -> Self {
         Resources::new(0.0, silver, 0.0, 0.0, 0.0)
     }
 
-    /// Creates a `Resources` with only the gold denomination set.
     pub const fn gold(gold: impl [const] Into<f64>) -> Self {
         Resources::new(0.0, 0.0, gold, 0.0, 0.0)
     }
 
     pub const fn diamond(diamond: impl [const] Into<f64>) -> Self {
         Resources::new(0.0, 0.0, 0.0, diamond, 0.0)
+    }
+
+    pub const fn stars(stars: impl [const] Into<f64>) -> Self {
+        Resources::new(0.0, 0.0, 0.0, 0.0, stars)
     }
 
     /// Returns a single-line display of all non-zero denominations.

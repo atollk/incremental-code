@@ -1,2 +1,2 @@
 - victory screen implementieren
-- upgrade screen: show which upgrade level has buyable upgrades
+- bug: auto run should restart on compile

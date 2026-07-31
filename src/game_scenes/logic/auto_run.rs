@@ -39,6 +39,17 @@ impl AutoRunner {
         }
         Some((self.since_last_run.as_secs_f64() / deadline.as_secs_f64()).clamp(0.0, 1.0))
     }
+
+    pub(crate) fn reset(&mut self) {
+        // Start the "run"
+        (self.run_duration, self.resource_gain) = with_game_state(|game_state| {
+            if let Some(Ok(program)) = &game_state.compiled_program {
+                (Some(program.execution_time()), program.resource_gain())
+            } else {
+                (None, Resources::zero())
+            }
+        });
+    }
 }
 
 impl TickerMut for AutoRunner {
@@ -56,14 +67,7 @@ impl TickerMut for AutoRunner {
                     self.since_last_run = Duration::from_secs(0);
                 }
             } else {
-                // Start the "run"
-                (self.run_duration, self.resource_gain) = with_game_state(|game_state| {
-                    if let Some(Ok(program)) = &game_state.compiled_program {
-                        (Some(program.execution_time()), program.resource_gain())
-                    } else {
-                        (None, Resources::zero())
-                    }
-                });
+                self.reset();
             }
         }
     }

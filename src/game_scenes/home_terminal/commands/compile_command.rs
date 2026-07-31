@@ -1,5 +1,6 @@
 use crate::backend::events::Event;
 use crate::game_scenes::base::SceneSwitch;
+use crate::game_scenes::logic::auto_run::with_auto_run_mut;
 use crate::game_scenes::logic::compilation::compile_thread;
 use crate::game_state::with_game_state;
 use crate::widgets::terminal::{ChainCmd, ParagraphCmd, RunningCommand};
@@ -25,7 +26,7 @@ pub(super) fn compile_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
                 let result = compile_cmd
                     .result
                     .as_ref()
-                    .expect("compile command to finish");
+                    .expect("compile command did not finish");
                 let paragraph: Paragraph<'static> = if let Err(e) = result {
                     Paragraph::new(e.to_string())
                 } else {
@@ -33,6 +34,9 @@ pub(super) fn compile_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
                 };
                 with_game_state(|game_state| {
                     log::info!("Compiled program: {:?}", game_state.compiled_program)
+                });
+                with_auto_run_mut(|auto_run| {
+                    auto_run.reset();
                 });
                 Box::new(ParagraphCmd::new(paragraph))
             }),
