@@ -334,7 +334,7 @@ impl_upgrade!(
         ((1e-4, -0.9), "0.01% n ^ -0.9"),
         ((1e-4, -0.95), "0.01% n ^ -0.95"),
         ((1e-5, -0.99), "0.001% n ^ -0.99"),
-        ((1e-6, -1.), "0.0001% n ^ -1"),
+        ((1e-6, -0.9999), "0.0001% n ^ -0.9999"),
     ],
     costs=[
         [
@@ -352,20 +352,20 @@ impl_upgrade!(
             Resources::silver(100),
             Resources::silver(2e3),
             Resources::silver(20e3),
-            Resources::inf(),
+            Resources::silver(900e21),
         ],
         [
             Resources::gold(30),
             Resources::gold(200),
             Resources::gold(10e3),
             Resources::gold(5e6),
-            Resources::inf(),
+            Resources::gold(100e21),
         ],
         [
             Resources::diamond(100e3),
             Resources::stars(10),
             Resources::diamond(1e9),
-            Resources::inf(),
+            Resources::stars(1000),
         ]
     ]
 );
@@ -495,8 +495,8 @@ impl_upgrade!(
             Resources::gold(1.5e6),
             Resources::diamond(20e3),
             Resources::stars(10),
-            Resources::inf(),
-            Resources::inf(),
+            Resources::gold(200e18),
+            Resources::silver(1e120),
         ]
     ]
 );
@@ -520,7 +520,7 @@ impl_upgrade!(
         Resources::new(300e6, 100e3, 10e3, 0, 0),
         Resources::diamond(20),
         Resources::stars(10),
-        Resources::inf(),
+        Resources::bronze(1e120),
     ]]
 );
 
@@ -608,7 +608,7 @@ impl_upgrade!(
         Resources::gold(1e6),
         Resources::stars(10),
         Resources::stars(10), // core upgrade 25
-        Resources::inf(), // core upgrade 26
+        Resources::stars(5e3), // core upgrade 26
     ]]
 );
 
@@ -657,7 +657,7 @@ impl_upgrade!(
         Resources::bronze(300e6) + Resources::gold(1000),
         Resources::gold(11e3),
         Resources::diamond(400e3),
-        Resources::stars(15),
+        Resources::bronze(40e48),
     ]]
 );
 
@@ -672,6 +672,8 @@ impl_upgrade!(
         (|x| x.sqrt() * 128., "128 sqrt(n)"),
         (|x| x.sqrt() * 1e6, "1,000,000 sqrt(n)"),
         (|x| x, "n"),
+        (|x| x.powi(8), "n^8"),
+        (|x| x.powi(64), "n^64"),
     ],
     costs=[[
         Resources::bronze(100e3),
@@ -679,6 +681,8 @@ impl_upgrade!(
         Resources::gold(2e6),
         Resources::bronze(1e12),
         Resources::diamond(800e6),
+        Resources::gold(10e12),
+        Resources::stars(987),
     ]]
 );
 
@@ -747,11 +751,13 @@ impl_upgrade!(
         (10e-6, "10,000 ns"),
         (1e-6, "1000 ns"),
         (10e-9, "10 ns"),
+        (10e-12, "0.01 ns"),
     ],
     costs=[[
         Resources::gold(1e6),
         Resources::new(100e12, 50e6, 1e6, 100, 0),
         Resources::stars(30),
+        Resources::inf(),
     ]]
 );
 
@@ -785,6 +791,7 @@ impl_upgrade!(
         (|x| iterated_log2_nonneg(x, 1), "log(n)"),
         (|x| x.log2().powi(2), "log(n)^2"),
         (|x| x.log2().powi(4), "log(n)^4"),
+        (|x| x.log2().powi(16), "log(n)^16"),
     ],
     costs=[[
         Resources::silver(5e3) + Resources::bronze(150e3),
@@ -792,6 +799,7 @@ impl_upgrade!(
         Resources::silver(100e3) + Resources::bronze(100e6),
         Resources::bronze(10e9) + Resources::diamond(100),
         Resources::bronze(20e27) + Resources::stars(10),
+        Resources::silver(100e21),
     ]]
 );
 
@@ -824,7 +832,7 @@ impl_upgrade!(
     ],
     costs=[[
         Resources::bronze(20e15) + Resources::silver(1e12) + Resources::gold(50e6),
-        Resources::inf(),
+        Resources::diamond(150e9),
     ]]
 );
 
@@ -836,12 +844,12 @@ impl_upgrade!(
         (|x| x, "1"),
         (|x| x * 100., "100"),
         (|x| x * 1e6, "1,000,000"),
-        (|x| x * x, "n^2"),
+        (|x| x * x * 1e6, "n^2"),
     ],
     costs=[[
         Resources::bronze(255e12),
         Resources::bronze(10e21),
-        Resources::inf(),
+        Resources::bronze(700e54),
     ]]
 );
 
@@ -857,10 +865,17 @@ impl_upgrade!(
 
 impl_upgrade!(
     AdditiveReboot,
-    type=bool,
+    type=(bool, bool),
     level=6,
-    values=[(false, LOCKED), (true, UNLOCKED)],
-    costs=[[Resources::inf()]]
+    values=[
+        ((false, false), LOCKED),
+        ((true, false), UNLOCKED),
+        ((true, true), "Reboot on Autorun"),
+    ],
+    costs=[[
+        Resources::new(10e54, 10e21, 10e12, 10e9, 10),
+        Resources::new(1e154, 1e121, 1e45, 10e12, 1000),
+    ]]
 );
 
 impl_upgrade!(

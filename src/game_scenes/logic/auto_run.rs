@@ -49,6 +49,19 @@ impl AutoRunner {
             (None, Resources::zero())
         }
     }
+
+    fn on_timer_done(&mut self) {
+        // Run finished: grant the resources
+        with_game_state_mut(|game_state| {
+            game_state.current_resources += self.resource_gain.clone();
+            if game_state.upgrades.additive_reboot.value().1 {
+                game_state.current_resources += game_state.prestige_currency().1;
+            }
+        });
+        self.run_duration = None;
+        self.resource_gain = Resources::zero();
+        self.since_last_run = Duration::from_secs(0);
+    }
 }
 
 impl TickerMut for AutoRunner {
@@ -57,13 +70,7 @@ impl TickerMut for AutoRunner {
             self.since_last_run += elapsed;
             if let Some(run_duration) = self.run_duration {
                 if self.since_last_run >= period + run_duration {
-                    // Run finished: grant the resources
-                    with_game_state_mut(|game_state| {
-                        game_state.current_resources += self.resource_gain.clone();
-                    });
-                    self.run_duration = None;
-                    self.resource_gain = Resources::zero();
-                    self.since_last_run = Duration::from_secs(0);
+                    self.on_timer_done();
                 }
             } else {
                 self.reset();

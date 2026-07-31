@@ -143,6 +143,7 @@ impl CompiledProgram {
         time
     }
 
+    // TODO: powf and the hurwitz caching require most of the runtime here
     fn execution_time_with_upgrades(&self, upgrades: &UpgradesForExecTime) -> Duration {
         /*
         Math time:

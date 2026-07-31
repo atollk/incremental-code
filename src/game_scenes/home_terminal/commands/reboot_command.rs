@@ -22,15 +22,18 @@ struct RebootCmd {
 }
 
 pub(super) fn reboot_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
-    if with_game_state(|game_state| game_state.upgrades.additive_reboot.value()) {
-        let resource_gain = with_game_state(|game_state| game_state.prestige_currency()).1;
-        let text = format!("Gained {} from reboot.", resource_gain.fmt_oneline());
-        Box::new(ParagraphCmd::new(Paragraph::new(Text::from(text))))
-    } else {
-        Box::new(RebootCmd {
-            state: RebootState::Asking,
-        })
-    }
+    with_game_state_mut(|game_state| -> Box<dyn RunningCommand<SceneSwitch>> {
+        if game_state.upgrades.additive_reboot.value().0 {
+            let resource_gain = game_state.prestige_currency().1;
+            let text = format!("Gained {} from reboot.", resource_gain.fmt_oneline());
+            game_state.current_resources += resource_gain;
+            Box::new(ParagraphCmd::new(Paragraph::new(Text::from(text))))
+        } else {
+            Box::new(RebootCmd {
+                state: RebootState::Asking,
+            })
+        }
+    })
 }
 
 impl RebootCmd {
