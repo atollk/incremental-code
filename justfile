@@ -1,5 +1,8 @@
-check:
+check-tui:
     cargo check --workspace --features tui
+
+check-ratzilla:
+    cargo check --workspace --features ratzilla --target wasm32-unknown-unknown
 
 check-all:
     cargo check --workspace --features tui

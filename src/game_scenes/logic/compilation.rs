@@ -21,7 +21,7 @@ fn predefined_function_print(
             "print requires a string argument".to_string(),
         ));
     };
-    meta.program.print_len = Some(s.len().max(meta.program.print_len.unwrap_or(0.)));
+    meta.program.print_len = Some((s.len() as f64).max(meta.program.print_len.unwrap_or(0.)));
     Ok(ProgramValue::None)
 }
 
@@ -222,8 +222,6 @@ pub mod compile_thread {
     use crate::global_variable;
     use language::{CompileError, CompileResult};
     use std::sync::{Arc, Mutex};
-    #[cfg(not(target_arch = "wasm32"))]
-    use std::thread;
 
     #[derive(Debug, Clone)]
     pub enum CompileThreadStatus {
@@ -237,64 +235,72 @@ pub mod compile_thread {
     pub struct CompileThread {
         status: Arc<Mutex<CompileThreadStatus>>,
         #[cfg(not(target_arch = "wasm32"))]
-        join_handle: Option<thread::JoinHandle<()>>,
+        join_handle: Option<std::thread::JoinHandle<()>>,
+        #[cfg(target_arch = "wasm32")]
+        join_handle: Option<js_sys::Promise>,
     }
 
     impl CompileThread {
+        fn inner_compile_logic(status: Arc<Mutex<CompileThreadStatus>>) {
+            *status.lock().unwrap() = CompileThreadStatus::Running;
+            // Debounce is_cancelled check to reduce Mutex locks.
+            let mut is_cancelled_debounce = 0;
+            let status_for_cancel = status.clone();
+            let is_cancelled = move || {
+                is_cancelled_debounce = (is_cancelled_debounce + 1) % 100;
+                if is_cancelled_debounce == 0 {
+                    matches!(
+                        *status_for_cancel.lock().unwrap(),
+                        CompileThreadStatus::Cancelled
+                    )
+                } else {
+                    false
+                }
+            };
+
+            // Compile
+            let get_compile_result = || -> CompileResult<_> {
+                let program_code = with_game_state(|game_state| game_state.program_code.clone());
+                let mut parsed_code = parse_code(&program_code)?;
+                verify_unlocks(&program_code, &parsed_code)
+                    .map_err(|e| CompileError::new(e.to_string()))?;
+                compress_code(&mut parsed_code);
+                compile_code(&parsed_code, is_cancelled)
+            };
+            let thread_result = match get_compile_result() {
+                Ok(compile_result) => {
+                    with_game_state_mut(|game_state| {
+                        game_state.compiled_program = Some(compile_result);
+                        game_state.is_stale = false;
+                    });
+                    Ok(())
+                }
+                Err(e) => Err(e.to_string()),
+            };
+            *status.lock().unwrap() = CompileThreadStatus::Idle(thread_result);
+        }
+
         /// Compiles the program code in the current game_state.
         /// If compilation fails, an Err is stored in `self.result`.
         /// If compilation succeeds, an Ok is stored in `self.result` and the compilation result is stored in the game_state.
         pub fn compile(&mut self) {
             let status = self.status.clone();
-            let f = move || {
-                *status.lock().unwrap() = CompileThreadStatus::Running;
-                // Debounce is_cancelled check to reduce Mutex locks.
-                let mut is_cancelled_debounce = 0;
-                let status_for_cancel = status.clone();
-                let is_cancelled = move || {
-                    is_cancelled_debounce = (is_cancelled_debounce + 1) % 100;
-                    if is_cancelled_debounce == 0 {
-                        matches!(
-                            *status_for_cancel.lock().unwrap(),
-                            CompileThreadStatus::Cancelled
-                        )
-                    } else {
-                        false
-                    }
-                };
-
-                // Compile
-                let get_compile_result = || -> CompileResult<_> {
-                    let program_code =
-                        with_game_state(|game_state| game_state.program_code.clone());
-                    let mut parsed_code = parse_code(&program_code)?;
-                    verify_unlocks(&program_code, &parsed_code)
-                        .map_err(|e| CompileError::new(e.to_string()))?;
-                    compress_code(&mut parsed_code);
-                    compile_code(&parsed_code, is_cancelled)
-                };
-                let thread_result = match get_compile_result() {
-                    Ok(compile_result) => {
-                        with_game_state_mut(|game_state| {
-                            game_state.compiled_program = Some(compile_result);
-                            game_state.is_stale = false;
-                        });
-                        Ok(())
-                    }
-                    Err(e) => Err(e.to_string()),
-                };
-                *status.lock().unwrap() = CompileThreadStatus::Idle(thread_result);
-            };
             #[cfg(not(target_arch = "wasm32"))]
             {
-                let t = thread::spawn(f);
+                let f = move || Self::inner_compile_logic(status);
+                let t = std::thread::spawn(f);
                 self.join_handle = Some(t);
             }
             #[cfg(target_arch = "wasm32")]
             {
                 // wasm32 has no working thread support in this build (no shared-memory/atomics
                 // target features configured), so compile synchronously on the main thread.
-                f();
+                let f = async move {
+                    Self::inner_compile_logic(status);
+                    Ok(js_sys::wasm_bindgen::JsValue::UNDEFINED)
+                };
+                let t = wasm_bindgen_futures::future_to_promise(f);
+                self.join_handle = Some(t);
             }
         }
 
@@ -314,7 +320,6 @@ pub mod compile_thread {
         fn default() -> Self {
             CompileThread {
                 status: Arc::new(Mutex::new(CompileThreadStatus::Idle(Ok(())))),
-                #[cfg(not(target_arch = "wasm32"))]
                 join_handle: None,
             }
         }
