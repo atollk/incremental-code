@@ -1,4 +1,4 @@
-use crate::game_state::{Resources, with_game_state};
+use crate::game_state::{Resources, Upgrades};
 use cached::cached;
 use itertools::Itertools;
 use language::{CompileError, CompileResult, CompilingMetadata};
@@ -98,13 +98,13 @@ struct UpgradesForExecTime {
 }
 
 impl UpgradesForExecTime {
-    fn from_game_state() -> Self {
-        with_game_state(|game_state| UpgradesForExecTime {
-            instruction_execution_speed: game_state.upgrades.instruction_execution_speed.value(),
-            sleep_speed_reset: game_state.upgrades.sleep_speed_reset.value(),
-            min_instruction_duration: game_state.upgrades.min_instruction_duration.value(),
-            brk_slowdown: game_state.upgrades.brk_slowdown.value(),
-        })
+    fn from_game_state(upgrades: &Upgrades) -> Self {
+        Self {
+            instruction_execution_speed: upgrades.instruction_execution_speed.value(),
+            sleep_speed_reset: upgrades.sleep_speed_reset.value(),
+            min_instruction_duration: upgrades.min_instruction_duration.value(),
+            brk_slowdown: upgrades.brk_slowdown.value(),
+        }
     }
 }
 
@@ -118,8 +118,8 @@ impl CompiledProgram {
         }
     }
 
-    pub fn execution_time(&self) -> Duration {
-        let upgrades = UpgradesForExecTime::from_game_state();
+    pub fn execution_time(&self, upgrades: &Upgrades) -> Duration {
+        let upgrades = UpgradesForExecTime::from_game_state(upgrades);
         log::debug!(
             "exec time w/o: min duration | sleep reset | brk slowdown:  {} ms  |  {} ms  |  {} ms",
             self.execution_time_with_upgrades(&UpgradesForExecTime {
@@ -230,19 +230,7 @@ impl CompiledProgram {
             + Duration::try_from_secs_f64(sleep_duration_sum).unwrap_or_else(|_| Duration::MAX)
     }
 
-    pub fn resource_gain(&self) -> Resources {
-        struct ResourceUpgrades {
-            bronze_per_instruction: (u8, f32),
-            silver_per_sleep_second: fn(f64) -> f64,
-            gold_print_log_nesting: fn(f64) -> f64,
-            diamond_per_brk: fn(f64) -> f64,
-        }
-        let upgrades = with_game_state(|game_state| ResourceUpgrades {
-            bronze_per_instruction: game_state.upgrades.bronze_per_instruction.value(),
-            silver_per_sleep_second: game_state.upgrades.silver_per_sleep_second.value(),
-            gold_print_log_nesting: game_state.upgrades.gold_print_log_nesting.value(),
-            diamond_per_brk: game_state.upgrades.diamond_per_brk.value(),
-        });
+    pub fn resource_gain(&self, upgrades: &Upgrades) -> Resources {
         let instruction_counts_between_brk = self
             .instruction_counts
             .iter()
@@ -252,17 +240,17 @@ impl CompiledProgram {
         // Bronze is awarded based on the total number of instructions run.
         let bronze: f64 = cached_hurwitz(
             total_instruction_count.into(),
-            (upgrades.bronze_per_instruction.1 as f64).into(),
-        ) * upgrades.bronze_per_instruction.0 as f64;
+            (upgrades.bronze_per_instruction.value().1 as f64).into(),
+        ) * upgrades.bronze_per_instruction.value().0 as f64;
         // Silver is awarded based on the total sleep duration.
         let silver: f64 = self
             .sleep_calls
             .iter()
-            .map(|secs| (upgrades.silver_per_sleep_second)(*secs))
+            .map(|secs| upgrades.silver_per_sleep_second.value()(*secs))
             .sum();
         // Gold is awarded based on the last print statement and its argument length.
         let gold: f64 = if let Some(print_len) = self.print_len {
-            (upgrades.gold_print_log_nesting)(print_len as f64).max(1.)
+            upgrades.gold_print_log_nesting.value()(print_len).max(1.)
         } else {
             0.
         };
@@ -281,7 +269,7 @@ impl CompiledProgram {
             let diamonds = min_others.log2()
                 * brk_relatives
                 * (instruction_counts_between_brk.len() - 1) as f64;
-            (upgrades.diamond_per_brk)(diamonds)
+            upgrades.diamond_per_brk.value()(diamonds)
         };
 
         Resources::new(bronze, silver, gold, diamond, 0.) + self.gain_resources.clone()
@@ -490,7 +478,7 @@ mod tests {
             instruction_counts: counts.clone(),
             ..CompiledProgram::new()
         }
-        .execution_time()
+        .execution_time(&with_game_state(|game_state| game_state.upgrades.clone()))
     }
 
     fn assert_close(actual: Duration, expected_secs: f64) {

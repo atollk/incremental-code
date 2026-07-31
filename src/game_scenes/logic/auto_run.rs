@@ -1,5 +1,5 @@
 use crate::game_scenes::base::TickerMut;
-use crate::game_state::{Resources, with_game_state, with_game_state_mut};
+use crate::game_state::{Resources, with_game_state_mut};
 use crate::global_variable;
 use std::time::Duration;
 
@@ -41,14 +41,13 @@ impl AutoRunner {
     }
 
     pub(crate) fn reset(&mut self) {
-        // Start the "run"
-        (self.run_duration, self.resource_gain) = with_game_state(|game_state| {
-            if let Some(Ok(program)) = &game_state.compiled_program {
-                (Some(program.execution_time()), program.resource_gain())
-            } else {
-                (None, Resources::zero())
-            }
-        });
+        let program_stats =
+            with_game_state_mut(|game_state| game_state.get_or_compute_program_stats());
+        (self.run_duration, self.resource_gain) = if let Some(program_stats) = program_stats {
+            (Some(program_stats.1), program_stats.0)
+        } else {
+            (None, Resources::zero())
+        }
     }
 }
 

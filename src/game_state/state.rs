@@ -36,12 +36,13 @@ pub struct EphemeralGameState {
     pub upgrade_tree_selected: Vec<usize>,
     /// Submitted terminal command history, restored on scene re-entry.
     pub terminal_history: Vec<String>,
+    /// Resource gained for one program run
+    pub compiled_program_stats: Option<(Resources, Duration)>,
 }
 
 impl Default for GameState {
     fn default() -> Self {
         let start_code = r#""#;
-        // let start_resources = Resources::new(1e9, 1e9, 1e9, 1e9, 1e9);
         let start_resources = Resources::zero();
         GameState {
             program_code: start_code.to_string(),
@@ -173,6 +174,7 @@ impl GameState {
             self.program_code = String::new();
         }
         self.compiled_program = None;
+        self.ephemeral.compiled_program_stats = None;
         self.on_upgrades_commit();
     }
 
@@ -195,6 +197,9 @@ impl GameState {
             self.compiled_program = None;
         }
 
+        // Reset the program stats cache
+        self.ephemeral.compiled_program_stats = None;
+
         // Update the auto runner
         let auto_run_duration = self.upgrades.auto_run.value();
         with_auto_run_mut(|auto_run| {
@@ -209,6 +214,17 @@ impl GameState {
         if self.upgrades.win_condition.value() {
             todo!()
         }
+    }
+
+    pub(crate) fn get_or_compute_program_stats(&mut self) -> Option<(Resources, Duration)> {
+        let stats = &mut self.ephemeral.compiled_program_stats;
+        if stats.is_none() {
+            let compiled_program = self.compiled_program.as_ref()?.as_ref().ok()?;
+            let resources = compiled_program.resource_gain(&self.upgrades);
+            let duration = compiled_program.execution_time(&self.upgrades);
+            *stats = Some((resources, duration));
+        }
+        stats.clone()
     }
 }
 

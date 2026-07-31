@@ -43,44 +43,40 @@ fn run_cmd_without_auto_compile() -> Box<dyn RunningCommand<SceneSwitch>> {
 }
 
 fn run_cmd_inner() -> Box<dyn RunningCommand<SceneSwitch>> {
-    let compiled_program = with_game_state(|game_state| game_state.compiled_program.clone());
-    if let Some(compiled_program) = compiled_program {
-        match compiled_program {
-            Ok(compiled_program) => {
-                let execution_time = compiled_program.execution_time();
-                // Successful run
-                Box::new(ChainCmd::new(
-                    Box::new(RunCmd::new(execution_time)),
-                    Box::new(move |run_cmd: &RunCmd| {
-                        if run_cmd.was_cancelled() {
-                            return Box::new(ParagraphCmd::new(Paragraph::new(Text::from(
-                                "Run cancelled.",
-                            ))));
-                        }
-                        let resource_gain = compiled_program.resource_gain();
-                        with_game_state_mut(|game_state| {
-                            game_state.current_resources += resource_gain.clone()
-                        });
-                        let text = Text::from(format!("Gained {}", resource_gain.fmt_oneline()));
-                        Box::new(ParagraphCmd::new(Paragraph::new(text)))
-                    }),
-                    false,
-                ))
-            }
-            Err((err, exec_duration)) => {
-                // Display error
-                Box::new(ChainCmd::new(
-                    Box::new(RunCmd::new(exec_duration)),
-                    Box::new(move |_| Box::new(ParagraphCmd::new(Paragraph::new(Text::from(err))))),
-                    false,
-                ))
-            }
-        }
+    let program_stats = with_game_state_mut(|game_state| game_state.get_or_compute_program_stats());
+    if let Some((resource_gain, execution_time)) = program_stats {
+        // Successful run
+        Box::new(ChainCmd::new(
+            Box::new(RunCmd::new(execution_time)),
+            Box::new(move |run_cmd: &RunCmd| {
+                if run_cmd.was_cancelled() {
+                    return Box::new(ParagraphCmd::new(Paragraph::new(Text::from(
+                        "Run cancelled.",
+                    ))));
+                }
+                with_game_state_mut(|game_state| {
+                    game_state.current_resources += resource_gain.clone();
+                    let text = Text::from(format!("Gained {}", resource_gain.fmt_oneline()));
+                    Box::new(ParagraphCmd::new(Paragraph::new(text)))
+                })
+            }),
+            false,
+        ))
     } else {
-        // Not compiled yet
-        Box::new(ParagraphCmd::new(Paragraph::new(Text::from(
-            "The current code has not been compiled yet.",
-        ))))
+        let compiled_program = with_game_state(|game_state| game_state.compiled_program.clone());
+        if let Some(Err((err, exec_duration))) = compiled_program {
+            // Display error
+            Box::new(ChainCmd::new(
+                Box::new(RunCmd::new(exec_duration)),
+                Box::new(move |_| Box::new(ParagraphCmd::new(Paragraph::new(Text::from(err))))),
+                false,
+            ))
+        } else {
+            // Not compiled yet
+            Box::new(ParagraphCmd::new(Paragraph::new(Text::from(
+                "The current code has not been compiled yet.",
+            ))))
+        }
     }
 }
 

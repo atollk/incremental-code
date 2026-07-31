@@ -257,7 +257,7 @@ fn compile_code(
                     instruction_counts: compiling_program.program.instruction_counts,
                     ..CompiledProgram::new()
                 }
-                .execution_time(),
+                .execution_time(&with_game_state(|game_state| game_state.upgrades.clone())),
             )),
         })
     }
@@ -319,6 +319,7 @@ pub mod compile_thread {
                 Ok(compile_result) => {
                     with_game_state_mut(|game_state| {
                         game_state.compiled_program = Some(compile_result);
+                        game_state.ephemeral.compiled_program_stats = None;
                         game_state.is_stale = false;
                     });
                     Ok(())
