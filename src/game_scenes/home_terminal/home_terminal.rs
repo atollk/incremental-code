@@ -2,7 +2,7 @@ use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::Scene;
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_scenes::home_terminal::commands::{command_list, unknown_cmd};
+use crate::game_scenes::home_terminal::commands::{CommandListItem, command_list, unknown_cmd};
 use crate::game_state::{with_game_state, with_game_state_mut};
 use crate::widgets::hud::draw_hud;
 use crate::widgets::terminal::{RunningCommand, TerminalWidget};
@@ -36,7 +36,18 @@ impl HomeTerminalScene {
 
     fn handle_terminal_command(&self, cmd: &str) -> Box<dyn RunningCommand<SceneSwitch>> {
         let commands = command_list();
-        if let Ok(cmd) = commands.iter().filter(|c| c.name == cmd).exactly_one() {
+        if let Ok(cmd) = commands
+            .into_iter()
+            .filter_map(|c| {
+                if let CommandListItem::Command(c) = c {
+                    Some(c)
+                } else {
+                    None
+                }
+            })
+            .filter(|c| c.name == cmd)
+            .exactly_one()
+        {
             (cmd.runner)(self)
         } else {
             unknown_cmd(cmd.to_owned())
@@ -52,6 +63,13 @@ impl HomeTerminalScene {
             .get_or_insert_with(|| (self.terminal_widget.input.clone(), 0));
         let completion_candidates = command_list()
             .iter()
+            .filter_map(|c| {
+                if let CommandListItem::Command(c) = c {
+                    Some(c)
+                } else {
+                    None
+                }
+            })
             .map(|cmd| cmd.name)
             .filter(|cmd| cmd.starts_with(&*input))
             .collect_vec();

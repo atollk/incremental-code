@@ -29,6 +29,11 @@ use crate::game_scenes::home_terminal::commands::volume_command::volume_cmd;
 use crate::game_state::with_game_state;
 pub use unknown_command::unknown_cmd;
 
+pub enum CommandListItem {
+    Command(Command),
+    Separator,
+}
+
 /// A terminal command entry: its name, help text, and a factory that creates a runner for it.
 pub struct Command {
     pub(crate) name: &'static str,
@@ -37,7 +42,7 @@ pub struct Command {
 }
 
 /// Returns the full list of available terminal commands.
-pub fn command_list() -> Vec<Command> {
+pub fn command_list() -> Vec<CommandListItem> {
     let (unlock_code, unlock_music, unlock_reboot) = with_game_state(|game_state| {
         (
             game_state.upgrades.unlock_code.value(),
@@ -47,63 +52,87 @@ pub fn command_list() -> Vec<Command> {
     });
     let mut commands = Vec::new();
 
-    commands.push(Command {
+    macro_rules! add_cmd {
+        () => {
+            commands.push(CommandListItem::Separator);
+        };
+        ($command:expr) => {
+            commands.push(CommandListItem::Command($command));
+        };
+    }
+
+    add_cmd!(Command {
         name: "help",
         help_description: "Displays this help text",
         runner: |_| help_cmd(),
     });
-    commands.push(Command {
-        name: "save",
-        help_description: "Saves the game. Will be loaded automatically on the next startup.",
-        runner: |_| save_cmd(),
-    });
+
+    add_cmd!();
+
     if unlock_reboot {
-        commands.push(Command {
+        add_cmd!(Command {
             name: "reboot",
             help_description: "Reset all upgrades but gain additional currency",
             runner: |_| reboot_cmd(),
         });
     }
+
+    add_cmd!();
+
     if unlock_code {
-        commands.push(Command {
+        add_cmd!(Command {
             name: "docs",
             help_description: "Explanation of the coding language",
             runner: |scene| docs_cmd(scene.height),
         });
-        commands.push(Command {
+        add_cmd!(Command {
             name: "code",
             help_description: "Opens the code editor to write or modify your program",
             runner: |_| code_cmd(),
         });
-        commands.push(Command {
+        add_cmd!(Command {
             name: "compile",
             help_description: "Compiles the program code to make it executable",
             runner: |_| compile_cmd(),
         });
-        commands.push(Command {
+        add_cmd!(Command {
             name: "run",
             help_description: "Runs the program code after compiling",
             runner: |_| run_cmd(),
         });
     }
-    commands.push(Command {
+
+    add_cmd!();
+
+    add_cmd!(Command {
         name: "upgrades",
         help_description: "Opens the upgrade tree",
         runner: |_| upgrades_cmd(),
     });
+
+    add_cmd!();
+
     if unlock_music {
-        commands.push(Command {
+        add_cmd!(Command {
             name: "volume",
             help_description: "Control the music volume",
             runner: |_| volume_cmd(),
-        })
+        });
     }
-    commands.push(Command {
+
+    add_cmd!();
+
+    add_cmd!(Command {
+        name: "save",
+        help_description: "Saves the game. Will be loaded automatically on the next startup.",
+        runner: |_| save_cmd(),
+    });
+    add_cmd!(Command {
         name: "reset",
         help_description: "Resets the game, removing any save data",
         runner: |_| reset_cmd(),
     });
-    commands.push(Command {
+    add_cmd!(Command {
         name: "exit",
         help_description: "Exits the game",
         runner: |_| exit_cmd(),

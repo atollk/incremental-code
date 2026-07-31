@@ -67,6 +67,7 @@ fn get_docs_lines() -> Vec<Line<'static>> {
 
     ln!("NotPython is a small programming language.");
     ln!();
+
     ln!("SYNTAX RULES");
     ln!("  Simple statements end with ;");
     ln!("  Block headers (if, loop, def) end with :");
@@ -89,6 +90,7 @@ fn get_docs_lines() -> Vec<Line<'static>> {
     ln!("  {\"k\": \"v\"}      dict");
     ln!();
     ln!("OPERATORS");
+    // TODO: only show mult and div if unlocked
     ln!("  + - * / %         arithmetic");
     ln!("  == != < > <= >=   comparison");
     ln!("  and  or  not      boolean");
@@ -103,6 +105,7 @@ fn get_docs_lines() -> Vec<Line<'static>> {
     ln!("    pass;");
     ln!("  end");
     ln!();
+
     if allows_loops {
         ln!("LOOPS");
         ln!("  loop:");
@@ -130,7 +133,7 @@ fn get_docs_lines() -> Vec<Line<'static>> {
             ln!("  def pure add(a, b):");
             ln!("    return a + b;");
             ln!("  end");
-            ln!("  Caches the result per input (memoization).");
+            ln!("  Caches the result per input for faster compile and run times.");
             ln!("  May only access its own local variables, not outer-scope ones.");
         }
 
@@ -142,20 +145,20 @@ fn get_docs_lines() -> Vec<Line<'static>> {
         });
     }
 
-    if unlock_print {
-        ln!();
-        ln!("BUILT-IN: print");
-        ln!("  print(value)");
-        ln!("  Converts value to a string and displays it.");
-        ln!("  Earns silver proportional to the number of characters.");
-    }
-
     if unlock_sleep {
         ln!();
         ln!("BUILT-IN: sleep");
         ln!("  sleep(seconds)");
         ln!("  Pauses execution for the given duration.");
-        ln!("  Earns gold proportional to the sleep time.");
+        ln!("  Earns silver proportional to the sleep time.");
+    }
+
+    if unlock_print {
+        ln!();
+        ln!("BUILT-IN: print");
+        ln!("  print(value)");
+        ln!("  Converts value to a string and displays it.");
+        ln!("  Earns gold proportional to the number of characters.");
     }
 
     if unlock_brk {
