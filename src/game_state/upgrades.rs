@@ -892,5 +892,5 @@ impl_upgrade!(
     type=bool,
     level=6,
     values=[(false, "not won"), (true, "won")],
-    costs=[[Resources::inf()]]
+    costs=[[Resources::new(1e270, 100e135, 10e45, 100e12, 100e3)]]
 );

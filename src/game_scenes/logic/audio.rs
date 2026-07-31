@@ -96,13 +96,16 @@ impl Default for AudioBackend {
     }
 }
 
+fn silence_between_songs() -> Duration {
+    Duration::from_secs(random_range(5..10))
+}
+
 impl TickerMut for AudioBackend {
     fn tick(&mut self, elapsed: Duration) {
         let Some(inner) = &mut self.inner else { return };
         match (inner.player.empty(), inner.bgm_silence) {
             (true, None) => {
-                let silence = Duration::from_secs(random_range(10..20));
-                inner.bgm_silence = Some(silence);
+                inner.bgm_silence = Some(silence_between_songs());
             }
             (false, None) => {}
             (true, Some(_)) => {
