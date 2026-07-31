@@ -32,9 +32,6 @@ pub(super) fn compile_cmd() -> Box<dyn RunningCommand<SceneSwitch>> {
                 } else {
                     Paragraph::new("Compilation successful.")
                 };
-                with_game_state(|game_state| {
-                    log::info!("Compiled program: {:?}", game_state.compiled_program)
-                });
                 with_auto_run_mut(|auto_run| {
                     auto_run.reset();
                 });

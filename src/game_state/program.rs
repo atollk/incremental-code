@@ -1,6 +1,8 @@
 use crate::game_state::{Resources, with_game_state};
+use cached::cached;
 use itertools::Itertools;
 use language::{CompileError, CompileResult, CompilingMetadata};
+use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -106,15 +108,19 @@ impl CompiledProgram {
                 // Compute the time taken for just the instructions by considering
                 // speedup effects and the min duration limit.
                 let sleep_cycle_duration = if min_duration_reached {
-                    let before_min = hurwitz(min_duration_reached_at, instruction_speed_exp)
-                        * (speed)
+                    let before_min = cached_hurwitz(
+                        min_duration_reached_at.into(),
+                        instruction_speed_exp.into(),
+                    ) * (speed)
                         * (instruction_speed_const)
                         / b_pow_k;
                     let after_min =
                         (sleep_split - min_duration_reached_at) * upgrades.min_instruction_duration;
                     before_min + after_min
                 } else {
-                    hurwitz(sleep_split, instruction_speed_exp) * speed * instruction_speed_const
+                    cached_hurwitz(sleep_split.into(), instruction_speed_exp.into())
+                        * speed
+                        * instruction_speed_const
                         / b_pow_k
                 };
                 instructions_duration_sum += sleep_cycle_duration;
@@ -170,11 +176,11 @@ impl CompiledProgram {
             .iter()
             .map(|brk_set| brk_set.iter().map(|i| *i as f64).sum())
             .collect_vec();
-        let total_instruction_count = instruction_counts_between_brk.iter().sum();
+        let total_instruction_count: f64 = instruction_counts_between_brk.iter().sum();
         // Bronze is awarded based on the total number of instructions run.
-        let bronze: f64 = hurwitz(
-            total_instruction_count,
-            upgrades.bronze_per_instruction.1 as f64,
+        let bronze: f64 = cached_hurwitz(
+            total_instruction_count.into(),
+            (upgrades.bronze_per_instruction.1 as f64).into(),
         ) * upgrades.bronze_per_instruction.0 as f64;
         // Silver is awarded based on the total sleep duration.
         let silver: f64 = self
@@ -208,6 +214,11 @@ impl CompiledProgram {
 
         Resources::new(bronze, silver, gold, diamond, 0.) + self.gain_resources.clone()
     }
+}
+
+#[cached(max_size = 100)]
+fn cached_hurwitz(n: OrderedFloat<f64>, k: OrderedFloat<f64>) -> f64 {
+    hurwitz(n.0, k.0)
 }
 
 // Approximates \sum_{i=1}^n i^k

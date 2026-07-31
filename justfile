@@ -20,6 +20,16 @@ clippy-all:
 test:
     cargo test --workspace --features tui
 
+profile-opengl:
+    #!/usr/bin/env bash
+    set -x
+    cargo build --profile profiling --features opengl
+    BIN_PATH="./target/profiling/incremental-code"
+    if [[ $(uname -a) == *"Linux"* ]]; then
+      echo '-1' | sudo tee /proc/sys/kernel/perf_event_paranoid
+    fi
+    cargo bin samply record "$BIN_PATH"
+
 bench_test:
     #!/usr/bin/env bash
     set -x

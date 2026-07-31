@@ -1,2 +1,2 @@
 - victory screen implementieren
-- bug: auto run should restart on compile
+- bug: cancelling 'compile' displays a success message

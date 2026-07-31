@@ -22,7 +22,7 @@ impl Default for StoreNative {
 impl StorageBackend for StoreNative {
     fn save<T: Serialize>(&self, key: &str, data: &T) -> anyhow::Result<()> {
         let path = self.directory.join(format!("{key}.json"));
-        let json = serde_json::to_string_pretty(data)?;
+        let json = serde_json::to_string(data)?;
         std::fs::create_dir_all(path.parent().unwrap())?;
         std::fs::write(&path, json)?;
         log::info!(
