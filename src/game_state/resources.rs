@@ -160,11 +160,11 @@ impl PartialOrd for Resources {
     }
 }
 
-const BRONZE_SYMBOL: char = '🟤';
-const SILVER_SYMBOL: char = '⚪';
-const GOLD_SYMBOL: char = '🟡';
-const DIAMOND_SYMBOL: char = '💎';
-const STAR_SYMBOL: char = '⭐';
+pub const BRONZE_SYMBOL: char = '🟤';
+pub const SILVER_SYMBOL: char = '⚪';
+pub const GOLD_SYMBOL: char = '🟡';
+pub const DIAMOND_SYMBOL: char = '💎';
+pub const STAR_SYMBOL: char = '⭐';
 
 struct ResourcesFmt<'a> {
     parent: &'a Resources,

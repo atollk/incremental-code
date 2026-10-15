@@ -15,6 +15,7 @@ struct AudioBackendInner {
     sink: MixerDeviceSink,
     player: Player,
     bgm_silence: Option<Duration>,
+    bgm_enabled: bool,
 }
 
 impl AudioBackendInner {
@@ -26,6 +27,7 @@ impl AudioBackendInner {
             sink,
             player,
             bgm_silence: None,
+            bgm_enabled: false,
         })
     }
 }
@@ -50,6 +52,7 @@ impl AudioBackend {
         let Some(inner) = &mut self.inner else {
             return Ok(());
         };
+        inner.bgm_enabled = true;
         with_settings(|settings| inner.player.set_volume(settings.bgm_volume));
         if inner.bgm_silence.is_none() && inner.player.empty() {
             self.start_bgm()?;
@@ -75,6 +78,8 @@ impl AudioBackend {
 
     pub fn stop_bgm(&mut self) {
         let Some(inner) = &mut self.inner else { return };
+        inner.bgm_enabled = false;
+        inner.bgm_silence = None;
         inner.player.clear();
     }
 
@@ -103,6 +108,9 @@ fn silence_between_songs() -> Duration {
 impl TickerMut for AudioBackend {
     fn tick(&mut self, elapsed: Duration) {
         let Some(inner) = &mut self.inner else { return };
+        if !inner.bgm_enabled {
+            return;
+        }
         match (inner.player.empty(), inner.bgm_silence) {
             (true, None) => {
                 inner.bgm_silence = Some(silence_between_songs());

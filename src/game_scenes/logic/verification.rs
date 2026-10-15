@@ -49,6 +49,16 @@ pub fn verify_unlocks(source: &str, parsed_program: &NotPythonProgram) -> anyhow
     )
 }
 
+/// Number of decimal places float literals may have, given the integer limit:
+/// unlocking integers up to 10^n also unlocks floats with precision 10^-n.
+/// `None` means float literals are not unlocked yet.
+pub fn float_decimals(max_int: i64) -> Option<u32> {
+    if max_int < 10 {
+        return None;
+    }
+    Some((max_int.ilog10()).min(2))
+}
+
 fn verify_expr(
     expr: &NotPythonExpr,
     strings_allowed: bool,
@@ -75,10 +85,19 @@ fn verify_expr(
                 bail!("String literals are not unlocked yet");
             }
         }
-        NotPythonExpr::Float(_)
-        | NotPythonExpr::Boolean(_)
-        | NotPythonExpr::None
-        | NotPythonExpr::Variable(_) => {}
+        NotPythonExpr::Float(f) => {
+            let Some(decimals) = float_decimals(max_int) else {
+                bail!("Float literals are not unlocked yet");
+            };
+            let scale = 10f64.powi(decimals as i32);
+            if (f * scale - (f * scale).round()).abs() > 1e-9 * scale.max(1.0) {
+                bail!("Float literal {f} exceeds allowed precision of 10^-{decimals}");
+            }
+            if f.abs() > max_int as f64 {
+                bail!("Float literal {f} exceeds max allowed value of {max_int}");
+            }
+        }
+        NotPythonExpr::Boolean(_) | NotPythonExpr::None | NotPythonExpr::Variable(_) => {}
         NotPythonExpr::List(elems) => {
             for e in elems {
                 verify_expr(e, strings_allowed, max_int, level)?;
@@ -322,6 +341,31 @@ mod tests {
             let parsed = language::parse_program(source).unwrap();
             assert!(verify_unlocks(source, &parsed).is_err());
         });
+    }
+
+    fn float_ok(literals_level: u8, source: &str) -> bool {
+        with_levels(literals_level, 3, || {
+            let parsed = language::parse_program(source).unwrap();
+            verify_unlocks(source, &parsed).is_ok()
+        })
+    }
+
+    #[test]
+    fn float_decimals_follow_integer_limit() {
+        assert_eq!(float_decimals(5), None);
+        assert_eq!(float_decimals(10), Some(1));
+        assert_eq!(float_decimals(100), Some(2));
+        assert_eq!(float_decimals(255), Some(2));
+    }
+
+    #[test]
+    #[serial]
+    fn floats_unlock_with_integer_limit() {
+        assert!(!float_ok(2, "x := 0.5;\n")); // max_int 5
+        assert!(float_ok(3, "x := 0.5;\n")); // max_int 10: 1 decimal
+        assert!(!float_ok(3, "x := 0.25;\n"));
+        assert!(float_ok(5, "x := 0.25;\n")); // max_int 100: 2 decimals
+        assert!(!float_ok(5, "x := 0.125;\n"));
     }
 
     #[test]
