@@ -1,0 +1,94 @@
+version: '3'
+
+tasks:
+  check-tui:
+    cmds:
+      - cargo check --workspace --features tui
+
+  check-ratzilla:
+    cmds:
+      - cargo check --workspace --features ratzilla --target wasm32-unknown-unknown
+
+  check-all:
+    cmds:
+      - cargo check --workspace --features tui
+      - cargo check --workspace --features opengl
+      - cargo check --workspace --features ratzilla --target wasm32-unknown-unknown
+
+  clippy:
+    cmds:
+      - cargo clippy --workspace --fix --features tui -- -D warnings
+
+  clippy-all:
+    cmds:
+      - cargo clippy --workspace --fix --features tui -- -D warnings
+      - cargo clippy --workspace --fix --features opengl --allow-dirty -- -D warnings
+      - cargo clippy --workspace --fix --features ratzilla --target wasm32-unknown-unknown --allow-dirty -- -D warnings
+
+  test:
+    cmds:
+      - cargo test --workspace --features tui
+
+  profile-opengl:
+    cmds:
+      - cargo build --profile profiling --features opengl
+      - |
+        if [[ $(uname -a) == *"Linux"* ]]; then
+          echo '-1' | sudo tee /proc/sys/kernel/perf_event_paranoid
+        fi
+      - cargo bin samply record ./target/profiling/busy-incremental-beaver
+
+  bench_test:
+    env:
+      TEST_NAME: stage_e_has_print_len
+    cmds:
+      - |
+        BUILD_OUTPUT=$(cargo test --profile profiling --features tui --no-run 2>&1)
+        BIN_PATH=$(echo "$BUILD_OUTPUT" | sed -n 's/.*(\(.*\))/\1/p' | tail -n1)
+        if [[ $(uname -a) == *"Linux"* ]]; then
+          echo '-1' | sudo tee /proc/sys/kernel/perf_event_paranoid
+        fi
+        cargo bin samply record "$BIN_PATH" "$TEST_NAME"
+
+  build-all:
+    deps: [build-tui, build-opengl, build-ratzilla, build-egui-desktop, build-egui-web]
+
+  build-tui:
+    cmds:
+      - cargo build --features tui
+
+  run-tui:
+    cmds:
+      - cargo run --features tui
+
+  build-opengl:
+    cmds:
+      - cargo build --features opengl
+
+  run-opengl:
+    cmds:
+      - cargo run --features opengl
+
+  build-ratzilla:
+    cmds:
+      - cargo bin trunk build --features ratzilla
+
+  run-ratzilla:
+    cmds:
+      - cargo bin trunk serve --features ratzilla
+
+  build-egui-desktop:
+    cmds:
+      - cargo build --features egui-desktop
+
+  run-egui-desktop:
+    cmds:
+      - cargo run --features egui-desktop
+
+  build-egui-web:
+    cmds:
+      - cargo bin trunk build --features egui-web
+
+  run-egui-web:
+    cmds:
+      - cargo bin trunk serve --features egui-web
