@@ -7,9 +7,7 @@ mod upgrades;
 mod settings;
 
 pub use program::CompiledProgram;
-pub use resources::{
-    BRONZE_SYMBOL, DIAMOND_SYMBOL, GOLD_SYMBOL, Resources, SILVER_SYMBOL, STAR_SYMBOL,
-};
+pub use resources::{BRONZE_SYMBOL, Resources};
 pub use save::{
     GLOBAL_AUTO_SAVER, erase_game_state, load_game_state, save_game_state, with_auto_saver_mut,
 };
