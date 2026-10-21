@@ -162,6 +162,12 @@ macro_rules! impl_upgrade {
                 None
             }
 
+            /// The value of the next level, or `None` at max level.
+            #[allow(dead_code)]
+            pub(crate) fn next_value(&self) -> Option<$val> {
+                Self::value_at(self.total_level() + 1)
+            }
+
             pub(crate) fn value(&self) -> $val {
                 Self::value_at(self.total_level()).unwrap_or_else(|| self.fail_oob())
             }
@@ -539,9 +545,9 @@ impl_upgrade!(
         ((false, 1), "0, 1"),
         ((false, 2), "2"),
         ((false, 5), "3, 4, 5"),
-        ((false, 10), "6-10"),
-        ((true, 10), "empty strings"),
-        ((true, 100), "numbers to 100"),
+        ((false, 10), "6-10; 0.1"),
+        ((true, 10), "strings"),
+        ((true, 100), "numbers to 100 and float precision 0.01"),
         ((true, 255), "numbers to 255"),
     ],
     costs=[[

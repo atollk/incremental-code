@@ -56,7 +56,27 @@ fn run_cmd_inner() -> Box<dyn RunningCommand<SceneSwitch>> {
                 }
                 with_game_state_mut(|game_state| {
                     game_state.current_resources += resource_gain.clone();
-                    let text = Text::from(format!("Gained {}", resource_gain.fmt_oneline()));
+                    let mut text = format!("Gained {}", resource_gain.fmt_oneline());
+                    if let Some(Ok(program)) = &game_state.compiled_program {
+                        let instructions: u64 = program.instruction_counts.iter().flatten().sum();
+                        text += &format!("\nInstructions executed: {instructions}");
+                        if game_state.upgrades.unlock_sleep.value() {
+                            let sleep_sum: f64 = program.sleep_calls.iter().sum();
+                            text += &format!("\nTotal sleep: {sleep_sum}s");
+                        }
+                        if game_state.upgrades.unlock_print.value() {
+                            text += &format!(
+                                "\nLongest print: {} chars",
+                                program.print_len.unwrap_or(0.)
+                            );
+                        }
+                        if game_state.upgrades.unlock_brk.value() {
+                            // The instruction counts are split once per brk call.
+                            let brk_count = program.instruction_counts.len().saturating_sub(1);
+                            text += &format!("\nBreakpoints hit: {brk_count}");
+                        }
+                    }
+                    let text = Text::from(text);
                     Box::new(ParagraphCmd::new(Paragraph::new(text)))
                 })
             }),

@@ -1,6 +1,6 @@
 use crate::game_scenes::logic::auto_run::with_auto_run;
 use crate::game_scenes::upgrades::count_buyable;
-use crate::game_state::{with_auto_saver_mut, with_game_state};
+use crate::game_state::{Upgrades, with_auto_saver_mut, with_game_state};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::{Constraint, Layout, Rect};
@@ -14,9 +14,13 @@ use ratatui_widgets::gauge::Gauge;
 pub const HUD_WIDTH: u16 = 22;
 
 /// Renders the HUD panel showing the player's current resource totals.
-pub struct HudWidget;
+pub struct HudWidget<'a> {
+    /// Upgrades to count buyable ones for; defaults to the committed upgrades.
+    /// The shop passes its uncommitted working copy.
+    pub upgrades_override: Option<&'a Upgrades>,
+}
 
-impl Widget for HudWidget {
+impl Widget for HudWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let text_lines = {
             let mut lines: Vec<String> = Vec::new();
@@ -32,7 +36,7 @@ impl Widget for HudWidget {
             // Buyable upgrades
             let buyable = with_game_state(|s| {
                 let resources = s.total_resources();
-                count_buyable(&s.upgrades, &resources)
+                count_buyable(self.upgrades_override.unwrap_or(&s.upgrades), &resources)
             });
             lines.push(format!("Buyable upgrades: {buyable}"));
             lines.push("".to_string());
@@ -89,13 +93,13 @@ impl Widget for HudWidget {
 /// Renders the [`HudWidget`] on the left side of the frame and returns the remaining content area.
 ///
 /// If the frame is narrower than [`HUD_WIDTH`], the full area is returned unchanged.
-pub fn draw_hud(frame: &mut Frame) -> Rect {
+pub fn draw_hud(frame: &mut Frame, upgrades_override: Option<&Upgrades>) -> Rect {
     let full_area = frame.area();
     if full_area.width <= HUD_WIDTH {
         return full_area;
     }
     let [hud_area, content_area] =
         Layout::horizontal([Constraint::Length(HUD_WIDTH), Constraint::Fill(1)]).areas(full_area);
-    frame.render_widget(HudWidget, hud_area);
+    frame.render_widget(HudWidget { upgrades_override }, hud_area);
     content_area
 }

@@ -40,6 +40,14 @@ impl AutoRunner {
         Some((self.since_last_run.as_secs_f64() / deadline.as_secs_f64()).clamp(0.0, 1.0))
     }
 
+    /// Drop the cached run of the previous program; the next tick recomputes it from the
+    /// current program. Unlike [`Self::reset`], this does not access the game state.
+    pub(crate) fn clear_cache(&mut self) {
+        self.run_duration = None;
+        self.resource_gain = Resources::zero();
+        self.since_last_run = Duration::ZERO;
+    }
+
     pub(crate) fn reset(&mut self) {
         let program_stats =
             with_game_state_mut(|game_state| game_state.get_or_compute_program_stats());

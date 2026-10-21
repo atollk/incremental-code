@@ -111,7 +111,7 @@ impl Scene for HomeTerminalScene {
 
         // Draw HUD
         let content_area = if with_game_state(|game_state| game_state.upgrades.unlock_hud.value()) {
-            draw_hud(frame)
+            draw_hud(frame, None)
         } else {
             frame.area()
         };

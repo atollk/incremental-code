@@ -249,7 +249,7 @@ impl CompiledProgram {
             .iter()
             .map(|secs| upgrades.silver_per_sleep_second.value()(*secs))
             .sum();
-        // Gold is awarded based on the last print statement and its argument length.
+        // Gold is awarded based on the longest print argument.
         let gold: f64 = if let Some(print_len) = self.print_len {
             upgrades.gold_print_log_nesting.value()(print_len).max(1.)
         } else {
