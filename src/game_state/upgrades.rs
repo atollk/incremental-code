@@ -95,7 +95,7 @@ macro_rules! impl_upgrade {
         costs=[ $( [ $( $cost:expr ),+ $(,)? ] ),+ $(,)? ]
     ) => {
         #[derive(Debug, Clone, PartialEq, std::hash::Hash, serde::Serialize, serde::Deserialize)]
-        pub(crate) struct $struct(
+        pub struct $struct(
             [u8; { [ $( impl_upgrade!(@unit_track [ $( $cost ),+ ]) ),+ ].len() }]
         );
 
