@@ -40,7 +40,9 @@ impl RebootCmd {
     fn current_text(&self) -> String {
         match self.state {
             RebootState::Asking => {
-                let resource_gain = with_game_state(|game_state| game_state.prestige_currency()).1;
+                let (start, carryover) =
+                    with_game_state(|game_state| game_state.prestige_currency());
+                let resource_gain = start + carryover;
                 format!(
                     "A reboot will reset all your current upgrades and you lose all your current resources.\n\
                     Depending on the amount of resources lost, you restart with different resources.\n\

@@ -203,6 +203,7 @@ impl GameState {
         // Update the auto runner
         let auto_run_duration = self.upgrades.auto_run.value();
         with_auto_run_mut(|auto_run| {
+            auto_run.clear_cache();
             if let Some(auto_run_duration) = auto_run_duration {
                 auto_run.set_period(auto_run_duration);
             } else {

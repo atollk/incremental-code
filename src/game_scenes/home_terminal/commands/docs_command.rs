@@ -17,16 +17,30 @@ pub(super) fn docs_cmd(height: u16) -> Box<dyn RunningCommand<SceneSwitch>> {
 }
 
 fn get_docs_lines() -> Vec<Line<'static>> {
-    let (unlock_print, unlock_sleep, unlock_brk, statements, (strings_allowed, max_int)) =
-        with_game_state(|gs| {
-            (
-                gs.upgrades.unlock_print.value(),
-                gs.upgrades.unlock_sleep.value(),
-                gs.upgrades.unlock_brk.value(),
-                gs.upgrades.statements.value(),
-                gs.upgrades.literals.value(),
-            )
-        });
+    let (
+        unlock_print,
+        unlock_sleep,
+        unlock_brk,
+        statements,
+        (strings_allowed, max_int),
+        bronze_per_instruction,
+        bronze_per_instruction_next_value,
+    ) = with_game_state(|gs| {
+        (
+            gs.upgrades.unlock_print.value(),
+            gs.upgrades.unlock_sleep.value(),
+            gs.upgrades.unlock_brk.value(),
+            gs.upgrades.statements.value(),
+            gs.upgrades.literals.value(),
+            gs.upgrades.bronze_per_instruction.value(),
+            gs.upgrades.bronze_per_instruction.next_value(),
+        )
+    });
+
+    // Explain `n` once the last constant-only level was bought,
+    // i.e. when the next level (or the current one) has an exponent.
+    let bronze_n = bronze_per_instruction.1 > 0.
+        || bronze_per_instruction_next_value.is_some_and(|(_, exponent)| exponent > 0.);
 
     // Mirrors the gating in `verification::verify_stmt`.
     let allows_loops = !matches!(statements, CodeStatementLevels::None);
@@ -92,7 +106,10 @@ fn get_docs_lines() -> Vec<Line<'static>> {
     ln!("  a[0]            index into a list or dict");
     ln!();
     ln!("TYPES");
-    ln!(format!("  -{max_int} to {max_int}       integer"));
+    ln!(format!(
+        "  {:<16}integer",
+        format!("-{max_int} to {max_int}")
+    ));
     match float_decimals(max_int as i64) {
         None => {}
         Some(1) => ln!("  0.1  .5         float (1 decimal)"),
@@ -169,8 +186,17 @@ fn get_docs_lines() -> Vec<Line<'static>> {
         ln!();
         ln!("BUILT-IN: sleep");
         ln!("  sleep(seconds)");
-        ln!("  Pauses execution for the given duration.");
-        ln!("  Earns silver proportional to the sleep time.");
+        ln!("  Pauses execution for the given number of seconds.");
+        ln!("  The wait is scaled by the current instruction speed,");
+        ln!("  so it can be shorter than the argument.");
+        ln!("  Earns silver based on the seconds passed to sleep.");
+        ln!();
+        ln!("  Sleep Speed Reset:");
+        ln!("  Instruction speed can ramp up with the number of");
+        ln!("  instructions run since the last sleep. After each sleep,");
+        ln!("  the speed boost gained so far is raised to the power of");
+        ln!("  the Sleep Speed Reset value: ^0 loses the boost fully,");
+        ln!("  \"none\" keeps all of it.");
     }
 
     if unlock_print {
@@ -178,7 +204,8 @@ fn get_docs_lines() -> Vec<Line<'static>> {
         ln!("BUILT-IN: print");
         ln!("  print(value)");
         ln!("  Converts value to a string and displays it.");
-        ln!("  Earns gold proportional to the number of characters.");
+        ln!("  Earns gold based on the length of the longest string");
+        ln!("  printed during a run; shorter prints do not add up.");
     }
 
     if unlock_brk {
@@ -187,6 +214,15 @@ fn get_docs_lines() -> Vec<Line<'static>> {
         ln!("  brk()");
         ln!("  Triggers a breakpoint, slowing down execution.");
         ln!("  Earns diamond each time a breakpoint is hit.");
+    }
+
+    if bronze_n {
+        ln!();
+        ln!("BRONZE");
+        ln!("  Every executed instruction earns bronze.");
+        ln!("  In the upgrade names, n is the number of instructions");
+        ln!("  executed in the run: \"n ^ 2\" means the bronze earned by");
+        ln!("  the n-th instruction grows like n squared.");
     }
 
     lines

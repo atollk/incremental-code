@@ -269,7 +269,7 @@ impl<'a> Scene for UpgradesScene<'a> {
 
             let content_area =
                 if with_game_state(|game_state| game_state.upgrades.unlock_hud.value()) {
-                    draw_hud(frame)
+                    draw_hud(frame, Some(&self.upgrades_working_copy))
                 } else {
                     frame.area()
                 };
@@ -286,7 +286,7 @@ impl<'a> Scene for UpgradesScene<'a> {
             self.process_input_event(event)?;
         }
         let content_area = if with_game_state(|game_state| game_state.upgrades.unlock_hud.value()) {
-            draw_hud(frame)
+            draw_hud(frame, Some(&self.upgrades_working_copy))
         } else {
             frame.area()
         };
