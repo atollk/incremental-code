@@ -38,15 +38,16 @@ impl CodeEditorScene {
             .with_max_lines(max_lines as usize);
         CodeEditorScene {
             editor,
-            original_code: code,
+            original_code: code.trim_end_matches('\n').to_string(),
             confirm_dialog: None,
         }
     }
 
     fn save_code(&self) {
-        let content = self.editor.get_content();
+        // the editor pads the buffer with empty lines; don't persist them
+        let content = self.editor.get_content().trim_end_matches('\n').to_string();
         with_game_state_mut(|state| {
-            if state.program_code != content {
+            if state.program_code.trim_end_matches('\n') != content {
                 state.is_stale = true;
             }
             state.program_code = content.clone();
@@ -80,7 +81,7 @@ impl Scene for CodeEditorScene {
             if let Some(dialog) = &self.confirm_dialog {
                 frame.render_widget(dialog, frame.area());
             }
-            dialog_scene_switch?;
+            return dialog_scene_switch;
         }
 
         // Editing mode
@@ -94,7 +95,7 @@ impl Scene for CodeEditorScene {
                         break 'events;
                     }
                     Some(EditorCommand::Exit) => {
-                        if self.editor.get_content() == self.original_code {
+                        if self.editor.get_content().trim_end_matches('\n') == self.original_code {
                             switch = SceneSwitch::SwitchTo(Box::new(HomeTerminalScene::new()));
                         } else {
                             self.confirm_dialog = Some(ConfirmDialog::new(

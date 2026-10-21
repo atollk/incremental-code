@@ -75,6 +75,8 @@ pub struct Code {
     applying_history: bool,
     history: History,
     current_batch: EditBatch,
+    /// When set, the buffer is always padded with trailing empty lines up to this many lines.
+    max_lines: Option<usize>,
     change_callback: Option<Box<dyn Fn(Vec<(usize, usize, usize, usize, String)>)>>,
 }
 
@@ -87,7 +89,40 @@ impl Code {
             applying_history: true,
             history: History::new(1000),
             current_batch: EditBatch::new(),
+            max_lines: None,
             change_callback: None,
+        }
+    }
+
+    /// Sets the line limit and immediately pads the buffer (without recording history).
+    pub fn set_max_lines(&mut self, max: Option<usize>) {
+        self.max_lines = max;
+        self.normalize_lines();
+        self.tx();
+    }
+
+    /// Returns the number of consecutive empty lines at the end of the buffer.
+    pub fn trailing_empty_lines(&self) -> usize {
+        let mut count = 0;
+        let mut idx = self.content.len_chars();
+        while idx > 0 && self.content.char(idx - 1) == '\n' {
+            count += 1;
+            idx -= 1;
+        }
+        count
+    }
+
+    /// Keeps the buffer at exactly `max_lines` lines: strips surplus trailing empty
+    /// lines and pads with empty lines. Non-empty lines are never removed.
+    fn normalize_lines(&mut self) {
+        let Some(max) = self.max_lines else { return };
+        while self.len_lines() > max && self.trailing_empty_lines() > 0 {
+            let len = self.len_chars();
+            self.remove(len - 1, len);
+        }
+        while self.len_lines() < max {
+            let len = self.len_chars();
+            self.insert(len, "\n");
         }
     }
 
@@ -197,6 +232,7 @@ impl Code {
 
     /// Commits the current transaction to the undo history if it contains any edits.
     pub fn commit(&mut self) {
+        self.normalize_lines();
         if !self.current_batch.edits.is_empty() {
             self.notify_changes(&self.current_batch.edits);
             self.history.push(self.current_batch.clone());

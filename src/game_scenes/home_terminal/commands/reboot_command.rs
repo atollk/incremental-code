@@ -44,7 +44,10 @@ impl RebootCmd {
                     with_game_state(|game_state| game_state.prestige_currency());
                 let resource_gain = start + carryover;
                 format!(
-                    "This will reset all upgrades but give additional resources.\nWith your current resources, you will restart with {}\nReboot?  [y/N]",
+                    "A reboot will reset all your current upgrades and you lose all your current resources.\n\
+                    Depending on the amount of resources lost, you restart with different resources.\n\
+                    If you reboot now, you will restart with: {}\n\
+                    Reboot?  [y/N]",
                     resource_gain.fmt_oneline()
                 )
             }

@@ -1,7 +1,8 @@
 use crate::backend::events::Event;
 use crate::backend::input::{KeyCode, KeyEventKind};
 use crate::game_scenes::base::SceneSwitch;
-use crate::game_state::{CodeStatementLevels, with_game_state};
+use crate::game_scenes::logic::verification::float_decimals;
+use crate::game_state::{BRONZE_SYMBOL, CodeStatementLevels, with_game_state};
 use crate::widgets::terminal::RunningCommand;
 use ratatui_core::buffer::Buffer;
 use ratatui_core::layout::Rect;
@@ -94,6 +95,11 @@ fn get_docs_lines() -> Vec<Line<'static>> {
     ln!("  Block headers (if, loop, def) end with :");
     ln!("  Blocks close with end");
     ln!();
+    ln!("RESOURCES");
+    ln!(format!(
+        "  Every instruction executed yields {BRONZE_SYMBOL}."
+    ));
+    ln!();
     ln!("VARIABLES");
     ln!("  x := 5;         declare");
     ln!("  x = 10;         reassign");
@@ -104,7 +110,11 @@ fn get_docs_lines() -> Vec<Line<'static>> {
         "  {:<16}integer",
         format!("-{max_int} to {max_int}")
     ));
-    ln!("  3.14  .5        float");
+    match float_decimals(max_int as i64) {
+        None => {}
+        Some(1) => ln!("  0.1  .5         float (1 decimal)"),
+        Some(d) => ln!(format!("  0.25  .5        float ({d} decimals)")),
+    }
     if strings_allowed {
         ln!("  \"hello\"         string");
     }
@@ -227,10 +237,14 @@ struct DocsCommand {
 
 impl DocsCommand {
     fn new(height: u16) -> DocsCommand {
+        let mut lines = get_docs_lines();
+        if lines.len() >= height as usize {
+            lines.push(Line::from("[Up/Down] scroll   [Enter/Esc] close"));
+        }
         DocsCommand {
             scroll_y: Cell::new(0),
             exit: false,
-            lines: get_docs_lines(),
+            lines,
             height,
         }
     }
@@ -238,7 +252,8 @@ impl DocsCommand {
 
 impl RunningCommand<SceneSwitch> for DocsCommand {
     fn is_done(&self) -> bool {
-        self.exit
+        // Everything fits on screen: nothing to scroll, so don't wait for input.
+        self.exit || self.lines.len() < self.height as usize
     }
 
     fn update(&mut self, events: &[Event], _time_delta: Duration) {
@@ -278,7 +293,7 @@ impl RunningCommand<SceneSwitch> for DocsCommand {
     }
 
     fn height(&self, _columns: u16) -> u16 {
-        min(self.height, self.lines.len() as u16) - 1
+        min(self.height.saturating_sub(1), self.lines.len() as u16)
     }
 
     fn get_metadata(&self) -> SceneSwitch {

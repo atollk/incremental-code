@@ -361,7 +361,7 @@ impl Editor {
     }
 
     pub fn with_max_lines(mut self, max: usize) -> Self {
-        self.max_lines = Some(max);
+        self.set_max_lines(Some(max));
         self
     }
 
@@ -372,6 +372,7 @@ impl Editor {
 
     pub fn set_max_lines(&mut self, max: Option<usize>) {
         self.max_lines = max;
+        self.code.set_max_lines(max);
     }
 
     pub fn set_max_line_width(&mut self, max: Option<usize>) {
@@ -413,7 +414,18 @@ impl Editor {
                 0
             };
             let lines_after_removal = current_lines.saturating_sub(freed);
-            max.saturating_sub(lines_after_removal)
+            // Trailing empty lines below the insertion point are padding and
+            // can be consumed by new lines (they get stripped on commit).
+            let del_end = match selection {
+                Some(sel) if !sel.is_empty() => sel.sorted().1,
+                _ => effective_cursor,
+            };
+            let row_end = self.code.point(del_end).0;
+            let free_padding = self
+                .code
+                .trailing_empty_lines()
+                .min(current_lines - 1 - row_end);
+            (max + free_padding).saturating_sub(lines_after_removal)
         });
 
         // Column at which the first segment will be inserted.
@@ -655,5 +667,56 @@ mod tests {
         let selection = Selection::new(2, 2);
         let clamped = editor.clamp_insertion_text(2, Some(selection), "XXXXXXXX");
         assert_eq!(clamped, "XXXXX");
+    }
+
+    fn padded_editor(text: &str, max_lines: usize) -> Editor {
+        Editor::new(plain_text_lang(), text).with_max_lines(max_lines)
+    }
+
+    fn type_newline_at(editor: &mut Editor, cursor: usize) {
+        editor.set_cursor(cursor);
+        editor.apply(DefaultAction::InsertNewline);
+    }
+
+    #[test]
+    fn buffer_is_padded_to_max_lines() {
+        let editor = padded_editor("a\nb", 5);
+        assert_eq!(editor.code.len_lines(), 5);
+        assert_eq!(editor.get_content(), "a\nb\n\n\n");
+    }
+
+    #[test]
+    fn newline_in_middle_consumes_trailing_empty_line() {
+        let mut editor = padded_editor("a\nb\nc", 5);
+        type_newline_at(&mut editor, 1); // after "a"
+        assert_eq!(editor.code.len_lines(), 5);
+        assert_eq!(editor.get_content(), "a\n\nb\nc\n");
+    }
+
+    #[test]
+    fn newline_never_drops_non_empty_lines() {
+        let mut editor = padded_editor("a\nb\nc", 3);
+        type_newline_at(&mut editor, 1);
+        assert_eq!(editor.get_content(), "a\nb\nc");
+    }
+
+    #[test]
+    fn deleting_newline_in_middle_shifts_following_lines_up() {
+        let mut editor = padded_editor("a\nb\nc\nd", 6);
+        // Backspace at start of line "c" (offset 4) joins it with "b".
+        editor.set_cursor(4);
+        editor.apply(DefaultAction::Delete);
+        assert_eq!(editor.code.len_lines(), 6);
+        assert_eq!(editor.get_content(), "a\nbc\nd\n\n\n");
+    }
+
+    #[test]
+    fn undo_restores_padded_state() {
+        let mut editor = padded_editor("a\nb", 4);
+        type_newline_at(&mut editor, 1);
+        assert_eq!(editor.get_content(), "a\n\nb\n");
+        let batch = editor.code.undo().unwrap();
+        let _ = batch;
+        assert_eq!(editor.get_content(), "a\nb\n\n");
     }
 }
